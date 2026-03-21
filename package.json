@@ -1,0 +1,9 @@
+{
+  "name": "dinedesk",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=packages/api",
+    "dev:cms": "npm run dev --workspace=packages/cms"
+  }
+}

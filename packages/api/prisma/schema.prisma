@@ -1,0 +1,179 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  role          String   @default("EDITOR")
+  clientAccess  Json     @default("{}")
+  createdAt     DateTime @default(now())
+}
+
+model Group {
+  id      String   @id @default(cuid())
+  name    String
+  color   String   @default("#6366F1")
+  clients Client[]
+}
+
+model Client {
+  id              String           @id @default(cuid())
+  name            String
+  domain          String?
+  status          String           @default("draft")
+  groupId         String?
+  group           Group?           @relation(fields: [groupId], references: [id])
+  locations       Location[]
+  pages           Page[]
+  siteConfig      SiteConfig?
+  deployments     Deployment[]
+  menuCategories  MenuCategory[]
+  menuItems       MenuItem[]
+  specials        Special[]
+  banners         Banner[]
+  formSubmissions FormSubmission[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model SiteConfig {
+  id         String   @id @default(cuid())
+  clientId   String   @unique
+  client     Client   @relation(fields: [clientId], references: [id])
+  settings   Json?
+  netlify    Json?
+  colours    Json?
+  analytics  Json?
+  shortcodes Json?
+  homepage   Json?
+  reviews    Json?
+  booking    Json?
+  notes      Json?
+  header     Json?
+  headerCtas Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+}
+
+model Location {
+  id       String  @id @default(cuid())
+  clientId String
+  client   Client  @relation(fields: [clientId], references: [id])
+  name     String
+  address  String
+  phone    String?
+  hours    Json?
+
+  @@index([clientId])
+}
+
+model MenuCategory {
+  id        String     @id @default(cuid())
+  clientId  String
+  client    Client     @relation(fields: [clientId], references: [id])
+  name      String
+  sortOrder Int        @default(0)
+  items     MenuItem[]
+
+  @@index([clientId])
+}
+
+model MenuItem {
+  id          String        @id @default(cuid())
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id])
+  categoryId  String?
+  category    MenuCategory? @relation(fields: [categoryId], references: [id])
+  name        String
+  description String?
+  price       Float?
+  imageUrl    String?
+  isAvailable Boolean       @default(true)
+  isFeatured  Boolean       @default(false)
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+}
+
+model Special {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  title       String
+  description String?
+  price       Float?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model Page {
+  id       String  @id @default(cuid())
+  clientId String
+  client   Client  @relation(fields: [clientId], references: [id])
+  slug     String
+  title    String
+  content  String?
+  status   String  @default("draft")
+
+  @@index([clientId])
+}
+
+model Banner {
+  id       String  @id @default(cuid())
+  clientId String
+  client   Client  @relation(fields: [clientId], references: [id])
+  text     String
+  isActive Boolean @default(true)
+
+  @@index([clientId])
+}
+
+model Deployment {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  status      String
+  triggeredBy String
+  createdAt   DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model FormSubmission {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  formType  String
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  action     String
+  entity     String
+  entityName String?
+  userId     String?
+  userName   String?
+  clientId   String?
+  clientName String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  @@index([createdAt])
+}
