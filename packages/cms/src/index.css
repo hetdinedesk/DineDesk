@@ -55,15 +55,33 @@ body {
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  text-align: left;
+  border-inline: none;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+
+#root > * {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Reset Vite template heading scale inside the CMS — avoids giant “Home” titles and broken toolbars */
+.cms-app h1,
+.cms-app h2 {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: normal;
+  line-height: inherit;
+  margin: 0;
+  color: inherit;
 }
 
 h1,
@@ -81,6 +99,10 @@ h1 {
     font-size: 36px;
     margin: 20px 0;
   }
+  @media (max-width: 768px) {
+    font-size: 28px;
+    margin: 16px 0;
+  }
 }
 h2 {
   font-size: 24px;
@@ -89,6 +111,9 @@ h2 {
   margin: 0 0 8px;
   @media (max-width: 1024px) {
     font-size: 20px;
+  }
+  @media (max-width: 768px) {
+    font-size: 18px;
   }
 }
 p {

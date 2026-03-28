@@ -9,7 +9,52 @@ import CmsSection    from './pages/CmsSection'
 import ConfigSection from './pages/ConfigSection'
 import DashboardSection from './pages/DashboardSection'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
+
+// ── Unified Layout System ──────────────────────────────────────
+const LAYOUT = {
+  MAX_WIDTH: 1400,
+  DESKTOP_PAD: 32,
+  getSidePadding: () => `max(${LAYOUT.DESKTOP_PAD}px, calc((100vw - ${LAYOUT.MAX_WIDTH}px) / 2))`
+}
+
+/** Horizontal padding matches main content; `row` = toolbar row; `rowWrap` false = single line (site action bar). */
+function Container({ children, fullWidth = false, row = false, fill = false, rowWrap = true }) {
+  const sidePadding = fullWidth ? `${LAYOUT.DESKTOP_PAD}px` : `max(${LAYOUT.DESKTOP_PAD}px, calc((100vw - ${LAYOUT.MAX_WIDTH}px) / 2))`
+  return (
+    <div
+      style={{
+        padding: `0 ${sidePadding}`,
+        width: '100%',
+        boxSizing: 'border-box',
+        minWidth: 0,
+        ...(fill
+          ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
+          : {}),
+        ...(row
+          ? {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+              flexWrap: rowWrap ? 'wrap' : 'nowrap',
+              ...(rowWrap ? { rowGap: 12 } : {}),
+            }
+          : {}),
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 const C = {
   page:'#080C14', panel:'#0E1420', card:'#141C2E', hover:'#1A2540',
   border:'#1E2D4A', border2:'#2A3F63',
@@ -28,6 +73,8 @@ function MainApp() {
   const user = useAuthStore(s => s.user)
   const logout = useAuthStore(s => s.logout)
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isManager = user?.role === 'MANAGER'
+  const canManageAll = isSuperAdmin || isManager
   const [buildMenu,    setBuildMenu]    = useState(false)
   const [deploying,    setDeploying]    = useState(false)
   const [deployStatus, setDeployStatus] = useState(null) // 'success'|'error'|null
@@ -39,68 +86,102 @@ function MainApp() {
   const activeSiteRef = useRef(null)
   activeSiteRef.current = activeSite
 
-  // ── Restore active site on page refresh ──
+  // ── Restore active site and navigation on page refresh ──
   useEffect(() => {
-  const saved = sessionStorage.getItem('dd_active_site')
-  if (saved) {
-    try {
-      const site = JSON.parse(saved)
-      // Always re-fetch fresh client data to get current status
-      fetch(`http://localhost:3001/api/clients/${site.id}`, {
-        headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
-      }).then(r => r.json()).then(fresh => {
-        setActiveSite({ ...site, ...fresh })
-        setSiteNav('config')
-        sessionStorage.setItem('dd_active_site', JSON.stringify({ ...site, ...fresh }))
-      }).catch(() => {
-        setActiveSite(site)
-        setSiteNav('config')
-      })
-    } catch {}
-  }
-}, [])
+    const saved = sessionStorage.getItem('dd_active_site')
+    const savedNav = sessionStorage.getItem('dd_site_nav')
+    if (saved) {
+      try {
+        const site = JSON.parse(saved)
+        const token = localStorage.getItem('dd_token')
+        const h = { Authorization: 'Bearer ' + token }
+
+        Promise.all([
+          fetch(`http://localhost:3001/api/clients/${site.id}`, { headers: h }).then(r => r.json()),
+          fetch(`http://localhost:3001/api/clients/${site.id}/config`, { headers: h }).then(r => r.json()),
+        ]).then(([fresh, cfg]) => {
+          const merged = {
+            ...site, ...fresh,
+            siteType: cfg?.settings?.siteType || 'restaurant',
+            indexing: cfg?.settings?.indexing || 'blocked'
+          }
+          setActiveSite(merged)
+          setSiteNav(savedNav || 'config')
+          sessionStorage.setItem('dd_active_site', JSON.stringify(merged))
+        }).catch(() => {
+          setActiveSite({ ...site, indexing: site.indexing || 'blocked' })
+          setSiteNav(savedNav || 'config')
+        })
+      } catch {}
+    }
+  }, [])
 
   // ── Listen for name updates from ConfigSection ──
   useEffect(() => {
     const handler = (e) => {
-  if (activeSiteRef.current && e.detail?.id === activeSiteRef.current.id) {
-    setActiveSite(prev => ({
-      ...prev,
-      name:   e.detail.name   || prev.name,
-      status: e.detail.status || prev.status,
-    }))
-    const updated = {
-  ...activeSiteRef.current,
-  name:   e.detail.name   || activeSiteRef.current.name,
-  status: e.detail.status || activeSiteRef.current.status,
-}
-activeSiteRef.current = updated
-sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
-  }
-}
+      if (activeSiteRef.current && e.detail?.id === activeSiteRef.current.id) {
+        setActiveSite(prev => ({
+          ...prev,
+          name: e.detail.name || prev.name,
+          status: e.detail.status || prev.status,
+          indexing: e.detail.indexing || prev.indexing,
+        }))
+        const updated = {
+          ...activeSiteRef.current,
+          name: e.detail.name || activeSiteRef.current.name,
+          status: e.detail.status || activeSiteRef.current.status,
+          indexing: e.detail.indexing || activeSiteRef.current.indexing,
+        }
+        activeSiteRef.current = updated
+        sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
+      }
+    }
     window.addEventListener('client-updated', handler)
     return () => window.removeEventListener('client-updated', handler)
   }, [])
 
-  const openSite = (client) => {
-    setActiveSite(client)
-    setSiteNav('config')
-    sessionStorage.setItem('dd_active_site', JSON.stringify(client))
+  // ── Save navigation state when it changes ──
+  useEffect(() => {
+    if (activeSite && siteNav) {
+      sessionStorage.setItem('dd_site_nav', siteNav)
+    }
+  }, [siteNav, activeSite])
+
+  const openSite = async (client) => {
+    setSiteNav('home')
+    try {
+      const token = localStorage.getItem('dd_token')
+      const cfg = await fetch(
+        `http://localhost:3001/api/clients/${client.id}/config`,
+        { headers: { Authorization: 'Bearer ' + token } }
+      ).then(r => r.json())
+      const merged = {
+        ...client,
+        siteType: cfg?.settings?.siteType || 'restaurant',
+        indexing: cfg?.settings?.indexing || 'blocked'
+      }
+      setActiveSite(merged)
+      sessionStorage.setItem('dd_active_site', JSON.stringify(merged))
+    } catch {
+      setActiveSite({ ...client, indexing: 'blocked' })
+      sessionStorage.setItem('dd_active_site', JSON.stringify({ ...client, indexing: 'blocked' }))
+    }
   }
 
   const closeSite = () => {
     setActiveSite(null)
-    setSiteNav('config')
+    setSiteNav('home')
     sessionStorage.removeItem('dd_active_site')
-    setGlobalNav(isSuperAdmin ? 'home' : 'sites')
+    sessionStorage.removeItem('dd_site_nav')
+    setGlobalNav(canManageAll ? 'home' : 'sites')
   }
 
-  const globalNavItems = isSuperAdmin
-    ? [{ key:'home', label:'Home' }, { key:'sites', label:'Sites' }, { key:'users', label:'Users' }]
+  const globalNavItems = canManageAll
+    ? [{ key:'home', label:'Home' }, { key:'sites', label:'Sites' }, ...(isSuperAdmin ? [{ key:'users', label:'Users' }] : [])]
     : [{ key:'sites', label:'My Sites' }]
 
   const getSiteNavItems = (site) => {
-    if (isSuperAdmin || !site) {
+    if (canManageAll || !site) {
       return [
         { key:'items',  label:'Items'  },
         { key:'cms',    label:'CMS'    },
@@ -117,9 +198,9 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:'#080C14',
+  <div style={{ minHeight:'100vh', background:'#080C14',
       fontFamily:"'DM Sans',system-ui,sans-serif", color:'#F1F5FF',
-      display:'flex', flexDirection:'column' }}>
+      display:'flex', flexDirection:'column', width:'100%', overflow:'hidden' }}>
 
         <style>{`
       @keyframes fadeIn {
@@ -131,12 +212,10 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800;900&display=swap" rel="stylesheet"/>
 
       {/* ── Top nav ── */}
-      <div style={{ height:52, background:'#0E1420',
-        borderBottom:'1px solid #1E2D4A', display:'flex',
-        alignItems:'center', justifyContent:'space-between',
-        padding:'0 24px', flexShrink:0 }}>
-
-        <div style={{ display:'flex', alignItems:'center', gap:24 }}>
+        <div style={{ height:52, background:'#0E1420',
+        borderBottom:'1px solid #1E2D4A', flexShrink:0, width:'100%' }}>
+        <Container row>
+        <div style={{ display:'flex', alignItems:'center', gap:24, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
 
           {/* Logo — always goes home */}
           <div
@@ -145,19 +224,9 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
               setGlobalNav('home')
               sessionStorage.removeItem('dd_active_site')
             }}
-            style={{ display:'flex', alignItems:'center', gap:10,
+            style={{ display:'flex', alignItems:'center', gap:6,
               marginRight:8, cursor:'pointer' }}>
-            <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
-              <defs>
-                <linearGradient id="navGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#FFA733"/>
-                  <stop offset="100%" stopColor="#C0310A"/>
-                </linearGradient>
-              </defs>
-              <path d="M8 15 L8 85 L32 85 Q60 85 60 50 Q60 15 32 15 Z M22 30 L30 30 Q44 30 44 50 Q44 70 30 70 L22 70 Z" fill="url(#navGrad)"/>
-              <rect x="16" y="46" width="18" height="8" rx="4" fill="url(#navGrad)"/>
-              <path d="M54 22 L54 78 L72 78 Q94 78 94 50 Q94 22 72 22 Z M66 35 L71 35 Q80 35 80 50 Q80 65 71 65 L66 65 Z" fill="url(#navGrad)"/>
-            </svg>
+            <img src="/logo-icon.png" alt="" style={{ width:32, height:32 }} />
             <span style={{ fontWeight:900, fontSize:15, letterSpacing:'-0.03em' }}>
               <span style={{ color:'#F1F5FF' }}>Dine</span>
               <span style={{ color:'#FF6B2B' }}>Desk</span>
@@ -183,7 +252,7 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
               <button onClick={closeSite}
                 style={{ background:'none', border:'none', cursor:'pointer',
                   color:'#7A8BAD', fontSize:13, fontFamily:'inherit' }}>
-                ← {isSuperAdmin ? 'All Sites' : 'My Sites'}
+                ← {canManageAll ? 'All Sites' : 'My Sites'}
               </button>
               <span style={{ color:'#FF6B2B', fontWeight:700, fontSize:14,
                 maxWidth:200, overflow:'hidden', textOverflow:'ellipsis',
@@ -205,14 +274,13 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
           )}
         </div>
 
-        {/* Right side */}
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink: 0 }}>
           <div style={{ textAlign:'right' }}>
             <div style={{ fontSize:13, color:'#F1F5FF', fontWeight:600 }}>
               {user?.name}
             </div>
             <div style={{ fontSize:11, color:'#445572' }}>
-              {isSuperAdmin ? 'Staff' : 'Client'}
+              {isSuperAdmin ? 'Super Admin' : isManager ? 'Manager' : 'Client'}
             </div>
           </div>
           <div style={{ width:32, height:32, borderRadius:'50%',
@@ -229,26 +297,44 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
             Logout
           </button>
         </div>
+      </Container>
       </div>
 
-      {/* ── Site action bar — shown when a site is open ── */}
-{activeSite && (
-  <div style={{ height:44, background:'#0A0F1A',
+      {/* ── Site action bar — single row, same vertical rhythm as primary header ── */}
+      {activeSite && (
+  <div style={{
+    minHeight: 48,
+    background:'#0A0F1A',
     borderBottom:`1px solid ${C.border}`,
-    display:'flex', alignItems:'center', justifyContent:'space-between',
-    padding:'0 24px', flexShrink:0, position:'relative', zIndex:100 }}>
+    flexShrink:0,
+    position:'relative',
+    zIndex:100,
+    width:'100%',
+    display:'flex',
+    alignItems:'center',
+  }}>
+    <Container row rowWrap={false}>
+    <div style={{ display:'flex', alignItems:'center', gap:12, flex: 1, minWidth: 0, overflow: 'hidden' }}>
 
-    {/* Left — site name + status */}
-    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-      <span style={{ fontSize:13, fontWeight:700, color:'#F1F5FF' }}>
+      <span
+        title={activeSite.name}
+        style={{
+          fontSize:13,
+          fontWeight:700,
+          color:'#F1F5FF',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          minWidth: 0,
+        }}>
         {activeSite.name}
       </span>
       <span style={{ fontSize:11, fontWeight:700,
-        color: activeSite.status === 'live' ? '#22C55E' : '#F59E0B',
-        background: activeSite.status === 'live' ? '#05201080' : '#1A100080',
-        border: `1px solid ${activeSite.status === 'live' ? '#22C55E40' : '#F59E0B40'}`,
+        color: activeSite.status === 'live' && activeSite.indexing === 'allowed' ? '#22C55E' : '#F59E0B',
+        background: activeSite.status === 'live' && activeSite.indexing === 'allowed' ? '#05201080' : '#1A100080',
+        border: `1px solid ${activeSite.status === 'live' && activeSite.indexing === 'allowed' ? '#22C55E40' : '#F59E0B40'}`,
         padding:'2px 8px', borderRadius:4 }}>
-        {activeSite.status === 'live' ? 'Live' : 'Draft'}
+        {activeSite.status === 'live' && activeSite.indexing === 'allowed' ? 'Live' : 'Draft'}
       </span>
       {deployStatus === 'success' && (
         <span style={{ fontSize:11, color:'#22C55E' }}>
@@ -262,21 +348,32 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
       )}
     </div>
 
-    {/* Right — action buttons */}
-    <div style={{ display:'flex', alignItems:'center', gap:8, position:'relative' }}>
+    <div style={{ display:'flex', alignItems:'center', gap:8, position:'relative', flexShrink: 0 }}>
 
-      {/* Preview Site button */}
       <button
+        type="button"
         onClick={() => {
           const previewUrl = `http://localhost:3000?site=${activeSite.id}`
           window.open(previewUrl, '_blank')
         }}
-        style={{ padding:'6px 14px', background:'transparent',
-          border:`1px solid #2A3F63`, borderRadius:6,
-          color:'#7A8BAD', fontSize:12, cursor:'pointer',
-          fontFamily:'inherit', display:'flex', alignItems:'center', gap:6 }}>
+        style={{
+          height: 32,
+          padding:'0 14px',
+          background:'transparent',
+          border:`1px solid #2A3F63`,
+          borderRadius:6,
+          color:'#7A8BAD',
+          fontSize:12,
+          cursor:'pointer',
+          fontFamily:'inherit',
+          display:'inline-flex',
+          alignItems:'center',
+          justifyContent:'center',
+          gap:6,
+          boxSizing:'border-box',
+        }}>
         Preview
-        <span style={{ fontSize:10 }}>↗</span>
+        <span style={{ fontSize:10, lineHeight: 1 }}>↗</span>
       </button>
 
       {/* Start Build hover dropdown */}
@@ -287,6 +384,7 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
 
   {/* Main button — Deploy Live */}
   <button
+    type="button"
     onClick={async () => {
       setDeploying(true)
       setDeployStatus(null)
@@ -305,14 +403,26 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
       }
     }}
     disabled={deploying}
-    style={{ padding:'6px 18px', background: deploying ? '#1F2D4A' : '#FF6B2B',
+    style={{
+      height: 32,
+      padding:'0 18px',
+      background: deploying ? '#1F2D4A' : '#FF6B2B',
       border:`1px solid ${deploying ? '#2A3F63' : '#FF6B2B'}`,
-      borderRadius:7, color:'#fff', fontWeight:700, fontSize:12,
+      borderRadius:7,
+      color:'#fff',
+      fontWeight:700,
+      fontSize:12,
       cursor: deploying ? 'not-allowed' : 'pointer',
-      fontFamily:'inherit', display:'flex', alignItems:'center', gap:6,
-      transition:'all 0.15s' }}>
+      fontFamily:'inherit',
+      display:'inline-flex',
+      alignItems:'center',
+      justifyContent:'center',
+      gap:6,
+      boxSizing:'border-box',
+      transition:'all 0.15s',
+    }}>
     {deploying ? 'Building…' : 'Deploy Live'}
-    <span style={{ fontSize:10, opacity:0.7 }}>▾</span>
+    <span style={{ fontSize:10, opacity:0.7, lineHeight: 1 }}>▾</span>
   </button>
 
   {/* Hover dropdown */}
@@ -380,35 +490,46 @@ sessionStorage.setItem('dd_active_site', JSON.stringify(updated))
     </div>
   )}
 </div>
-    </div>
   </div>
-)}
+</Container>
+  </div>
+      )}
 
       {/* ── Page content ── */}
-      <div style={{ flex:1, overflow:'hidden', display:'flex' }}>
+<Container fill>
+<div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', width:'100%' }}>
 
-        {!activeSite && isSuperAdmin && globalNav === 'home' && (
+
+
+        {!activeSite && canManageAll && globalNav === 'home' && (
           <GlobalHome onOpenSite={openSite} isSuperAdmin={isSuperAdmin} />
         )}
         {!activeSite && isSuperAdmin && globalNav === 'users' && (
           <div style={{ padding:40, color:'#7A8BAD' }}>Users management — coming soon.</div>
         )}
-        {!activeSite && (isSuperAdmin ? globalNav === 'sites' : true) && (
+        {!activeSite && (canManageAll ? globalNav === 'sites' : true) && (
           <SitesList
             onOpenSite={openSite}
-            isSuperAdmin={isSuperAdmin}
+            isSuperAdmin={canManageAll}
             clientAccess={user?.clientAccess || {}}
-            show={isSuperAdmin
+            show={canManageAll
               ? globalNav === 'sites'
               : globalNav === 'sites' || globalNav === 'home'}
           />
         )}
 
-        {activeSite && siteNav === 'items'  && <ItemsSection  clientId={activeSite.id} />}
+        {activeSite && siteNav === 'items' && (
+  <ItemsSection
+    clientId={activeSite.id}
+    siteType={activeSite.siteConfig?.settings?.siteType || 'restaurant'}
+  />
+)}
         {activeSite && siteNav === 'cms'    && <CmsSection    clientId={activeSite.id} />}
         {activeSite && siteNav === 'config' && <ConfigSection clientId={activeSite.id} />}
+        {activeSite && siteNav === 'dashboard' && <DashboardSection clientId={activeSite.id} />}
       </div>
-    </div>
+    </Container>
+  </div>
   )
 }
 
@@ -478,37 +599,65 @@ function GlobalHome({ onOpenSite, isSuperAdmin }) {
   useEffect(() => { loadClients(); loadGroups() }, [])
 
   const addClient = async () => {
-  if (!clientName || !clientDomain) return
+  if (!clientName) return
 
-  // Validate domain — strip http/https if pasted, then check format
-  const rawDomain = clientDomain.trim()
+  // Generate domain from name if not provided
+  const generatedDomain = clientName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .join('-') + '.dinedesk.local'
+
+  const finalDomain = clientDomain.trim()
     .replace(/^https?:\/\//i, '')
     .replace(/\/.*$/, '')
-    .toLowerCase()
+    .toLowerCase() || generatedDomain
 
-  const domainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/
-  if (!domainRegex.test(rawDomain)) {
-    setClientDomainError('Please enter a valid domain e.g. urbaneatsmcl.com.au')
-    return
+  try {
+    const res = await fetch('http://localhost:3001/api/clients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+      body: JSON.stringify({ name: clientName, domain: finalDomain, status: 'draft' })
+    })
+    
+    if (!res.ok) {
+      const error = await res.json()
+      console.error('Failed to add client:', error)
+      alert('Failed to add client: ' + (error.error || 'Unknown error'))
+      return
+    }
+    
+    setClientName(''); setClientDomain(''); setAddingClient(false)
+    loadClients()
+  } catch (err) {
+    console.error('Add client error:', err)
+    alert('Error adding client: ' + err.message)
   }
-
-  setClientDomainError('')
-  await fetch('http://localhost:3001/api/clients', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
-    body: JSON.stringify({ name: clientName, domain: rawDomain, status: 'draft' })
-  })
-  setClientName(''); setClientDomain(''); setAddingClient(false); loadClients()
 }
 
 const addGroup = async () => {
   if (!groupName) return
-  await fetch('http://localhost:3001/api/groups', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
-    body: JSON.stringify({ name: groupName, color: groupColor })
-  })
-  setGroupName(''); setGroupColor('#FF6B2B'); setAddingGroup(false); loadGroups()
+  
+  try {
+    const res = await fetch('http://localhost:3001/api/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+      body: JSON.stringify({ name: groupName, color: groupColor })
+    })
+    
+    if (!res.ok) {
+      const error = await res.json()
+      console.error('Failed to add group:', error)
+      alert('Failed to add group: ' + (error.error || 'Unknown error'))
+      return
+    }
+    
+    setGroupName(''); setGroupColor('#FF6B2B'); setAddingGroup(false)
+    loadGroups()
+  } catch (err) {
+    console.error('Add group error:', err)
+    alert('Error adding group: ' + err.message)
+  }
 }
 
   const saveGroupEdit = async () => {
@@ -570,7 +719,7 @@ const addGroup = async () => {
 
             {/* Modal header */}
             <div style={{ height:4, background: openGroup.color }}/>
-            <div style={{ padding:'20px 24px 0', display:'flex',
+            <div style={{ padding:'20px 32px 0', display:'flex',
               alignItems:'center', justifyContent:'space-between' }}>
               <div style={{ display:'flex', alignItems:'center', gap:12 }}>
                 <div style={{ width:14, height:14, borderRadius:'50%',
@@ -637,7 +786,7 @@ const addGroup = async () => {
             </div>
 
             {/* Sites in this group */}
-            <div style={{ padding:'16px 24px 8px' }}>
+            <div style={{ padding:'16px 32px 8px' }}>
               <div style={{ fontSize:11, fontWeight:700, color:C.t3,
                 textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>
                 Sites in this group
@@ -671,7 +820,7 @@ const addGroup = async () => {
             </div>
 
             {/* Assign sites to group */}
-            <div style={{ padding:'8px 24px 20px' }}>
+            <div style={{ padding:'8px 32px 20px' }}>
               <div style={{ fontSize:11, fontWeight:700, color:C.t3,
                 textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>
                 Assign sites to this group
@@ -709,9 +858,9 @@ const addGroup = async () => {
         </div>
       )}
 
-      {/* ── Search strip ── */}
+      {/* ── Search strip (horizontal padding comes from parent Container) ── */}
       <div style={{ background:C.panel, borderBottom:`1px solid ${C.border}`,
-        padding:'12px 28px', display:'flex', alignItems:'center',
+        padding:'12px 0', display:'flex', alignItems:'center',
         justifyContent:'space-between', flexShrink:0 }}>
         <h1 style={{ margin:0, fontSize:15, fontWeight:800, color:C.t0 }}>Home</h1>
         <div style={{ position:'relative' }}>
@@ -730,8 +879,8 @@ const addGroup = async () => {
       </div>
 
       {/* ── Metrics ── */}
-      <div style={{ padding:'20px 28px 0' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)',
+      <div style={{ padding:'20px 0 0' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))',
           gap:12, marginBottom:24 }}>
           {metrics.map(({ label, value, icon, color }) => (
             <div key={label} style={{ background:C.panel, border:`1px solid ${C.border}`,
@@ -751,8 +900,8 @@ const addGroup = async () => {
       </div>
 
       {/* ── Two-column layout ── */}
-      <div style={{ padding:'0 28px 40px',
-        display:'grid', gridTemplateColumns:'1fr 360px', gap:20 }}>
+      <div style={{ padding:'0 0 40px',
+        display:'grid', gridTemplateColumns:'minmax(0, 1fr) minmax(280px, 360px)', gap:20 }}>
 
         {/* ═══ LEFT — Sites list ═══ */}
         <div>
@@ -777,41 +926,21 @@ const addGroup = async () => {
           {addingClient && (
   <div style={{ background:C.panel, border:`1px solid ${C.border}`,
     borderRadius:10, padding:16, marginBottom:16,
-    display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap' }}>
+    display:'flex', gap:10, alignItems:'flex-end' }}>
     <HomeInp label="Restaurant Name" value={clientName}
       onChange={setClientName} placeholder="e.g. Urban Eats Melbourne"/>
-    <div style={{ flex:1 }}>
-      <label style={{ fontSize:11, fontWeight:700, color:C.t3,
-        textTransform:'uppercase', letterSpacing:'0.06em',
-        display:'block', marginBottom:5 }}>Domain</label>
-      <input value={clientDomain}
-        onChange={e => { setClientDomain(e.target.value); setClientDomainError('') }}
-        placeholder="e.g. urbaneatsmcl.com.au"
-        style={{ width:'100%', padding:'9px 11px', background:C.input,
-          border:`1px solid ${clientDomainError ? '#EF4444' : C.border}`,
-          borderRadius:7, color:C.t0, fontSize:13, fontFamily:'inherit',
-          outline:'none', boxSizing:'border-box' }}
-        onFocus={e => e.target.style.borderColor = clientDomainError ? '#EF4444' : C.acc}
-        onBlur={e => e.target.style.borderColor = clientDomainError ? '#EF4444' : C.border}
-      />
-      {clientDomainError && (
-        <div style={{ fontSize:11, color:'#EF4444', marginTop:4 }}>
-          ⚠️ {clientDomainError}
-        </div>
-      )}
-    </div>
-    <div style={{ display:'flex', gap:8, alignSelf: clientDomainError ? 'center' : 'flex-end' }}>
-      <button onClick={addClient}
-        style={{ padding:'9px 18px', background:C.acc, border:'none',
-          borderRadius:7, color:'#fff', fontWeight:700, fontSize:13,
-          cursor:'pointer', fontFamily:'inherit' }}>Save</button>
-      <button onClick={() => { setAddingClient(false); setClientDomainError('') }}
-        style={{ padding:'9px 14px', background:'transparent',
-          border:`1px solid ${C.border}`, borderRadius:7,
-          color:C.t2, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
-        Cancel
-      </button>
-    </div>
+    <HomeInp label="Domain (optional)" value={clientDomain}
+      onChange={setClientDomain} placeholder="Auto-generated if left blank"/>
+    <button onClick={addClient}
+      style={{ padding:'9px 18px', background:C.acc, border:'none',
+        borderRadius:7, color:'#fff', fontWeight:700, fontSize:13,
+        cursor:'pointer', fontFamily:'inherit' }}>Save</button>
+    <button onClick={() => { setAddingClient(false); setClientDomain('') }}
+      style={{ padding:'9px 14px', background:'transparent',
+        border:`1px solid ${C.border}`, borderRadius:7,
+        color:C.t2, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+      Cancel
+    </button>
   </div>
 )}
 
@@ -1038,14 +1167,40 @@ function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {}, show = true })
   useEffect(() => { reload() }, [])
 
   const add = async () => {
-    if (!name || !domain) return
-    await fetch('http://localhost:3001/api/clients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + localStorage.getItem('dd_token') },
-      body: JSON.stringify({ name, domain, status: 'draft' })
-    })
-    setName(''); setDomain(''); setAdding(false); reload()
+    if (!name) return
+    // Generate domain from name if not provided
+    const generatedDomain = name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .join('-') + '.dinedesk.local'
+    
+    const finalDomain = domain.trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase() || generatedDomain
+    
+    try {
+      const res = await fetch('http://localhost:3001/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + localStorage.getItem('dd_token') },
+        body: JSON.stringify({ name, domain: finalDomain, status: 'draft' })
+      })
+      
+      if (!res.ok) {
+        const error = await res.json()
+        console.error('Failed to add client:', error)
+        alert('Failed to add client: ' + (error.error || 'Unknown error'))
+        return
+      }
+      
+      setName(''); setDomain(''); setAdding(false)
+      reload()
+    } catch (err) {
+      console.error('Add client error:', err)
+      alert('Error adding client: ' + err.message)
+    }
   }
 
   const C2 = {
@@ -1055,7 +1210,7 @@ function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {}, show = true })
   }
 
   return (
-    <div style={{ padding:'32px 40px', overflowY:'auto', flex:1 }}>
+    <div style={{ padding:'32px 0', overflowY:'auto', flex:1, minWidth: 0 }}>
 
       <div style={{ display:'flex', justifyContent:'space-between',
         alignItems:'center', marginBottom:24 }}>
@@ -1082,20 +1237,24 @@ function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {}, show = true })
         <div style={{ background:C2.panel, border:`1px solid ${C2.border}`,
           borderRadius:10, padding:20, marginBottom:20,
           display:'flex', gap:12, alignItems:'flex-end' }}>
-          {[
-            ['Restaurant Name', name,   setName,   'e.g. Urban Eats Melbourne'],
-            ['Domain',          domain, setDomain, 'e.g. urbaneatsmcl.com.au'],
-          ].map(([lbl, val, set, ph]) => (
-            <div key={lbl} style={{ flex:1 }}>
-              <label style={{ fontSize:11, fontWeight:700, color:C2.t3,
-                textTransform:'uppercase', display:'block', marginBottom:5 }}>{lbl}</label>
-              <input value={val} onChange={e => set(e.target.value)} placeholder={ph}
-                style={{ width:'100%', padding:'9px 11px', background:C2.input,
-                  border:`1px solid ${C2.border}`, borderRadius:7, color:C2.t0,
-                  fontSize:13, fontFamily:'inherit', outline:'none',
-                  boxSizing:'border-box' }}/>
-            </div>
-          ))}
+          <div style={{ flex:1 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C2.t3,
+              textTransform:'uppercase', display:'block', marginBottom:5 }}>Restaurant Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Urban Eats Melbourne"
+              style={{ width:'100%', padding:'9px 11px', background:C2.input,
+                border:`1px solid ${C2.border}`, borderRadius:7, color:C2.t0,
+                fontSize:13, fontFamily:'inherit', outline:'none',
+                boxSizing:'border-box' }}/>
+          </div>
+          <div style={{ flex:1 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C2.t3,
+              textTransform:'uppercase', display:'block', marginBottom:5 }}>Domain (optional)</label>
+            <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="Auto-generated if left blank"
+              style={{ width:'100%', padding:'9px 11px', background:C2.input,
+                border:`1px solid ${C2.border}`, borderRadius:7, color:C2.t0,
+                fontSize:13, fontFamily:'inherit', outline:'none',
+                boxSizing:'border-box' }}/>
+          </div>
           <button onClick={add}
             style={{ padding:'9px 20px', background:C2.acc, border:'none',
               borderRadius:7, color:'#fff', fontWeight:700, fontSize:13,
@@ -1180,17 +1339,19 @@ export default function App() {
     else setReady(true)
   }, [])
 
-  if (!ready) return <div style={{ padding:40, color:'#7A8BAD' }}>Loading...</div>
+  if (!ready) return <div className="cms-app" style={{ padding:40, color:'#7A8BAD' }}>Loading...</div>
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-  <Route path="/site-admin/*" element={<SiteAdminApp />} />
-  <Route path="/login" element={<LoginPage />} />
-  <Route path="/*" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
-</Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <div className="cms-app" style={{ width:'100%', flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/site-admin/*" element={<SiteAdminApp />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/*" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </div>
   )
 }
