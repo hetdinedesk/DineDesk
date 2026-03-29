@@ -9,16 +9,17 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  password      String
-  role          String   @default("EDITOR")
-  clientAccess  Json     @default("{}")
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         String   @default("EDITOR")
+  clientAccess Json     @default("{}")
+  createdAt    DateTime @default(now())
 }
 
 model Group {
@@ -37,12 +38,18 @@ model Client {
   group           Group?           @relation(fields: [groupId], references: [id])
   locations       Location[]
   pages           Page[]
+  navigationItems NavigationItem[]
+  homeSections    HomeSection[]
+  alerts          AlertPopup[]
+  paymentGateway  PaymentGateway?
+  legalDocs       LegalDoc[]
   siteConfig      SiteConfig?
   deployments     Deployment[]
   menuCategories  MenuCategory[]
   menuItems       MenuItem[]
   specials        Special[]
   banners         Banner[]
+  footerSections  FooterSection[]
   formSubmissions FormSubmission[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -52,6 +59,7 @@ model SiteConfig {
   id         String   @id @default(cuid())
   clientId   String   @unique
   client     Client   @relation(fields: [clientId], references: [id])
+  version    Int      @default(1)
   settings   Json?
   netlify    Json?
   colours    Json?
@@ -62,21 +70,46 @@ model SiteConfig {
   booking    Json?
   notes      Json?
   header     Json?
+  footer     Json?
   headerCtas Json?
+  social     Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 }
 
 model Location {
-  id       String  @id @default(cuid())
-  clientId String
-  client   Client  @relation(fields: [clientId], references: [id])
-  name     String
-  address  String
-  phone    String?
-  hours    Json?
+  id             String  @id @default(cuid())
+  clientId       String
+  client         Client  @relation(fields: [clientId], references: [id])
+  name           String
+  displayName    String?
+  address        String
+  suburb         String?
+  city           String?
+  state          String?
+  postcode       String?
+  country        String? @default("Australia")
+  phone          String?
+  bookingPhone   String?
+  deliveryPhone  String?
+  lat            String?
+  lng            String?
+  hours          Json?
+  exteriorImage      String?
+  formEmail          String?
+  showInFooter       Boolean  @default(false)
+  alternateStyling   Boolean  @default(false)  
+  galleryImages      Json?    @default("[]")
 
+  isPrimary          Boolean  @default(false)
+
+  isActive           Boolean  @default(true)
+  deliveryZone       Boolean  @default(false)
+  menuCategories     Json[]   @default([])
+
+  // Single primary per client enforced in API routes
   @@index([clientId])
+  @@index([isPrimary])
 }
 
 model MenuCategory {
@@ -108,35 +141,164 @@ model MenuItem {
 }
 
 model Special {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   clientId    String
-  client      Client   @relation(fields: [clientId], references: [id])
+  client      Client    @relation(fields: [clientId], references: [id])
   title       String
   description String?
   price       Float?
   imageUrl    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
-}
-
-model Page {
-  id       String  @id @default(cuid())
-  clientId String
-  client   Client  @relation(fields: [clientId], references: [id])
-  slug     String
-  title    String
-  content  String?
-  status   String  @default("draft")
+  bannerImage String?
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean   @default(true)
+  showInNav   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 
   @@index([clientId])
 }
 
+model Page {
+  id              String           @id @default(cuid())
+  clientId        String
+  client          Client           @relation(fields: [clientId], references: [id])
+  slug            String           @unique
+  title           String
+  content         String?
+  metaTitle       String?
+  metaDesc        String?
+  ogImage         String?
+  status          String           @default("draft")
+  inNavigation    Boolean          @default(false)
+  navOrder        Int              @default(0)
+  parentId        String?
+  parentPage      Page?            @relation("PageChildren", fields: [parentId], references: [id])
+  childPages      Page[]           @relation("PageChildren")
+  navigationItems NavigationItem[] @relation
+  bannerId        String?
+  banner          Banner?          @relation(fields: [bannerId], references: [id], onDelete: SetNull)
+  footerLinks     FooterLink[]
+
+  @@index([clientId])
+  @@index([slug])
+  @@index([bannerId])
+}
+
 model Banner {
+  id         String  @id @default(cuid())
+  clientId   String
+  client     Client  @relation(fields: [clientId], references: [id])
+  title      String?
+  text       String
+  imageUrl   String?
+  buttonText String?
+  buttonUrl  String?
+  isActive   Boolean @default(true)
+  assignTo   Json[]  @default([]) // ["hero", "pages:/about", "specials"]
+  sortOrder  Int     @default(0)
+  widthPx    Int?
+  heightPx   Int?
+  pages      Page[]
+
+  @@index([clientId])
+}
+
+model FooterSection {
+  id        String       @id @default(cuid())
+  clientId  String
+  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int          @default(0)
+  links     FooterLink[]
+
+  @@index([clientId])
+}
+
+model FooterLink {
+  id              String        @id @default(cuid())
+  footerSectionId String
+  footerSection   FooterSection @relation(fields: [footerSectionId], references: [id], onDelete: Cascade)
+  label           String
+  pageId          String?
+  page            Page?         @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  externalUrl     String?
+  sortOrder       Int           @default(0)
+
+  @@index([footerSectionId])
+}
+
+model NavigationItem {
+  id        String           @id @default(cuid())
+  clientId  String
+  client    Client           @relation(fields: [clientId], references: [id])
+  label     String
+  url       String
+  isActive  Boolean          @default(true)
+  sortOrder Int              @default(0)
+  parentId  String?
+  parent    NavigationItem?  @relation("NavChildren", fields: [parentId], references: [id])
+  children  NavigationItem[] @relation("NavChildren")
+  pageId    String?
+  page      Page?            @relation(fields: [pageId], references: [id])
+
+  @@index([clientId])
+  @@index([parentId])
+}
+
+model HomeSection {
+  id         String  @id @default(cuid())
+  clientId   String
+  client     Client  @relation(fields: [clientId], references: [id])
+  type       String // "hero", "featured-menu", "specials", "cta", "reviews"
+  title      String?
+  content    String?
+  imageUrl   String?
+  buttonText String?
+  buttonUrl  String?
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+
+  @@index([clientId])
+  @@index([sortOrder])
+}
+
+model AlertPopup {
+  id            String    @id @default(cuid())
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id])
+  title         String
+  message       String
+  startDate     DateTime?
+  endDate       DateTime?
+  pages         Json[]    @default([]) // ["/", "/menu"]
+  isDismissible Boolean   @default(true)
+  isActive      Boolean   @default(true)
+
+  @@index([clientId])
+}
+
+model PaymentGateway {
+  id       String  @id @default(cuid())
+  clientId String  @unique
+  client   Client  @relation(fields: [clientId], references: [id])
+  provider String // "stripe", "paypal"
+  config   Json // API keys, etc.
+  isActive Boolean @default(false)
+  currency String  @default("AUD")
+  taxRate  Float   @default(0.1)
+
+  @@index([clientId])
+}
+
+model LegalDoc {
   id       String  @id @default(cuid())
   clientId String
   client   Client  @relation(fields: [clientId], references: [id])
-  text     String
+  type     String // "privacy", "terms", "cookies"
+  title    String
+  content  String
+  urlSlug  String?
   isActive Boolean @default(true)
 
   @@index([clientId])
@@ -175,5 +337,6 @@ model ActivityLog {
   clientName String?
   metadata   Json?
   createdAt  DateTime @default(now())
+
   @@index([createdAt])
 }
