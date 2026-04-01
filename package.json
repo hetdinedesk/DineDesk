@@ -4,6 +4,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "dev:api": "npm run dev --workspace=packages/api",
-    "dev:cms": "npm run dev --workspace=packages/cms"
+    "dev:cms": "npm run dev --workspace=packages/cms",
+    "build": "npm install --prefix packages/site-template && npm run build --prefix packages/site-template"
   }
 }
