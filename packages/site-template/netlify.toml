@@ -6,7 +6,7 @@
 
 [build.environment]
   # Set Node.js version
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   # Enable Next.js static export if needed
   # NEXT_PUBLIC_SITE_TEMPLATE = "theme-v1"
 
