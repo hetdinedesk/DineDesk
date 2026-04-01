@@ -1,11 +1,12 @@
 const { log } = require('../lib/activityLog')
 const express  = require('express')
 const bcrypt   = require('bcryptjs')
-const { authenticateToken } = require('../middleware/auth')
-const prisma   = require('../lib/prisma')
+const { authenticateToken, requireRole } = require('../middleware/auth')
+const { prisma } = require('../lib/prisma')
 const router   = express.Router()
 
 router.use(authenticateToken)
+router.use(requireRole('SUPER_ADMIN'))
 
 // GET all users
 router.get('/', async (req, res) => {

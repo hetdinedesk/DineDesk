@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
       }),
       prisma.page.findMany({
         where: { clientId },
-        orderBy: [{ navOrder: 'asc' }, { createdAt: 'desc' }]
+        orderBy: [{ navOrder: 'asc' }]
       }),
       prisma.footerSection.findMany({
         where: { clientId },
@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
       }),
       prisma.banner.findMany({
         where: { clientId },
-        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }]
+        orderBy: [{ sortOrder: 'asc' }]
       })
     ])
 
@@ -102,23 +102,22 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
   const keptIds = new Set()
 
   const upsertRoot = async (h, hi) => {
-    const hUrl =
-      h.url != null && h.url !== ''
-        ? h.url
-        : navUrlFor(h.pageId, '')
+    const hUrl = h.url != null && h.url !== '' ? h.url : navUrlFor(h.pageId, '')
+    const pageId = h.pageId && !isTempId(h.pageId) ? h.pageId : null
     const data = {
       label: String(h.label || '').trim() || 'Menu',
       url: hUrl || '',
       isActive: h.isActive !== false,
       sortOrder: hi,
-      pageId: h.pageId || null
+      pageId,
+      parentId: null
     }
 
     if (!isTempId(h.id)) {
-      const row = await tx.navigationItem.findFirst({
-        where: { id: h.id, clientId, parentId: null }
+      const row = await tx.navigationItem.findUnique({
+        where: { id: h.id }
       })
-      if (row) {
+      if (row && row.clientId === clientId) {
         await tx.navigationItem.update({
           where: { id: h.id },
           data
@@ -127,51 +126,44 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
         return h.id
       }
     }
+
     const created = await tx.navigationItem.create({
-      data: {
-        ...data,
-        clientId,
-        parentId: null
-      }
+      data: { ...data, clientId }
     })
     keptIds.add(created.id)
     return created.id
   }
 
   const upsertChild = async (c, parentId, ci) => {
-    const pg = c.pageId ? pageById.get(c.pageId) : null
+    const pg = c.pageId && !isTempId(c.pageId) ? pageById.get(c.pageId) : null
     const label = String(c.label || '').trim() || (pg ? pg.title : 'Page')
-    const cUrl =
-      c.url != null && c.url !== ''
-        ? c.url
-        : navUrlFor(c.pageId, '')
+    const cUrl = c.url != null && c.url !== '' ? c.url : navUrlFor(c.pageId, '')
+    const pageId = c.pageId && !isTempId(c.pageId) ? c.pageId : null
     const data = {
       label,
       url: cUrl || '',
       isActive: c.isActive !== false,
       sortOrder: ci,
-      pageId: c.pageId || null
+      pageId,
+      parentId
     }
 
     if (!isTempId(c.id)) {
-      const row = await tx.navigationItem.findFirst({
-        where: { id: c.id, clientId }
+      const row = await tx.navigationItem.findUnique({
+        where: { id: c.id }
       })
-      if (row) {
+      if (row && row.clientId === clientId) {
         await tx.navigationItem.update({
           where: { id: c.id },
-          data: { ...data, parentId }
+          data
         })
         keptIds.add(c.id)
         return c.id
       }
     }
+
     const created = await tx.navigationItem.create({
-      data: {
-        ...data,
-        clientId,
-        parentId
-      }
+      data: { ...data, clientId }
     })
     keptIds.add(created.id)
     return created.id
@@ -181,27 +173,27 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
     const h = headerSections[hi]
     const rootId = await upsertRoot(h, hi)
     const children = Array.isArray(h.children) ? h.children : []
-    let ci = 0
-    for (const c of children) {
-      if (!c.pageId) continue
-      await upsertChild(c, rootId, ci)
-      ci++
+    for (let ci = 0; ci < children.length; ci++) {
+      await upsertChild(children[ci], rootId, ci)
     }
   }
 
   const toRemove = existing.filter((e) => !keptIds.has(e.id))
-  const childRemove = toRemove.filter((e) => e.parentId)
-  const rootRemove = toRemove.filter((e) => !e.parentId)
-
-  if (childRemove.length) {
-    await tx.navigationItem.deleteMany({
-      where: { id: { in: childRemove.map((x) => x.id) } }
-    })
-  }
-  if (rootRemove.length) {
-    await tx.navigationItem.deleteMany({
-      where: { id: { in: rootRemove.map((x) => x.id) } }
-    })
+  if (toRemove.length) {
+    // Delete children first, then roots
+    const childrenToRemove = toRemove.filter(e => e.parentId)
+    const rootsToRemove = toRemove.filter(e => !e.parentId)
+    
+    if (childrenToRemove.length) {
+      await tx.navigationItem.deleteMany({
+        where: { id: { in: childrenToRemove.map(x => x.id) } }
+      })
+    }
+    if (rootsToRemove.length) {
+      await tx.navigationItem.deleteMany({
+        where: { id: { in: rootsToRemove.map(x => x.id) } }
+      })
+    }
   }
 }
 
@@ -248,6 +240,13 @@ router.put('/', async (req, res) => {
     const clientId = getClientId(req)
     const { headerSections, footerSections } = req.body
 
+    // Ensure client exists first
+    const clientExists = await prisma.client.findUnique({ where: { id: clientId } })
+    if (!clientExists) {
+      console.error('Client not found during navbar save:', clientId)
+      return res.status(404).json({ error: 'Client not found' })
+    }
+
     await prisma.$transaction(async (tx) => {
       const pages = await tx.page.findMany({ where: { clientId } })
       const pageById = new Map(pages.map((p) => [p.id, p]))
@@ -259,7 +258,7 @@ router.put('/', async (req, res) => {
       if (Array.isArray(footerSections)) {
         await replaceFooterSections(tx, clientId, footerSections)
       }
-    })
+    }, { timeout: 15000 })
 
     const navFlat = await prisma.navigationItem.findMany({
       where: { clientId },

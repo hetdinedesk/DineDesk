@@ -1,4 +1,4 @@
-function buildThemeCSS(colours) {
+export function buildThemeCSS(colours, settings={}) {
   if (!colours) return ''
 
   const c = {
@@ -15,10 +15,31 @@ function buildThemeCSS(colours) {
     accentBg:   colours.accentBg   || '#F7F2EA',
   }
 
+  const fonts = {
+    heading: settings.fontFamily || 'Cormorant Garamond, serif',
+    body:    settings.bodyFont  || 'Inter, sans-serif'
+  }
+
   return `
 :root {
+  --primary:           ${c.primary};
+  --primary-foreground: ${c.ctaText};
+  --secondary:         ${c.secondary};
+  --secondary-foreground: ${c.navText};
+  --accent:            ${c.accentBg};
+  --accent-foreground: ${c.bodyText};
+  --background:        ${c.bodyBg};
+  --foreground:        ${c.bodyText};
+  --card:              ${c.bodyBg};
+  --card-foreground:   ${c.bodyText};
+  --popover:           ${c.bodyBg};
+  --popover-foreground: ${c.bodyText};
+  --border:            rgba(0,0,0,0.1);
+  --input:             ${c.accentBg};
+
   --color-primary:     ${c.primary};
   --color-secondary:   ${c.secondary};
+  --color-accent:      ${c.accentBg};
   --color-header-bg:   ${c.headerBg};
   --color-header-text: ${c.headerText};
   --color-nav-bg:      ${c.navBg};
@@ -28,18 +49,8 @@ function buildThemeCSS(colours) {
   --color-cta-bg:      ${c.ctaBg};
   --color-cta-text:    ${c.ctaText};
   --color-accent-bg:   ${c.accentBg};
+  --font-heading:      ${fonts.heading};
+  --font-body:         ${fonts.body};
 }
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--color-body-bg);
-  color: var(--color-body-text);
-  -webkit-font-smoothing: antialiased;
-}
-a { color: inherit; text-decoration: none; }
-img { display: block; max-width: 100%; }
 `.trim()
 }
-
-module.exports = { buildThemeCSS }

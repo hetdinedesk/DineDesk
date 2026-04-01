@@ -9,32 +9,27 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
+import { C } from '../theme'
 
-const C = {
-  page:'#080C14', panel:'#0E1420', card:'#141C2E',
-  border:'#1E2D4A', border2:'#2A3F63',
-  t0:'#F1F5FF', t1:'#B8C5E0', t2:'#7A8BAD', t3:'#445572',
-  acc:'#FF6B2B', cyan:'#00D4FF', green:'#22C55E', amber:'#F59E0B', input:'#111827'
-}
-
-// Sidebar groups — matching prototype CONFIG_SIDEBAR exactly
+// Sidebar groups — Clean 3-layer structure:
+// General (Site identity) | Design (Visual layer) | Deploy (Publishing)
 const SIDEBAR = [
-  { group:'Restaurant Settings', icon:'', items:[
+  { group:'General', icon:'', items:[
     { key:'site-settings',  label:'Site Settings'  },
-    { key:'site-notes',     label:'Site Notes'     },
-    { key:'analytics',      label:'Analytics'      },
-    { key:'site-branding',  label:'Site Branding'  },
+    { key:'site-branding',  label:'Branding'       },
     { key:'shortcodes',     label:'Shortcodes'     },
+    { key:'site-notes',     label:'Notes'          },
   ]},
-  { group:'Content Settings', icon:'', items:[
-    { key:'themes',         label:'Themes'         },
+  { group:'Design', icon:'', items:[
+    { key:'themes',         label:'Theme'          },
     { key:'header-config',  label:'Header'         },
+    { key:'social-links',   label:'Social Links'   },
     { key:'reviews',        label:'Reviews'        },
     { key:'booking',        label:'Booking'        },
   ]},
-  { group:'Publishing', icon:'', items:[
-    { key:'netlify',        label:'Netlify Setup'  },
-    { key:'deploy',         label:'Deploy'         },
+  { group:'Deploy', icon:'', items:[
+    { key:'analytics',      label:'Analytics'      },
+    { key:'netlify',        label:'Deployment'     },
   ]},
 ]
 
@@ -67,9 +62,130 @@ function SaveBtn({ onClick, saving }) {
 }
 
 export default function ConfigSection({ clientId }) {
-  const [activeKey, setActiveKey] = useState('site-settings')
+  // Restore activeKey from sessionStorage on page refresh
+  const getSavedActiveKey = () => {
+    try {
+      const saved = sessionStorage.getItem(`config_active_${clientId}`)
+      return saved || 'site-settings'
+    } catch {
+      return 'site-settings'
+    }
+  }
+  
+  const [activeKey, setActiveKey] = useState(getSavedActiveKey)
   const [collapsed, setCollapsed] = useState({})
-  const [client,    setClient]    = useState(null)   // ← moved inside
+  const [client,    setClient]    = useState(null)
+  
+  // Centralized draft state to prevent data loss on tab switch
+  // Restore from sessionStorage to survive refreshes
+  const getInitialDrafts = () => {
+    try {
+      const saved = sessionStorage.getItem(`config_drafts_${clientId}`)
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  }
+
+  const [drafts, setDrafts] = useState(getInitialDrafts)
+
+  // Clear specific draft on successful save
+  const clearDraft = (key) => {
+    setDrafts(prev => {
+      const updated = { ...prev }
+      delete updated[key]
+      try {
+        sessionStorage.setItem(`config_drafts_${clientId}`, JSON.stringify(updated))
+      } catch (err) {
+        console.warn('[Config] Failed to clear draft from sessionStorage:', err)
+        // Don't fail silently - notify user
+        if (err.name === 'QuotaExceededError') {
+          console.warn('[Config] SessionStorage quota exceeded - clearing all drafts')
+          try {
+            sessionStorage.removeItem(`config_drafts_${clientId}`)
+          } catch {}
+        }
+      }
+      return updated
+    })
+  }
+
+  // Enhanced draft saving with error handling and recovery
+  const setDraft = (key, data) => {
+    // Sanitize data to prevent circular references and React elements
+    const sanitizedData = JSON.parse(JSON.stringify(data))
+    
+    setDrafts(prev => {
+      const updated = { ...prev, [key]: sanitizedData }
+      try {
+        sessionStorage.setItem(`config_drafts_${clientId}`, JSON.stringify(updated))
+        
+        // Create backup in localStorage for critical data
+        if (key === 'site-settings') {
+          try {
+            localStorage.setItem(`config_backup_${clientId}`, JSON.stringify({
+              timestamp: Date.now(),
+              data: sanitizedData
+            }))
+          } catch (backupErr) {
+            console.warn('[Config] Failed to create backup in localStorage:', backupErr)
+          }
+        }
+      } catch (err) {
+        console.warn('[Config] Failed to save draft to sessionStorage:', err)
+        // Handle quota exceeded by clearing other drafts
+        if (err.name === 'QuotaExceededError') {
+          console.warn('[Config] SessionStorage quota exceeded - clearing other drafts')
+          try {
+            // Keep only current draft, clear others
+            const minimalDraft = { [key]: sanitizedData }
+            sessionStorage.setItem(`config_drafts_${clientId}`, JSON.stringify(minimalDraft))
+            setDrafts(minimalDraft)
+          } catch (quotaErr) {
+            console.warn('[Config] Even minimal draft failed to save:', quotaErr)
+          }
+        }
+      }
+      return updated
+    })
+  }
+
+  // Recovery mechanism for lost drafts
+  const recoverDraft = (key) => {
+    try {
+      // Try sessionStorage first
+      const sessionDrafts = sessionStorage.getItem(`config_drafts_${clientId}`)
+      if (sessionDrafts) {
+        const drafts = JSON.parse(sessionDrafts)
+        if (drafts[key]) {
+          console.log(`[Config] Recovered draft for ${key} from sessionStorage`)
+          return drafts[key]
+        }
+      }
+      
+      // Fallback to localStorage backup for critical data
+      if (key === 'site-settings') {
+        const backup = localStorage.getItem(`config_backup_${clientId}`)
+        if (backup) {
+          const backupData = JSON.parse(backup)
+          console.log(`[Config] Recovered backup for ${key} from localStorage`)
+          return backupData.data
+        }
+      }
+    } catch (err) {
+      console.warn('[Config] Failed to recover draft:', err)
+    }
+    return null
+  }
+
+  // Save activeKey to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`config_active_${clientId}`, activeKey)
+    } catch (err) {
+      console.warn('[Config] Failed to save active tab to sessionStorage:', err)
+    }
+  }, [activeKey, clientId])
 
   useEffect(() => {                                   // ← moved inside
     fetch(`http://localhost:3001/api/clients/${clientId}`, {
@@ -83,21 +199,45 @@ export default function ConfigSection({ clientId }) {
   })
 
   const renderConfig = () => {
-  switch(activeKey) {
-    case 'site-settings':  return <SiteSettings   clientId={clientId} config={config} client={client} />
-    case 'site-notes':     return <SiteNotes       clientId={clientId} config={config} />
-    case 'analytics':      return <AnalyticsConfig clientId={clientId} config={config} />
-    case 'site-branding':  return <BrandingConfig  clientId={clientId} config={config} />
-    case 'shortcodes':     return <ShortcodesConfig clientId={clientId} config={config} client={client} />
-    case 'themes':         return <ThemesConfig    clientId={clientId} config={config} />
-    case 'header-config':  return <HeaderConfig    clientId={clientId} config={config} onNavigate={setActiveKey} />
-    case 'reviews':        return <ReviewsConfig   clientId={clientId} config={config} />
-    case 'booking':        return <BookingConfig   clientId={clientId} config={config} />
-    case 'netlify':        return <NetlifyConfig   clientId={clientId} config={config} />
-    case 'deploy':         return <DeployConfig    clientId={clientId} config={config} />
-    default: return <div style={{color:C.t3}}>Coming soon.</div>
+    try {
+      const common = { clientId, config, draft: drafts[activeKey], setDraft: (d) => setDraft(activeKey, d), clearDraft: clearDraft }
+
+      // Check for unsaved drafts and show warning
+      if (drafts[activeKey] && !config[activeKey.replace('-', '')]) {
+        console.warn(`[Config] Unsaved draft detected for ${activeKey}`)
+      }
+
+      switch(activeKey) {
+        case 'site-settings':  return <SiteSettings   {...common} client={client} />
+        case 'site-notes':     return <SiteNotes       {...common} />
+        case 'analytics':      return <AnalyticsConfig {...common} />
+        case 'site-branding':  return <BrandingConfig  {...common} />
+        case 'shortcodes':     return <ShortcodesConfig {...common} client={client} />
+        case 'themes':         return <ThemesConfig    {...common} />
+        case 'header-config':  return <HeaderConfig    {...common} onNavigate={setActiveKey} />
+        case 'social-links':   return <SocialLinksConfig {...common} />
+        case 'reviews':        return <ReviewsConfig   {...common} />
+        case 'footer':         return <FooterConfig    {...common} />
+        case 'booking':        return <BookingConfig   {...common} />
+        case 'netlify':        return <NetlifyConfig   {...common} />
+        default: return <div style={{color:C.t3}}>Coming soon.</div>
+      }
+    } catch (err) {
+      console.error('Render config error:', err)
+      return (
+        <div style={{ padding:40, background:C.card, borderRadius:12, border:`1px solid ${C.border}` }}>
+          <h3 style={{ color:C.acc, marginBottom:10 }}>Section Error</h3>
+          <p style={{ color:C.t2, fontSize:14 }}>There was an error rendering this section. Try clearing your drafts or refreshing the page.</p>
+          <button 
+            onClick={() => { setDraft(activeKey, null); window.location.reload() }}
+            style={{ marginTop:20, padding:'8px 16px', background:C.acc, color:'#fff', border:'none', borderRadius:6, cursor:'pointer' }}
+          >
+            Reset Section Draft
+          </button>
+        </div>
+      )
+    }
   }
-}
 
   return (
     <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden' }}>
@@ -153,9 +293,24 @@ const COUNTRIES = [
   'Canada','Singapore','Japan','Other'
 ]
 
-function SiteSettings({ clientId, config, client }) {
+const SITE_TYPES = [
+  { key:'restaurant',  label:'Full-Service Restaurant', desc:'Dine-in + takeaway + reservations'    },
+  { key:'cafe',        label:'Cafe / Coffee Shop',      desc:'Order ahead + loyalty + brunch'       },
+  { key:'foodtruck',   label:'Food Truck',              desc:'Location-based + quick ordering'      },
+  { key:'delivery',    label:'Cloud Kitchen',           desc:'Delivery only + multi-brand'          },
+  { key:'quickserve',  label:'Quick Service',           desc:'Fast food + combos + high volume'     },
+  { key:'catering',    label:'Catering',                desc:'Events + quotes + packages'           },
+  { key:'mealprep',    label:'Meal Prep',               desc:'Subscriptions + scheduled delivery'   },
+  { key:'finedine',    label:'Fine Dining',             desc:'Tasting menus + reservations + cellar'},
+]
+
+function SiteSettings({ clientId, config, client, draft, setDraft, clearDraft }) {
   const qc = useQueryClient()
-  const [form,   setForm]   = useState(config.settings || {})
+  const [form,   setForm]   = useState(() => {
+    if (draft) return draft
+    if (config.settings) return config.settings
+    return {}
+  })
   const [errors, setErrors] = useState({})
   const [groups, setGroups] = useState([])
   const [selectedGroupId, setSelectedGroupId] = useState(client?.groupId || '')
@@ -164,7 +319,14 @@ function SiteSettings({ clientId, config, client }) {
   setSelectedGroupId(client?.groupId || '')
 }, [client])
 
-  useEffect(() => { setForm(config.settings || {}) }, [config])
+  useEffect(() => { 
+    if (!draft) setForm(config.settings || {}) 
+  }, [config])
+
+  // Sync local form to parent draft
+  useEffect(() => {
+    setDraft(form)
+  }, [form])
 
   useEffect(() => {
     fetch('http://localhost:3001/api/groups', {
@@ -221,17 +383,29 @@ function SiteSettings({ clientId, config, client }) {
   },
   onSuccess: () => {
     qc.invalidateQueries(['config', clientId])
+    clearDraft('site-settings')
     fetch(`http://localhost:3001/api/clients/${clientId}`, {
       headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
     }).then(r => r.json()).then(d => {
       window.dispatchEvent(new CustomEvent('client-updated', {
   detail: {
-    id:     clientId,
-    name:   form.restaurantName || d.name,
-    status: form.indexing === 'allowed' ? 'live' : 'draft',
+    id:       clientId,
+    name:     form.restaurantName || d.name,
+    status:   form.indexing === 'allowed' ? 'live' : 'draft',
+    indexing: form.indexing || 'blocked',
+    siteType: form.siteType || 'restaurant',
   }
 }))
     }).catch(() => {})
+  },
+  onError: (err) => {
+    console.error('Save failed:', err)
+    console.error('Error details:', err.response?.data)
+    
+    // Don't clear draft on error - keep it for retry
+    // Show user-friendly error message
+    const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
+    alert(`Save failed: ${errorMsg}\n\nYour changes are still saved as a draft. Please try again.`)
   }
 })
 
@@ -287,7 +461,7 @@ const handleKey = (e) => {
         Site Settings
       </h2>
       <p style={{ margin:'0 0 24px', fontSize:13, color:C.t3 }}>
-        Core details for this restaurant.
+        Core identity for your website — name, contact details, and regional settings.
       </p>
 
       {/* ── Section: Identity ── */}
@@ -302,6 +476,10 @@ const handleKey = (e) => {
     {field('Restaurant Name (CMS only) *', 'restaurantName',
       { placeholder:'e.g. Urban Eats Melbourne',
         hint:'Updates the site name across the CMS when saved' })}
+
+    {field('Public Display Name', 'displayName',
+      { placeholder:'e.g. Urban Eats',
+        hint:'The name shown to visitors on your website' })}
 
     {/* Group — changeable dropdown */}
     <div>
@@ -333,6 +511,7 @@ const handleKey = (e) => {
       })()}
     </div>
   </div>
+
 </div>
 
       {/* ── Section: Contact ── */}
@@ -792,7 +971,7 @@ function RichEditorBlock({ label, hint, editor, onLinkClick, onImageClick }) {
 }
 
 // ── Site Notes ───────────────────────────────────────────────
-function SiteNotes({ clientId, config }) {
+function SiteNotes({ clientId, config, draft, setDraft }) {
   const qc = useQueryClient()
   const [linkModal,  setLinkModal]  = useState(null)
   const [imageModal, setImageModal] = useState(null) // { editor, dropFile? }
@@ -808,26 +987,43 @@ function SiteNotes({ clientId, config }) {
 
   const generalEditor = useEditor({
     extensions: makeExtensions('Add general notes — analytics IDs, scripts, developer contacts…'),
-    content: config.notes?.general || '',
+    content: draft?.general || config.notes?.general || '',
     editorProps: { attributes: { style:'text-align:left' } }
   })
 
   const stockEditor = useEditor({
     extensions: makeExtensions('Add operational notes…'),
-    content: config.notes?.stock || '',
+    content: draft?.stock || config.notes?.stock || '',
     editorProps: { attributes: { style:'text-align:left' } }
   })
 
   // Sync when config loads from server
   useEffect(() => {
-    if (generalEditor && config.notes?.general !== undefined)
+    if (generalEditor && config.notes?.general !== undefined && !draft)
       generalEditor.commands.setContent(config.notes.general || '', false)
   }, [config.notes?.general])
 
   useEffect(() => {
-    if (stockEditor && config.notes?.stock !== undefined)
+    if (stockEditor && config.notes?.stock !== undefined && !draft)
       stockEditor.commands.setContent(config.notes.stock || '', false)
   }, [config.notes?.stock])
+
+  // Sync to draft on change
+  useEffect(() => {
+    if (!generalEditor || !stockEditor) return
+    const update = () => {
+      setDraft({
+        general: generalEditor.getHTML(),
+        stock:   stockEditor.getHTML(),
+      })
+    }
+    generalEditor.on('update', update)
+    stockEditor.on('update', update)
+    return () => {
+      generalEditor.off('update', update)
+      stockEditor.off('update', update)
+    }
+  }, [generalEditor, stockEditor])
 
   const mutation = useMutation({
     mutationFn: () => saveConfig(clientId, {
@@ -836,7 +1032,10 @@ function SiteNotes({ clientId, config }) {
         stock:   stockEditor?.getHTML()   || '',
       }
     }),
-    onSuccess: () => qc.invalidateQueries(['config', clientId])
+    onSuccess: () => {
+      qc.invalidateQueries(['config', clientId])
+            clearDraft(activeKey)
+    }
   })
 
   // Insert image into editor — show preview in modal first, then insert on confirm
@@ -860,7 +1059,7 @@ function SiteNotes({ clientId, config }) {
     // Insert local preview immediately so user sees it
     editor?.chain().focus().setImage({ src: localUrl }).run()
 
-    // Upload to R2 in background and replace src when done
+    // Upload to storage in background and replace src when done
     const formData = new FormData()
     formData.append('file', file)
     const token = localStorage.getItem('dd_token')
@@ -872,14 +1071,18 @@ function SiteNotes({ clientId, config }) {
       })
       const data = await res.json()
       if (data.url) {
-        // Replace the local blob URL with the real R2 URL in the HTML
+        // Replace the local blob URL with the real URL in the HTML
         const current = editor?.getHTML() || ''
         const updated = current.replace(localUrl, data.url)
         editor?.commands.setContent(updated, false)
+        console.log(`✅ Image uploaded: ${data.storage === 'local' ? 'Local storage' : 'R2'}`)
+      } else {
+        throw new Error(data.error || 'Upload failed')
       }
-    } catch {
-      // R2 not set up — local preview stays, will need to re-upload later
-      console.warn('R2 upload failed — image shown as local preview only')
+    } catch (err) {
+      // Show error but keep local preview
+      console.error('Image upload failed:', err.message)
+      // Don't replace the local URL - it will show as broken but that's better than nothing
     }
   }
 
@@ -953,12 +1156,18 @@ function SiteNotes({ clientId, config }) {
 
 
 //-------Analytics Config ─────────────────────────────────────────────
-function AnalyticsConfig({ clientId, config }) {
+function AnalyticsConfig({ clientId, config, draft, setDraft }) {
   const qc = useQueryClient()
-  const [form,   setForm]   = useState(config.analytics || {})
+  const [form,   setForm]   = useState(draft || config.analytics || {})
   const [errors, setErrors] = useState({})
 
-  useEffect(() => { setForm(config.analytics || {}) }, [config])
+  useEffect(() => { 
+    if (!draft) setForm(config.analytics || {}) 
+  }, [config])
+
+  useEffect(() => {
+    setDraft(form)
+  }, [form])
 
   const set = (k, v) => {
     setForm(p => ({...p, [k]: v}))
@@ -977,7 +1186,10 @@ function AnalyticsConfig({ clientId, config }) {
 
   const mutation = useMutation({
     mutationFn: () => saveConfig(clientId, { analytics: form }),
-    onSuccess:  () => qc.invalidateQueries(['config', clientId])
+    onSuccess:  () => {
+      qc.invalidateQueries(['config', clientId])
+            clearDraft(activeKey)
+    }
   })
 
   const handleSave = () => { if (validate()) mutation.mutate() }
@@ -1069,25 +1281,72 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
   const [uploading, setUploading] = useState(false)
   const [dragging,  setDragging]  = useState(false)
   const [error,     setError]     = useState('')
+  const [progress,  setProgress]  = useState(0)
 
   const upload = async (file) => {
     if (!file) return
-    setUploading(true); setError('')
+    setUploading(true); setError(''); setProgress(0)
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File too large — max 5MB')
+      setUploading(false)
+      return
+    }
+    
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml']
+    if (!validTypes.includes(file.type)) {
+      setError('Invalid file type — use PNG, JPG, WEBP, or SVG')
+      setUploading(false)
+      return
+    }
+    
     const formData = new FormData()
     formData.append('file', file)
+    
     try {
+      setProgress(30)
       const res = await fetch(`http://localhost:3001/api/clients/${clientId}/images`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') },
         body: formData
       })
+      
+      setProgress(70)
       const data = await res.json()
-      if (data.url) onChange(data.url)
-      else setError('Upload failed — check R2 settings')
-    } catch {
-      setError('Upload failed — check R2 settings')
+      
+      if (!res.ok) {
+        // Show detailed error from server
+        throw new Error(data.details || data.error || 'Upload failed')
+      }
+      
+      if (data.url) {
+        setProgress(100)
+        onChange(data.url)
+        // Show which storage was used
+        if (data.storage === 'local') {
+          console.log('✅ Image saved locally — configure R2 for production')
+        } else {
+          console.log('✅ Image uploaded to R2')
+        }
+      } else {
+        throw new Error('No URL returned from server')
+      }
+    } catch (err) {
+      const errorMsg = err.message || 'Upload failed'
+      if (errorMsg.includes('R2')) {
+        setError('R2 storage not configured — image saved locally')
+      } else if (errorMsg.includes('permission')) {
+        setError('Permission denied — check R2 bucket settings')
+      } else if (errorMsg.includes('credentials')) {
+        setError('Invalid R2 credentials — check API keys')
+      } else {
+        setError(errorMsg)
+      }
     } finally {
       setUploading(false)
+      setProgress(0)
     }
   }
 
@@ -1138,10 +1397,10 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
 
       {/* Drop zone */}
       <div
-        onClick={openPicker}
+        onClick={() => !uploading && openPicker()}
         onDrop={e => {
           e.preventDefault(); setDragging(false)
-          upload(e.dataTransfer.files[0])
+          if (!uploading) upload(e.dataTransfer.files[0])
         }}
         onDragOver={e => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
@@ -1157,21 +1416,39 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
           fontSize:18, flexShrink:0, transition:'all 0.15s' }}>
           {uploading ? '⏳' : '↑'}
         </div>
-        <div>
+        <div style={{ flex:1 }}>
           <div style={{ fontSize:13, color: dragging ? C.acc : C.t1, fontWeight:600 }}>
-            {uploading ? 'Uploading…' : value ? 'Replace image' : 'Click to upload or drag & drop'}
+            {uploading ? `Uploading… ${progress}%` : value ? 'Replace image' : 'Click to upload or drag & drop'}
           </div>
           <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
-            {accept === '.svg' ? 'SVG only' : 'PNG, JPG, WEBP — max 5MB'}
+            {accept === '.svg' ? 'SVG only' : 'PNG, JPG, WEBP, SVG — max 5MB'}
           </div>
+          {/* Progress bar */}
+          {uploading && (
+            <div style={{ marginTop:8, height:4, background:C.border, borderRadius:2, overflow:'hidden' }}>
+              <div style={{ 
+                width:`${progress}%`, 
+                height:'100%', 
+                background:C.acc,
+                transition:'width 0.3s' 
+              }} />
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Error display */}
       {error && (
-        <div style={{ padding:'8px 18px', background:'#1A0505',
+        <div style={{ padding:'10px 18px', background:'#1A0505',
           borderTop:'1px solid #EF444430',
-          fontSize:12, color:'#EF4444' }}>
-          {error}
+          fontSize:12, color:'#EF4444', display:'flex', alignItems:'center', gap:8 }}>
+          <span>⚠️</span>
+          <span>{error}</span>
+          <button 
+            onClick={() => setError('')}
+            style={{ marginLeft:'auto', background:'none', border:'none', color:'#EF4444', cursor:'pointer', padding:4 }}>
+            ✕
+          </button>
         </div>
       )}
     </div>
@@ -1179,11 +1456,17 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
 }
 
 // ── Branding Config ──────────────────────────────────────────
-function BrandingConfig({ clientId, config }) {
+function BrandingConfig({ clientId, config, draft, setDraft }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState(config.settings || {})
+  const [form, setForm] = useState(draft || config.settings || {})
 
-  useEffect(() => { setForm(config.settings || {}) }, [config])
+  useEffect(() => { 
+    if (!draft) setForm(config.settings || {}) 
+  }, [config])
+
+  useEffect(() => {
+    setDraft(form)
+  }, [form])
 
   const set = (k, v) => setForm(p => ({...p, [k]: v}))
 
@@ -1191,6 +1474,7 @@ function BrandingConfig({ clientId, config }) {
   mutationFn: () => saveConfig(clientId, { settings: form }),
   onSuccess: () => {
     qc.invalidateQueries(['config', clientId])
+          clearDraft('site-branding')
   }
 })
 
@@ -1305,12 +1589,14 @@ function BrandingConfig({ clientId, config }) {
 }
 
 // ── Shortcodes Config ───────────────────────────────────────
-function ShortcodesConfig({ clientId, config, client }) {
+function ShortcodesConfig({ clientId, config, client, draft, setDraft, clearDraft }) {
   const qc = useQueryClient()
-  const [form,      setForm]      = useState({})
-  const [overrides, setOverrides] = useState({})
+  const [form,      setForm]      = useState(draft?.form || {})
+  const [overrides, setOverrides] = useState(draft?.overrides || {})
   const [groups,    setGroups]    = useState([])
   const [locations, setLocations] = useState([])
+  const [autoValues, setAutoValues] = useState({})
+  const [saved,     setSaved]     = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('dd_token')
@@ -1323,7 +1609,7 @@ function ShortcodesConfig({ clientId, config, client }) {
 
   useEffect(() => {
     if (!groups.length && !locations.length && !config.settings) return
-
+    
     const settings  = config.settings  || {}
     const savedOver = config.shortcodes?._overrides || {}
 
@@ -1337,17 +1623,25 @@ function ShortcodesConfig({ clientId, config, client }) {
       restaurantName: settings.displayName    || settings.restaurantName || '',
       group:          group?.name             || '',
       address:        primary?.address        || '',
-      suburb:         settings.suburb         || '',
-      state:          '',  // TODO — add state field to location form
+      suburb:         primary?.suburb         || settings.suburb || '',
+      state:          primary?.state          || '', 
       phone:          primary?.phone          || settings.phone || '',
       primaryEmail:   settings.defaultEmail   || '',
-      abn:            settings.abn            || '',
+      custom:         '',
     }
 
-    // Saved overrides win over auto
-    setForm({ ...auto, ...savedOver })
-    setOverrides(savedOver)
-  }, [config, groups, locations, client])
+    setAutoValues(auto)
+
+    if (!draft) {
+      // Saved overrides win over auto
+      setForm({ ...auto, ...savedOver })
+      setOverrides(savedOver)
+    }
+  }, [config, groups, locations, client, draft])
+
+  useEffect(() => {
+    setDraft({ form, overrides })
+  }, [form, overrides])
 
   const handleChange = (key, value) => {
     setForm(p    => ({...p,    [key]: value}))
@@ -1367,11 +1661,11 @@ function ShortcodesConfig({ clientId, config, client }) {
       restaurantName: settings.displayName  || settings.restaurantName || '',
       group:          group?.name           || '',
       address:        primary?.address      || '',
-      suburb:         settings.suburb       || '',
-      state:          '',
+      suburb:         primary?.suburb       || settings.suburb || '',
+      state:          primary?.state        || '',
       phone:          primary?.phone        || settings.phone || '',
       primaryEmail:   settings.defaultEmail || '',
-      abn:            settings.abn          || '',
+      custom:         '',
     }
     setForm(p => ({...p, [key]: auto[key] || ''}))
   }
@@ -1380,18 +1674,23 @@ function ShortcodesConfig({ clientId, config, client }) {
     mutationFn: () => saveConfig(clientId, {
       shortcodes: { ...form, _overrides: overrides }
     }),
-    onSuccess: () => qc.invalidateQueries(['config', clientId])
+    onSuccess: () => {
+      qc.invalidateQueries(['config', clientId])
+      clearDraft('shortcodes')
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    }
   })
 
   const codes = [
     { key:'restaurantName', label:'Restaurant Name', source:'Site Settings → Display Name'    },
     { key:'group',          label:'Group',           source:'Group assigned in Site Settings'  },
     { key:'address',        label:'Address',         source:'Locations → Primary location'    },
-    { key:'suburb',         label:'Suburb',          source:'Site Settings → Suburb'           },
-    { key:'state',          label:'State',           source:'Locations — add later'            },
+    { key:'suburb',         label:'Suburb',          source:'Locations → Primary location'    },
+    { key:'state',          label:'State',           source:'Locations → Primary location'    },
     { key:'phone',          label:'Phone',           source:'Locations → Primary location'    },
     { key:'primaryEmail',   label:'Email',           source:'Site Settings → Email'            },
-    { key:'abn',            label:'ABN',             source:'Site Settings → ABN'              },
+    { key:'custom',         label:'Custom',          source:'Custom code or text'              },
   ]
 
   return (
@@ -1422,13 +1721,15 @@ function ShortcodesConfig({ clientId, config, client }) {
           fontSize:11, fontWeight:700, color:C.t3,
           textTransform:'uppercase', letterSpacing:'0.05em' }}>
           <span>Shortcode</span>
-          <span>Source</span>
-          <span>Value</span>
+          <span>Source Data</span>
+          <span>Actual Value (Edit to Override)</span>
           <span></span>
         </div>
 
         {codes.map((c, i) => {
           const isOverridden = overrides[c.key] !== undefined
+          const autoVal = autoValues[c.key] || ''
+          
           return (
             <div key={c.key}
               style={{ display:'grid', gridTemplateColumns:'160px 220px 1fr 70px',
@@ -1444,25 +1745,25 @@ function ShortcodesConfig({ clientId, config, client }) {
                 {`{{${c.key}}}`}
               </span>
 
-              <span style={{ fontSize:11, color: isOverridden ? C.acc : C.t3 }}>
-                {isOverridden ? 'Manually overridden' : c.source}
+              <span style={{ fontSize:10, color:C.t4, textTransform:'uppercase', letterSpacing:'0.02em' }}>
+                {c.source}
               </span>
 
-              <input
-                value={form[c.key] || ''}
-                onChange={e => handleChange(c.key, e.target.value)}
-                placeholder={c.key === 'state' ? 'Add state field to locations first' : `Auto — ${c.source}`}
-                disabled={c.key === 'state' && !overrides['state']}
-                style={{ padding:'7px 10px', fontSize:13, background:C.input,
-                  border:`1px solid ${isOverridden ? C.acc+'60' : C.border}`,
-                  borderRadius:7,
-                  color: c.key === 'state' && !overrides['state'] ? C.t3 : isOverridden ? C.t0 : C.t1,
-                  fontFamily:'inherit', outline:'none',
-                  width:'100%', boxSizing:'border-box',
-                  opacity: c.key === 'state' && !overrides['state'] ? 0.5 : 1 }}
-                onFocus={e => { if (c.key !== 'state' || overrides['state']) e.target.style.borderColor = C.acc }}
-                onBlur={e  => e.target.style.borderColor = isOverridden ? C.acc+'60' : C.border}
-              />
+              <div style={{ position:'relative' }}>
+                <input
+                  value={form[c.key] || ''}
+                  onChange={e => handleChange(c.key, e.target.value)}
+                  placeholder={autoVal ? `Auto: ${autoVal}` : `Pulled from: ${c.source}`}
+                  style={{ padding:'7px 10px', fontSize:13, background:C.input,
+                    border:`1px solid ${isOverridden ? C.acc+'60' : C.border}`,
+                    borderRadius:7,
+                    color: isOverridden ? C.t0 : C.t1,
+                    fontFamily:'inherit', outline:'none',
+                    width:'100%', boxSizing:'border-box' }}
+                  onFocus={e => { e.target.style.borderColor = C.acc }}
+                  onBlur={e  => e.target.style.borderColor = isOverridden ? C.acc+'60' : C.border}
+                />
+              </div>
 
               <div style={{ display:'flex', justifyContent:'center' }}>
                 {isOverridden && (
@@ -1492,7 +1793,7 @@ function ShortcodesConfig({ clientId, config, client }) {
             boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
           {mutation.isPending ? 'Saving…' : 'Save Shortcodes'}
         </button>
-        {mutation.isSuccess && (
+        {saved && (
           <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>
         )}
       </div>
@@ -1500,45 +1801,42 @@ function ShortcodesConfig({ clientId, config, client }) {
   )
 }
 
-// ── Theme previews ───────────────────────────────────────────
+// ── Theme System ───────────────────────────────────────────
+// Each theme is purpose-built for a specific restaurant type
+// Theme = Layout + Style + Behavior + Priority
 const THEMES = [
   {
-    key:   'none',
-    label: 'None',
-    desc:  'Build your own styles from scratch using Theme Colours below',
-    preview: null,
-    defaults: { primary:'#FF6B2B', secondary:'#1C2B1A', headerBg:'#ffffff',
-                headerText:'#1A1A1A', navBg:'#1C2B1A', navText:'#ffffff',
-                bodyBg:'#ffffff', bodyText:'#1A1A1A',
-                ctaBg:'#FF6B2B', ctaText:'#ffffff', accentBg:'#F5F0EA' }
-  },
-  {
-    key:   'urban-bistro',
-    label: 'Urban Bistro',
-    desc:  'Warm modern Australian — earthy tones, clean layout',
+    key:   'theme-d1',
+    label: 'Modern Restaurant (D1)',
+    target: 'Full-service restaurants, Cafes, Fine dining',
+    sellAngle: 'Clean, modern, and highly configurable',
+    style: 'Modern layout with focus on imagery and clear CTAs',
+    features: ['Utility belt', 'Dynamic sections', 'Reviews carousel', 'Responsive header'],
     defaults: { primary:'#C8823A', secondary:'#1C2B1A', headerBg:'#ffffff',
                 headerText:'#1A1A1A', navBg:'#1C2B1A', navText:'#ffffff',
                 bodyBg:'#ffffff', bodyText:'#1A1A1A',
                 ctaBg:'#C8823A', ctaText:'#ffffff', accentBg:'#F7F2EA' }
   },
   {
-    key:   'noir-fine-dine',
-    label: 'Noir Fine Dine',
-    desc:  'Dark luxury editorial — gold accents, dramatic contrast',
-    defaults: { primary:'#D4AF37', secondary:'#0A0A0A', headerBg:'#0A0A0A',
-                headerText:'#ffffff', navBg:'#111111', navText:'#D4AF37',
-                bodyBg:'#0A0A0A', bodyText:'#E0E0E0',
-                ctaBg:'#D4AF37', ctaText:'#0A0A0A', accentBg:'#1A1A1A' }
+    key:   'theme-v2',
+    label: 'Classic Bistro',
+    target: 'Traditional venues',
+    sellAngle: 'Timeless and elegant',
+    style: 'Classic layout',
+    features: [],
+    comingSoon: true,
+    defaults: { primary:'#D4AF37', secondary:'#0A0A0A' }
   },
   {
-    key:   'garden-fresh',
-    label: 'Garden Fresh',
-    desc:  'Bright clean plant-forward — sage greens, light and airy',
-    defaults: { primary:'#4A7C59', secondary:'#F0F7F1', headerBg:'#ffffff',
-                headerText:'#1A1A1A', navBg:'#4A7C59', navText:'#ffffff',
-                bodyBg:'#F8FBF8', bodyText:'#1A1A1A',
-                ctaBg:'#4A7C59', ctaText:'#ffffff', accentBg:'#E8F5EC' }
-  },
+    key:   'theme-v3',
+    label: 'Urban Minimal',
+    target: 'Trendy spots',
+    sellAngle: 'Sleek and modern',
+    style: 'Minimalist layout',
+    features: [],
+    comingSoon: true,
+    defaults: { primary:'#1A1A1A', secondary:'#ffffff' }
+  }
 ]
 
 const COLOUR_GROUPS = [
@@ -1565,25 +1863,30 @@ const COLOUR_GROUPS = [
   ]},
 ]
 
-function ThemesConfig({ clientId, config }) {
+function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
   const qc = useQueryClient()
   const [saved,    setSaved]    = useState(false)
   const [tab,      setTab]      = useState('selection')
-  const [selected, setSelected] = useState(config.colours?.theme || 'none')
+  const [selected, setSelected] = useState(draft?.selected || config.colours?.theme || 'theme-v1')
   const [colours,  setColours]  = useState(() => {
+    if (draft?.colours) return draft.colours
     const c     = config.colours || {}
-    const theme = THEMES.find(t => t.key === (c.theme || 'none')) || THEMES[0]
+    const theme = THEMES.find(t => t.key === (c.theme || 'theme-v1')) || THEMES[0]
     return { ...theme.defaults, ...c }
   })
 
   useEffect(() => {
-    if (config.colours) {
+    if (config.colours && !draft) {
       const c     = config.colours
-      const theme = THEMES.find(t => t.key === (c.theme || 'none')) || THEMES[0]
-      setSelected(c.theme || 'none')
+      const theme = THEMES.find(t => t.key === (c.theme || 'theme-v1')) || THEMES[0]
+      setSelected(c.theme || 'theme-v1')
       setColours({ ...theme.defaults, ...c })
     }
   }, [config])
+
+  useEffect(() => {
+    setDraft({ selected, colours })
+  }, [selected, colours])
 
   const mutation = useMutation({
     mutationFn: () => saveConfig(clientId, {
@@ -1591,6 +1894,7 @@ function ThemesConfig({ clientId, config }) {
     }),
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
+      clearDraft('themes')
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     }
@@ -1628,10 +1932,11 @@ function ThemesConfig({ clientId, config }) {
   return (
     <div>
       <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
-        Themes
+        Theme
       </h2>
       <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
-        Choose a theme and customise the colours for this restaurant site.
+        Controls how your site looks — layout, colors, and visual style. 
+        This only affects the design, not your content.
       </p>
 
       {/* Tab bar */}
@@ -1658,70 +1963,69 @@ function ThemesConfig({ clientId, config }) {
               const isSelected = selected === theme.key
               return (
                 <div key={theme.key}
-                  onClick={() => selectTheme(theme.key)}
+                  onClick={() => !theme.comingSoon && selectTheme(theme.key)}
                   style={{ background:C.card,
                     border:`2px solid ${isSelected ? C.acc : C.border}`,
-                    borderRadius:12, overflow:'hidden', cursor:'pointer',
+                    borderRadius:12, overflow:'hidden', cursor: theme.comingSoon ? 'not-allowed' : 'pointer',
                     transition:'border-color 0.15s',
+                    position: 'relative',
+                    opacity: theme.comingSoon ? 0.7 : 1,
                     boxShadow: isSelected ? `0 0 0 1px ${C.acc}` : 'none' }}>
+
+                  {theme.comingSoon && (
+                    <div style={{
+                      position:'absolute', top:8, left:8, zIndex:10,
+                      background:'#eee', color:'#666', padding:'2px 8px',
+                      borderRadius:4, fontSize:10, fontWeight:700
+                    }}>COMING SOON</div>
+                  )}
 
                   {/* Preview area */}
                   <div style={{ height:160, position:'relative', overflow:'hidden',
                     background: theme.defaults.bodyBg }}>
-                    {theme.key === 'none' ? (
-                      <div style={{ height:'100%', display:'flex', alignItems:'center',
-                        justifyContent:'center', flexDirection:'column', gap:8 }}>
-                        <div style={{ width:48, height:48, borderRadius:12,
-                          border:`2px dashed ${C.border2}`, display:'flex',
-                          alignItems:'center', justifyContent:'center',
-                          fontSize:20, color:C.t3 }}>+</div>
-                        <span style={{ fontSize:12, color:C.t3 }}>Custom styles</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ height:28, background:theme.defaults.headerBg,
-                          borderBottom:`1px solid ${theme.defaults.navBg}20`,
-                          display:'flex', alignItems:'center', padding:'0 12px', gap:8 }}>
-                          <div style={{ width:40, height:8, borderRadius:4,
-                            background:theme.defaults.primary }}/>
-                          <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
-                            {[0,1,2].map(i => (
-                              <div key={i} style={{ width:20, height:5, borderRadius:3,
-                                background:theme.defaults.headerText+'40' }}/>
-                            ))}
-                          </div>
-                        </div>
-                        <div style={{ height:20, background:theme.defaults.navBg,
-                          display:'flex', alignItems:'center', padding:'0 12px', gap:6 }}>
-                          {[0,1,2,3].map(i => (
-                            <div key={i} style={{ width:18, height:4, borderRadius:2,
-                              background:theme.defaults.navText+'60' }}/>
-                          ))}
-                        </div>
-                        <div style={{ height:60, background:theme.defaults.secondary,
-                          display:'flex', alignItems:'center', padding:'0 16px', gap:10 }}>
-                          <div>
-                            <div style={{ width:70, height:7, borderRadius:3,
-                              background:'#ffffff60', marginBottom:5 }}/>
-                            <div style={{ width:50, height:5, borderRadius:3,
-                              background:'#ffffff40' }}/>
-                          </div>
-                          <div style={{ marginLeft:'auto', width:36, height:16,
-                            borderRadius:4, background:theme.defaults.ctaBg,
-                            display:'flex', alignItems:'center', justifyContent:'center' }}>
-                            <div style={{ width:20, height:4, borderRadius:2,
-                              background:theme.defaults.ctaText }}/>
-                          </div>
-                        </div>
-                        <div style={{ padding:'8px 12px', background:theme.defaults.bodyBg,
-                          display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5 }}>
+                    <>
+                      <div style={{ height:28, background:theme.defaults.headerBg,
+                        borderBottom:`1px solid ${theme.defaults.navBg}20`,
+                        display:'flex', alignItems:'center', padding:'0 12px', gap:8 }}>
+                        <div style={{ width:40, height:8, borderRadius:4,
+                          background:theme.defaults.primary }}/>
+                        <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
                           {[0,1,2].map(i => (
-                            <div key={i} style={{ background:theme.defaults.accentBg,
-                              borderRadius:4, height:24 }}/>
+                            <div key={i} style={{ width:20, height:5, borderRadius:3,
+                              background:theme.defaults.headerText+'40' }}/>
                           ))}
                         </div>
-                      </>
-                    )}
+                      </div>
+                      <div style={{ height:20, background:theme.defaults.navBg,
+                        display:'flex', alignItems:'center', padding:'0 12px', gap:6 }}>
+                        {[0,1,2,3].map(i => (
+                          <div key={i} style={{ width:18, height:4, borderRadius:2,
+                            background:theme.defaults.navText+'60' }}/>
+                        ))}
+                      </div>
+                      <div style={{ height:60, background:theme.defaults.secondary,
+                        display:'flex', alignItems:'center', padding:'0 16px', gap:10 }}>
+                        <div>
+                          <div style={{ width:70, height:7, borderRadius:3,
+                            background:'#ffffff60', marginBottom:5 }}/>
+                          <div style={{ width:50, height:5, borderRadius:3,
+                            background:'#ffffff40' }}/>
+                        </div>
+                        <div style={{ marginLeft:'auto', width:36, height:16,
+                          borderRadius:4, background:theme.defaults.ctaBg,
+                          display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          <div style={{ width:20, height:4, borderRadius:2,
+                            background:theme.defaults.ctaText }}/>
+                        </div>
+                      </div>
+                      <div style={{ padding:'8px 12px', background:theme.defaults.bodyBg,
+                        display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5 }}>
+                        {[0,1,2].map(i => (
+                          <div key={i} style={{ background:theme.defaults.accentBg,
+                            borderRadius:4, height:24 }}/>
+                        ))}
+                      </div>
+                    </>
                     {isSelected && (
                       <div style={{ position:'absolute', top:8, right:8,
                         width:22, height:22, borderRadius:'50%', background:C.acc,
@@ -1730,23 +2034,45 @@ function ThemesConfig({ clientId, config }) {
                     )}
                   </div>
 
-                  {/* Label */}
-                  <div style={{ padding:'12px 14px' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ fontSize:13, fontWeight:700,
+                  {/* Label & Info */}
+                  <div style={{ padding:'14px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                      <div style={{ fontSize:14, fontWeight:800,
                         color: isSelected ? C.acc : C.t0 }}>
                         {theme.label}
                       </div>
                       {isSelected && (
                         <span style={{ fontSize:10, fontWeight:700, color:C.acc,
-                          background:C.accBg, padding:'1px 7px', borderRadius:4,
+                          background:C.accBg, padding:'2px 8px', borderRadius:4,
                           border:`1px solid ${C.acc}40` }}>
                           Active
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize:11, color:C.t3, marginTop:3 }}>
-                      {theme.desc}
+                    
+                    {/* Target audience */}
+                    <div style={{ fontSize:11, color:C.t3, marginBottom:4 }}>
+                      🎯 {theme.target}
+                    </div>
+                    
+                    {/* Sell angle */}
+                    <div style={{ fontSize:10, color:C.t2, fontStyle:'italic', marginBottom:6 }}>
+                      💡 {theme.sellAngle}
+                    </div>
+                    
+                    {/* Features */}
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {theme.features?.slice(0, 3).map((f, i) => (
+                        <span key={i} style={{ 
+                          fontSize:9, 
+                          color:C.t3, 
+                          background:C.input,
+                          padding:'2px 6px', 
+                          borderRadius:3 
+                        }}>
+                          {f}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1862,24 +2188,37 @@ function ThemesConfig({ clientId, config }) {
                 ))}
               </div>
 
-              <div style={{ background: colours.secondary || '#1C2B1A',
-                padding:'20px 14px' }}>
-                <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:6 }}>
-                  Welcome to Our Restaurant
-                </div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginBottom:12 }}>
-                  Fresh ingredients, crafted with care
-                </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <div style={{ padding:'6px 14px', borderRadius:6,
-                    background: colours.ctaBg || '#FF6B2B',
-                    color: colours.ctaText || '#fff', fontSize:10, fontWeight:700 }}>
-                    Book a Table
+              <div style={{
+                background: `url(https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400)`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                padding:'20px 14px',
+                position: 'relative'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.5)',
+                  zIndex: 1
+                }} />
+                <div style={{ position:'relative', zIndex:2 }}>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:6 }}>
+                    Hero Banner Preview
                   </div>
-                  <div style={{ padding:'6px 14px', borderRadius:6, background:'transparent',
-                    border:'1px solid rgba(255,255,255,0.4)',
-                    color:'#fff', fontSize:10, fontWeight:600 }}>
-                    View Menu
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginBottom:12 }}>
+                    This is a simulation of the hero section.
+                  </div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <div style={{ padding:'6px 14px', borderRadius:6,
+                      background: colours.ctaBg || '#FF6B2B',
+                      color: colours.ctaText || '#fff', fontSize:10, fontWeight:700 }}>
+                      Book a Table
+                    </div>
+                    <div style={{ padding:'6px 14px', borderRadius:6, background:'transparent',
+                      border:'1px solid rgba(255,255,255,0.4)',
+                      color:'#fff', fontSize:10, fontWeight:600 }}>
+                      View Menu
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1937,6 +2276,201 @@ function ThemesConfig({ clientId, config }) {
   )
 }
 
+// ── Social Links Config ──────────────────────────────────────
+function SocialLinksConfig({ clientId, config, draft, setDraft, clearDraft }) {
+  const qc = useQueryClient()
+  const [saved, setSaved] = useState(false)
+  
+  // Default form state
+  const defaultForm = {
+    facebook: '',
+    instagram: '',
+    twitter: '',
+    showInFooter: true,
+  }
+  
+  // Merge config.social with defaults
+  const [form, setForm] = useState(() => {
+    if (draft) return draft
+    return {
+      ...defaultForm,
+      ...(config.social || {})
+    }
+  })
+
+  // Update form when config changes (but preserve local changes during editing)
+  useEffect(() => {
+    if (config.social && !draft) {
+      setForm(prev => ({
+        ...defaultForm,
+        ...config.social,
+        // Preserve any local changes that haven't been saved yet
+        ...prev,
+      }))
+    }
+  }, [config.social])
+
+  useEffect(() => {
+    setDraft(form)
+  }, [form])
+
+  const set = (k, v) => setForm(p => ({...p, [k]: v}))
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      // Filter out empty strings and clean up the data
+      const cleanedSocial = {
+        showInFooter: form.showInFooter,
+      }
+      
+      // Only include non-empty URLs
+      socialPlatforms.forEach(platform => {
+        const value = form[platform.key]
+        if (value && value.trim() !== '') {
+          cleanedSocial[platform.key] = value.trim()
+        }
+      })
+      
+      const result = await saveConfig(clientId, { social: cleanedSocial })
+      return result
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['config', clientId] })
+      clearDraft('social-links')
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    },
+    onError: (err) => {
+      console.error('Save failed:', err)
+      console.error('Error details:', err.response?.data)
+      alert('Failed to save. Please try again.')
+    }
+  })
+
+  // SVG Icons for social platforms
+  const socialIcons = {
+    facebook: <svg width="20" height="20" viewBox="0 0 24 24" fill="#1877F2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>,
+    instagram: <svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" fill="url(#ig)"/><defs><linearGradient id="ig" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stopColor="#833AB4"/><stop offset="50%" stopColor="#E1306C"/><stop offset="100%" stopColor="#FCAF45"/></linearGradient></defs><circle cx="12" cy="12" r="4" fill="none" stroke="white" strokeWidth="2"/><circle cx="17.5" cy="6.5" r="1.5" fill="white"/></svg>,
+    twitter: <svg width="20" height="20" viewBox="0 0 24 24" fill="#1DA1F2"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>,
+    tiktok: <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.74a4.85 4.85 0 0 1-1.01-.05z"/></svg>,
+    youtube: <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF0000"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="white"/></svg>,
+    linkedin: <svg width="20" height="20" viewBox="0 0 24 24" fill="#0A66C2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>,
+  }
+
+  const socialPlatforms = [
+    { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/yourpage' },
+    { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourhandle' },
+    { key: 'twitter', label: 'Twitter / X', placeholder: 'https://twitter.com/yourhandle' },
+  ]
+
+  // Handle Enter key to save
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      mutation.mutate()
+    }
+  }
+
+  return (
+    <div onKeyDown={handleKeyDown}>
+      <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
+        Social Links
+      </h2>
+      <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
+        Add your social media profiles. They can be displayed in the footer.
+        <span style={{ color:C.t2, marginLeft:8 }}>(Ctrl+Enter to save)</span>
+      </p>
+
+      {/* Social Links */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:20 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Social Media Profiles
+        </div>
+        
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          {socialPlatforms.map(platform => (
+            <div key={platform.key} style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+              <div style={{ 
+                width:44, 
+                height:44, 
+                borderRadius:8, 
+                background:C.hover,
+                display:'flex', 
+                alignItems:'center', 
+                justifyContent:'center',
+                flexShrink:0,
+                marginTop:20
+              }}>
+                {socialIcons[platform.key]}
+              </div>
+              <div style={{ flex:1 }}>
+                <Inp
+                  label={platform.label}
+                  value={form[platform.key]}
+                  onChange={e => set(platform.key, e.target.value)}
+                  placeholder={platform.placeholder}
+                  style={{ marginBottom:0 }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Display Options */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:20 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Display Options
+        </div>
+        
+        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+          {/* Show in Footer */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ display:'flex', flexDirection:'column' }}>
+              <span style={{ fontSize:13, fontWeight:600, color:C.t0 }}>Show in Footer</span>
+              <span style={{ fontSize:11, color:C.t3, marginTop:2 }}>Display social icons in the site footer</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => set('showInFooter', !form.showInFooter)}
+              style={{ 
+                width:48, 
+                height:26, 
+                borderRadius:13, 
+                cursor:'pointer',
+                background: form.showInFooter ? C.acc : C.hover, 
+                flexShrink:0,
+                border:`1px solid ${form.showInFooter ? C.acc : C.border2}`,
+                transition:'background 0.15s',
+                padding:0,
+                position:'relative'
+              }}
+            >
+              <span style={{ 
+                width:20, 
+                height:20, 
+                borderRadius:'50%', 
+                background:'#fff',
+                position:'absolute', 
+                top:2,
+                left: form.showInFooter ? 24 : 2, 
+                transition:'left 0.15s',
+                display:'block'
+              }}/>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <SaveBtn onClick={() => mutation.mutate()} saving={mutation.isPending || mutation.isLoading} />
+      {saved && <span style={{ marginLeft:12, color:C.acc, fontSize:13 }}>Saved!</span>}
+    </div>
+  )
+}
+
 // ── Header Config ─────────────────────────────────────────────
 const HEADER_TYPES = [
   { key:'standard-full', label:'Standard Full',  desc:'Logo left, nav centre, CTA right'         },
@@ -1958,29 +2492,244 @@ const CTA_VARIANTS = [
 ]
 
 const UTILITY_ITEMS = [
-  { key:'reviews',      label:'Reviews',      editKey:'reviews'  },
-  { key:'header-ctas',  label:'Header CTAs',  editKey:null       },
-  { key:'locations',    label:'Locations',    editKey:null, cmsNav:true },
-  { key:'social-links', label:'Social Links', editKey:null, cmsNav:true },
+  { key:'contact-info', label:'Contact Info', editKey:null, cmsNav:true, description:'Address, Phone, Hours' },
+  { key:'social-links', label:'Social Links', editKey:null, cmsNav:true, description:'Facebook, Instagram, etc.' },
+  { key:'reviews',      label:'Reviews',      editKey:'reviews', description:'Star rating & review count' },
+  { key:'header-ctas',  label:'Header CTAs',  editKey:null, description:'Custom call-to-action buttons' },
 ]
 
-function HeaderConfig({ clientId, config, onNavigate }) {
+// ── Utility Belt Order Component (Drag & Drop) ───────────────
+function UtilityBeltOrder({ items, utilityItems, onReorder, onToggle, onEdit }) {
+  const [draggedItem, setDraggedItem] = useState(null)
+  const [dragOverItem, setDragOverItem] = useState(null)
+  
+  // Get current order or default
+  const order = Array.isArray(utilityItems?.order) ? utilityItems.order : items.map(i => i.key)
+  
+  // Sort items based on order
+  const sortedItems = order.map(key => items.find(i => i.key === key)).filter(Boolean)
+  
+  const handleDragStart = (e, item) => {
+    setDraggedItem(item)
+    e.dataTransfer.effectAllowed = 'move'
+    // Set drag image
+    const rect = e.target.getBoundingClientRect()
+    e.dataTransfer.setDragImage(e.target, rect.width / 2, 20)
+  }
+  
+  const handleDragOver = (e, item) => {
+    e.preventDefault()
+    if (draggedItem && draggedItem.key !== item.key) {
+      setDragOverItem(item)
+    }
+  }
+  
+  const handleDragLeave = () => {
+    setDragOverItem(null)
+  }
+  
+  const handleDrop = (e, targetItem) => {
+    e.preventDefault()
+    if (!draggedItem || draggedItem.key === targetItem.key) {
+      setDraggedItem(null)
+      setDragOverItem(null)
+      return
+    }
+    
+    const newOrder = [...order]
+    const draggedIndex = newOrder.indexOf(draggedItem.key)
+    const targetIndex = newOrder.indexOf(targetItem.key)
+    
+    // Remove dragged item
+    newOrder.splice(draggedIndex, 1)
+    // Insert at new position
+    newOrder.splice(targetIndex, 0, draggedItem.key)
+    
+    onReorder(newOrder)
+    setDraggedItem(null)
+    setDragOverItem(null)
+  }
+  
+  const handleDragEnd = () => {
+    setDraggedItem(null)
+    setDragOverItem(null)
+  }
+  
+  return (
+    <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+      <div style={{ fontSize:11, fontWeight:700, color:C.t3,
+        textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>
+        Utility Belt Components
+        <span style={{ fontSize:10, fontWeight:400, color:C.t2, marginLeft:8 }}>
+          (Drag to reorder)
+        </span>
+      </div>
+      <div style={{ background:C.panel, border:`1px solid ${C.border}`,
+        borderRadius:9, overflow:'hidden' }}>
+        {/* Table header */}
+        <div style={{ display:'grid', gridTemplateColumns:'30px 1fr 80px 80px',
+          padding:'7px 14px', background:'#0A0F1A',
+          borderBottom:`1px solid ${C.border}`,
+          fontSize:11, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.05em' }}>
+          <span></span>
+          <span>Component</span>
+          <span>Active</span>
+          <span>Edit</span>
+        </div>
+        {sortedItems.map((item, i) => {
+          const isOn = utilityItems?.[item.key] !== false
+          const isDragging = draggedItem?.key === item.key
+          const isDragOver = dragOverItem?.key === item.key
+          
+          return (
+            <div 
+              key={item.key}
+              draggable
+              onDragStart={(e) => handleDragStart(e, item)}
+              onDragOver={(e) => handleDragOver(e, item)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, item)}
+              onDragEnd={handleDragEnd}
+              style={{ 
+                display:'grid', 
+                gridTemplateColumns:'30px 1fr 80px 80px',
+                padding:'11px 14px', 
+                alignItems:'center',
+                borderBottom: i < sortedItems.length-1 ? `1px solid ${C.border}20` : 'none',
+                background: isDragging ? C.accBg : isDragOver ? C.hover : 'transparent',
+                cursor: 'grab',
+                opacity: isDragging ? 0.5 : 1,
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => {
+                if (!draggedItem) e.currentTarget.style.background=C.hover
+              }}
+              onMouseLeave={e => {
+                if (!draggedItem && !isDragOver) e.currentTarget.style.background='transparent'
+              }}>
+              {/* Drag handle */}
+              <div style={{ cursor: 'grab', color: C.t2 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="9" cy="6" r="1.5" fill="currentColor"/>
+                  <circle cx="9" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="9" cy="18" r="1.5" fill="currentColor"/>
+                  <circle cx="15" cy="6" r="1.5" fill="currentColor"/>
+                  <circle cx="15" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="15" cy="18" r="1.5" fill="currentColor"/>
+                </svg>
+              </div>
+              {/* Label & description */}
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>
+                  {item.label}
+                </div>
+                <div style={{ fontSize:10, color:C.t3, marginTop:2 }}>
+                  {item.description}
+                </div>
+              </div>
+              {/* Toggle */}
+              <div onClick={() => onToggle(item.key, !isOn)}
+                style={{ width:36, height:20, borderRadius:10, cursor:'pointer',
+                  background: isOn ? C.acc : C.hover, position:'relative',
+                  border:`1px solid ${isOn ? C.acc : C.border2}`,
+                  transition:'background 0.15s' }}>
+                <div style={{ width:14, height:14, borderRadius:'50%',
+                  background:'#fff', position:'absolute', top:2,
+                  left: isOn ? 18 : 2, transition:'left 0.15s' }}/>
+              </div>
+              {/* Edit button */}
+              <button
+                onClick={() => onEdit(item)}
+                style={{ padding:'4px 10px', background:'transparent',
+                  border:`1px solid ${C.border2}`, borderRadius:5,
+                  color:C.t2, fontSize:11, cursor:'pointer',
+                  fontFamily:'inherit' }}>
+                Edit
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraft }) {
   const qc      = useQueryClient()
   const [saved,  setSaved]  = useState(false)
-  const [tab,    setTab]    = useState('header')
-  const [form,   setForm]   = useState(config.header || {
+  const [tab,    setTab]    = useState(draft?.tab || 'header')
+  
+  // Default structure for header configuration
+  const defaultHeader = {
     type:        'standard-full',
     utilityBelt: true,
-    utilityItems:{ reviews:true, 'header-ctas':true, locations:true, 'social-links':true },
+    utilityItems:{
+      order: ['contact-info', 'social-links', 'reviews', 'header-ctas'],
+      'contact-info': true,
+      'social-links': true,
+      reviews: true,
+      'header-ctas': true
+    },
     headerTheme: 'not-set',
+  }
+
+  // Helper to sanitize utilityItems before putting into state or saving
+  const sanitizeHeader = (header) => {
+    if (!header) return defaultHeader
+    
+    const rawUtil = header.utilityItems || {}
+    const items = {}
+    
+    // 1. Ensure order is an array of valid keys
+    let order = Array.isArray(rawUtil.order) ? rawUtil.order : []
+    // Filter out keys that aren't in our current UTILITY_ITEMS or are the 'order' key itself
+    const validKeys = UTILITY_ITEMS.map(i => i.key)
+    order = order.filter(key => validKeys.includes(key))
+    
+    // 2. Add missing valid keys to the end of order if they're not there
+    validKeys.forEach(key => {
+      if (!order.includes(key)) order.push(key)
+    })
+    
+    // 3. Build the utilityItems object with only valid keys as booleans
+    items.order = order
+    validKeys.forEach(key => {
+      // Convert object { active:true } or similar to boolean if needed
+      const val = rawUtil[key]
+      if (typeof val === 'object' && val !== null) {
+        items[key] = val.active !== false
+      } else if (typeof val === 'boolean') {
+        items[key] = val
+      } else {
+        items[key] = defaultHeader.utilityItems[key] !== false
+      }
+    })
+    
+    return {
+      ...defaultHeader,
+      ...header,
+      utilityItems: items
+    }
+  }
+
+  const [form,   setForm]   = useState(() => {
+    if (draft?.form) return sanitizeHeader(draft.form)
+    if (config?.header) return sanitizeHeader(config.header)
+    return defaultHeader
   })
-  const [ctas,   setCtas]   = useState(config.headerCtas || [])
+
+  const [ctas,   setCtas]   = useState(draft?.ctas || config?.headerCtas || [])
   const [ctaModal, setCtaModal] = useState(null) // null | 'new' | { ...cta }
 
   useEffect(() => {
-    if (config.header)     setForm(config.header)
-    if (config.headerCtas) setCtas(config.headerCtas)
+    if (config.header && !draft) setForm(sanitizeHeader(config.header))
+    if (config.headerCtas && !draft) setCtas(config.headerCtas)
   }, [config])
+
+  useEffect(() => {
+    setDraft({ tab, form, ctas })
+  }, [tab, form, ctas])
 
   const set = (k, v) => setForm(p => ({...p, [k]: v}))
   const setUtil = (k, v) => setForm(p => ({
@@ -1988,14 +2737,23 @@ function HeaderConfig({ clientId, config, onNavigate }) {
   }))
 
   const mutation = useMutation({
-    mutationFn: () => saveConfig(clientId, {
-      header:     form,
-      headerCtas: ctas,
-    }),
+    mutationFn: () => {
+      // Final sanitize before save
+      const cleanHeader = sanitizeHeader(form)
+      return saveConfig(clientId, {
+        header:     cleanHeader,
+        headerCtas: ctas,
+      })
+    },
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
+      clearDraft('header-config')
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
+    },
+    onError: (err) => {
+      console.error('Save failed:', err)
+      alert('Failed to save: ' + (err.response?.data?.error || err.message))
     }
   })
 
@@ -2108,72 +2866,26 @@ function HeaderConfig({ clientId, config, onNavigate }) {
 
             {/* Utility belt items */}
             {form.utilityBelt && (
-              <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:C.t3,
-                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>
-                  Utility Belt Components
-                </div>
-                <div style={{ background:C.panel, border:`1px solid ${C.border}`,
-                  borderRadius:9, overflow:'hidden' }}>
-                  {/* Table header */}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 80px 80px 60px',
-                    padding:'7px 14px', background:'#0A0F1A',
-                    borderBottom:`1px solid ${C.border}`,
-                    fontSize:11, fontWeight:700, color:C.t3,
-                    textTransform:'uppercase', letterSpacing:'0.05em' }}>
-                    <span>Component</span>
-                    <span>Active</span>
-                    <span>Edit</span>
-                    <span></span>
-                  </div>
-                  {UTILITY_ITEMS.map((item, i) => {
-                    const isOn = form.utilityItems?.[item.key] !== false
-                    return (
-                      <div key={item.key}
-                        style={{ display:'grid', gridTemplateColumns:'1fr 80px 80px 60px',
-                          padding:'11px 14px', alignItems:'center',
-                          borderBottom: i < UTILITY_ITEMS.length-1
-                            ? `1px solid ${C.border}20` : 'none' }}
-                        onMouseEnter={e => e.currentTarget.style.background=C.hover}
-                        onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                        <span style={{ fontSize:13, fontWeight:600, color:C.t0 }}>
-                          {item.label}
-                        </span>
-                        {/* Toggle */}
-                        <div onClick={() => setUtil(item.key, !isOn)}
-                          style={{ width:36, height:20, borderRadius:10, cursor:'pointer',
-                            background: isOn ? C.acc : C.hover, position:'relative',
-                            border:`1px solid ${isOn ? C.acc : C.border2}`,
-                            transition:'background 0.15s' }}>
-                          <div style={{ width:14, height:14, borderRadius:'50%',
-                            background:'#fff', position:'absolute', top:2,
-                            left: isOn ? 18 : 2, transition:'left 0.15s' }}/>
-                        </div>
-                        {/* Edit button */}
-                        <button
-                          onClick={() => {
-                            if (item.editKey) {
-                              onNavigate(item.editKey)
-                            } else if (item.key === 'header-ctas') {
-                              setTab('ctas')
-                            } else if (item.cmsNav) {
-                              // Dispatch event to switch to CMS tab
-                              window.dispatchEvent(new CustomEvent('cms-navigate', {
-                                detail: { section: item.key }
-                              }))
-                            }
-                          }}
-                          style={{ padding:'4px 10px', background:'transparent',
-                            border:`1px solid ${C.border2}`, borderRadius:5,
-                            color:C.t2, fontSize:11, cursor:'pointer',
-                            fontFamily:'inherit' }}>
-                          Edit
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+              <UtilityBeltOrder 
+                items={UTILITY_ITEMS}
+                utilityItems={form.utilityItems || {}}
+                onReorder={(newOrder) => setForm(p => ({
+                  ...p, 
+                  utilityItems: { ...p.utilityItems, order: newOrder }
+                }))}
+                onToggle={(key, value) => setUtil(key, value)}
+                onEdit={(item) => {
+                  if (item.editKey) {
+                    onNavigate(item.editKey)
+                  } else if (item.key === 'header-ctas') {
+                    setTab('ctas')
+                  } else if (item.cmsNav) {
+                    window.dispatchEvent(new CustomEvent('cms-navigate', {
+                      detail: { section: item.key }
+                    }))
+                  }
+                }}
+              />
             )}
           </div>
 
@@ -2501,331 +3213,2128 @@ function CtaModal({ cta, onSave, onClose }) {
 }
 
 // ── Reviews Config ───────────────────────────────────────────
-function ReviewsConfig({ clientId, config }) {
+function ReviewsConfig({ clientId, config, draft, setDraft, clearDraft }) {
   const qc = useQueryClient()
-  const [f, setF] = useState(config.reviews || {})
-  useEffect(() => { setF(config.reviews || {}) }, [config])
+  const [tab,   setTab]   = useState(draft?.tab || 'summary')
+  const [f,     setF]     = useState(draft?.f || config.reviews || {})
+  const [saved, setSaved] = useState(false)
+  const [ctaModal, setCtaModal] = useState(null)
+
+  useEffect(() => { 
+    if (!draft) setF(config.reviews || {}) 
+  }, [config])
+
+  useEffect(() => {
+    setDraft({ tab, f })
+  }, [tab, f])
+
   const s = (k, v) => setF(p => ({...p, [k]: v}))
-  const sr = (idx, field, val) => {
-    const arr = [...(f.items || [{},{},{}])]
-    arr[idx] = {...arr[idx], [field]: val}
-    setF(p => ({...p, items: arr}))
-  }
-  const mut = useMutation({
-    mutationFn: () => saveConfig(clientId, { reviews: f }),
-    onSuccess:  () => qc.invalidateQueries(['config', clientId])
-  })
 
-  const items = f.items || [{},{},{}]
-
-  return (
-    <div>
-      <h2 style={{margin:'0 0 16px',fontSize:17,fontWeight:700,color:C.t0}}>Reviews Settings</h2>
-
-      <div style={{fontSize:12,fontWeight:800,color:C.t3,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:12}}>Overall Scores</div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>
-        <Inp label="Overall Score"      value={f.overallScore}   onChange={e=>s('overallScore',e.target.value)}   placeholder="e.g. 4.8"/>
-        <Inp label="Total Reviews"     value={f.totalReviews}   onChange={e=>s('totalReviews',e.target.value)}   placeholder="e.g. 312"/>
-        <Inp label="Google Score"       value={f.googleScore}    onChange={e=>s('googleScore',e.target.value)}    placeholder="e.g. 4.8"/>
-        <Inp label="Google Count"       value={f.googleCount}    onChange={e=>s('googleCount',e.target.value)}    placeholder="e.g. 198"/>
-        <Inp label="TripAdvisor Score"  value={f.tripScore}      onChange={e=>s('tripScore',e.target.value)}      placeholder="e.g. 4.7"/>
-        <Inp label="TripAdvisor Count"  value={f.tripCount}      onChange={e=>s('tripCount',e.target.value)}      placeholder="e.g. 87"/>
-        <Inp label="Facebook Score"     value={f.fbScore}        onChange={e=>s('fbScore',e.target.value)}        placeholder="e.g. 4.9"/>
-        <Inp label="Facebook Count"     value={f.fbCount}        onChange={e=>s('fbCount',e.target.value)}        placeholder="e.g. 27"/>
-        <Inp label="Leave Review URL"   value={f.leaveReviewUrl} onChange={e=>s('leaveReviewUrl',e.target.value)} placeholder="https://g.page/r/..."/>
-      </div>
-
-      <div style={{fontSize:12,fontWeight:800,color:C.t3,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:16}}>Review Cards (shown on website — add up to 3)</div>
-      {items.slice(0,3).map(function(item, idx) { return (
-        <div key={idx} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:18,marginBottom:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.t2,marginBottom:10}}>Review #{idx+1}</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-            <Inp label="Reviewer Name" value={item.name}   onChange={e=>sr(idx,'name',e.target.value)}   placeholder="e.g. Sarah L."/>
-            <Inp label="Stars (1-5)"    value={item.stars}  onChange={e=>sr(idx,'stars',e.target.value)}  placeholder="5"/>
-            <Inp label="Date"           value={item.date}   onChange={e=>sr(idx,'date',e.target.value)}   placeholder="e.g. 2 weeks ago"/>
-            <Inp label="Platform"       value={item.source} onChange={e=>sr(idx,'source',e.target.value)} placeholder="Google / TripAdvisor"/>
-          </div>
-          <textarea value={item.text||''} onChange={e=>sr(idx,'text',e.target.value)} rows={3}
-            placeholder="The review text shown on the website..."
-            style={{width:'100%',padding:'8px 11px',fontSize:13,background:'#111827',
-              border:`1px solid ${C.border}`,borderRadius:7,color:C.t0,
-              fontFamily:'inherit',resize:'vertical',outline:'none',marginTop:10}}/>
-        </div>
-      )})}
-
-      <SaveBtn onClick={()=>mut.mutate()} saving={mut.isPending}/>
-    </div>
-  )
-}
-
-// ── Booking Config ────────────────────────────────────────────
-function BookingConfig({ clientId, config }) {
-  const qc = useQueryClient()
-  const [f, setF] = useState(config.booking || {})
-  useEffect(() => { setF(config.booking || {}) }, [config])
-  const s = (k, v) => setF(p => ({...p, [k]: v}))
-  const mut = useMutation({
-    mutationFn: () => saveConfig(clientId, { booking: f }),
-    onSuccess:  () => qc.invalidateQueries(['config', clientId])
-  })
-
-  return (
-    <div>
-      <h2 style={{margin:'0 0 16px',fontSize:17,fontWeight:700,color:C.t0}}>Booking Settings</h2>
-      <div style={{background:C.card,borderLeft:'3px solid #00D4FF',padding:'9px 14px',borderRadius:'0 7px 7px 0',fontSize:12,color:C.t2,marginBottom:20}}>
-        Set ONE booking method. The website will use whichever field you fill in, in this order: Booking URL first, then phone.
-      </div>
-      <div style={{display:'flex',flexDirection:'column',gap:14,maxWidth:560}}>
-        <Inp label="Booking URL (OpenTable / ResDiary / Quandoo / custom)"
-          value={f.bookingUrl} onChange={e=>s('bookingUrl',e.target.value)} mono
-          hint="External link opened when customer clicks Book a Table"
-          placeholder="https://www.opentable.com.au/..."/>
-        <Inp label="Phone Booking Number"
-          value={f.bookingPhone} onChange={e=>s('bookingPhone',e.target.value)}
-          placeholder="+61 3 9123 4567"/>
-        <Inp label="Book Button Label"
-          value={f.bookLabel} onChange={e=>s('bookLabel',e.target.value)}
-          placeholder="Book a Table" hint="Text shown on the booking CTA button"/>
-        <Inp label="Order Online URL"
-          value={f.orderUrl} onChange={e=>s('orderUrl',e.target.value)} mono
-          hint="DoorDash / UberEats / your own ordering system"
-          placeholder="https://www.ubereats.com/..."/>
-        <Inp label="Order Button Label"
-          value={f.orderLabel} onChange={e=>s('orderLabel',e.target.value)}
-          placeholder="Order Online"/>
-      </div>
-      <SaveBtn onClick={()=>mut.mutate()} saving={mut.isPending}/>
-    </div>
-  )
-}
-
-// ── Netlify Config ───────────────────────────────────────────
-function NetlifyConfig({ clientId, config }) {
-  const qc = useQueryClient()
-  const [form, setForm] = useState(config.netlify || {})
-  const set = (k, v) => setForm(p => ({...p, [k]: v}))
-  useEffect(() => { setForm(config.netlify||{}) }, [config])
   const mutation = useMutation({
-    mutationFn: () => saveConfig(clientId, { netlify: form }),
-    onSuccess: () => qc.invalidateQueries(['config', clientId])
-  })
-
-  return (
-    <div>
-      <h2 style={{ margin:'0 0 16px', fontSize:17, fontWeight:700, color:C.t0 }}>Netlify Setup</h2>
-      <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:560 }}>
-        <Inp label="Netlify Site ID" value={form.siteId} mono
-          placeholder="e.g. abc-def-123"
-          onChange={e => set('siteId', e.target.value)} />
-        <Inp label="Build Hook URL" value={form.buildHook} mono
-          placeholder="https://api.netlify.com/build_hooks/..."
-          hint="Netlify → Site Settings → Build Hooks → copy URL here"
-          onChange={e => set('buildHook', e.target.value)} />
-        <Inp label="Live Site URL" value={form.siteUrl} mono
-          placeholder="https://yourrestaurant.com.au"
-          onChange={e => set('siteUrl', e.target.value)} />
-      </div>
-
-      <div style={{marginTop:16}}>
-        <label style={{fontSize:11,fontWeight:700,color:C.t3,textTransform:'uppercase',
-          letterSpacing:'0.06em',display:'block',marginBottom:8}}>Site Template</label>
-        <select value={form.template||'urban-bistro'} onChange={e=>set('template',e.target.value)}
-          style={{padding:'9px 11px',fontSize:13,background:'#111827',border:`1px solid ${C.border}`,
-            borderRadius:7,color:C.t0,fontFamily:'inherit',outline:'none',width:'100%',maxWidth:560}}>
-          <option value="urban-bistro">🍽️ Urban Bistro — Warm modern Australian</option>
-          <option value="noir-fine-dine">🥂 Noir Fine Dine — Dark luxury editorial</option>
-          <option value="garden-fresh">🌿 Garden Fresh — Bright clean plant-forward</option>
-        </select>
-        <span style={{fontSize:11,color:C.t3,marginTop:5,display:'block'}}>
-          Changes template on next Deploy Live
-        </span>
-      </div>
-
-      <SaveBtn onClick={() => mutation.mutate()} saving={mutation.isPending} />
-    </div>
-  )
-}
-
-function DeployConfig({ clientId, config }) {
-  const qc = useQueryClient()
-  const [deployResult, setDeployResult] = useState(null)
-  const [creating,     setCreating]     = useState(false)
-  const [createResult, setCreateResult] = useState(null)
-
-  const netlifyConfig = config.netlify || {}
-
-  // Deploy history from our own database
-  const { data: deploys = [] } = useQuery({
-    queryKey: ['deploys', clientId],
-    queryFn:  () => getDeploys(clientId),
-    refetchInterval: deployResult === 'triggering' ? 5000 : false
-  })
-
-  // Trigger deploy mutation
-  const deployMutation = useMutation({
-    mutationFn: () => deployClient(clientId),
-    onMutate:   () => setDeployResult('triggering'),
-    onSuccess:  () => {
-      setDeployResult('success')
-      qc.invalidateQueries(['deploys', clientId])
-    },
-    onError: (err) => setDeployResult('error:' + (err.response?.data?.error || err.message))
-  })
-
-  // Create Netlify site mutation
-  const createMutation = useMutation({
-    mutationFn: () => createNetlifySite(clientId),
-    onMutate:   () => { setCreating(true); setCreateResult(null) },
-    onSuccess:  (data) => {
-      setCreating(false)
-      setCreateResult('✅ Netlify site created! Site ID: ' + data.id)
+    mutationFn: () => saveConfig(clientId, { reviews: f }),
+    onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
+            clearDraft('reviews')
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
     },
     onError: (err) => {
-      setCreating(false)
-      setCreateResult('❌ ' + (err.response?.data?.error || err.message))
+      console.error('Reviews save failed:', err)
+      console.error('Error details:', err.response?.data)
+      
+      // Show user-friendly error message
+      const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
+      alert(`Reviews save failed: ${errorMsg}\n\nYour changes are still saved as a draft. Please try again.`)
     }
   })
 
-  const C2 = { panel:'#0E1420',card:'#141C2E',border:'#1E2D4A',t0:'#F1F5FF',t1:'#B8C5E0',t2:'#7A8BAD',t3:'#445572',acc:'#FF6B2B',green:'#22C55E',amber:'#F59E0B',red:'#EF4444' }
+  // CTA helpers — same pattern as HeaderConfig
+  const ctas      = f.ctas || []
+  const saveCta   = (cta) => {
+    if (cta.id) {
+      s('ctas', ctas.map(c => c.id === cta.id ? cta : c))
+    } else {
+      s('ctas', [...ctas, { ...cta, id: Date.now().toString(), active: true }])
+    }
+    setCtaModal(null)
+  }
+  const deleteCta = (id) => {
+    if (!window.confirm('Delete this CTA?')) return
+    s('ctas', ctas.filter(c => c.id !== id))
+  }
+  const toggleCta = (id) => {
+    s('ctas', ctas.map(c => c.id === id ? {...c, active: !c.active} : c))
+  }
+
+  const tabs = [
+    { key:'summary', label:'Summary'       },
+    { key:'ctas',    label:'Calls To Action'},
+  ]
+
+  const field = (label, key, placeholder, opts={}) => (
+    <div key={key}>
+      <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+        textTransform:'uppercase', letterSpacing:'0.06em',
+        display:'block', marginBottom:5 }}>{label}</label>
+      <input
+        value={f[key] || ''}
+        onChange={e => s(key, e.target.value)}
+        placeholder={placeholder}
+        style={{ width:'100%', padding:'9px 11px', background:C.input,
+          border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+          fontSize:13, fontFamily: opts.mono ? 'monospace' : 'inherit',
+          outline:'none', boxSizing:'border-box' }}
+        onFocus={e => e.target.style.borderColor = C.acc}
+        onBlur={e  => e.target.style.borderColor = C.border}
+      />
+      {opts.hint && (
+        <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>{opts.hint}</div>
+      )}
+    </div>
+  )
+
+  const SaveRow = () => (
+    <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:24 }}>
+      <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
+        style={{ padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
+          border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
+          cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+          boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+      {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
+      {mutation.isError && (
+        <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Save Failed</span>
+      )}
+    </div>
+  )
 
   return (
     <div>
-      <h2 style={{ margin:'0 0 16px', fontSize:17, fontWeight:700, color:C2.t0 }}>Deploy Live</h2>
+      {ctaModal && (
+        <CtaModal
+          cta={ctaModal === 'new' ? null : ctaModal}
+          onSave={saveCta}
+          onClose={() => setCtaModal(null)}
+        />
+      )}
 
-      {/* Info box */}
-      <div style={{ background:C2.card, borderLeft:'3px solid #00D4FF', padding:'9px 14px',
-        borderRadius:'0 7px 7px 0', fontSize:12, color:C2.t2, marginBottom:20 }}>
-        Clicking Deploy Live sends a webhook to Netlify which triggers a full site rebuild.
-        The live site updates within 30–90 seconds.
+      <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
+        Reviews
+      </h2>
+      <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
+        Configure how reviews are displayed on the restaurant site.
+      </p>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            style={{ padding:'9px 20px', border:'none',
+              borderBottom: tab===t.key ? `2px solid ${C.acc}` : '2px solid transparent',
+              background:'none', color: tab===t.key ? C.t0 : C.t2,
+              fontWeight: tab===t.key ? 700 : 400, fontSize:13,
+              cursor:'pointer', fontFamily:'inherit', marginBottom:-1 }}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Site details row */}
-      {netlifyConfig.siteUrl && (
-        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20,
-          padding:'12px 16px', background:C2.card, border:`1px solid ${C2.border}`, borderRadius:10 }}>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:C2.t3, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>Live URL</div>
-            <a href={netlifyConfig.siteUrl} target="_blank" rel="noreferrer"
-              style={{ fontSize:13, color:'#00D4FF', fontFamily:'monospace' }}>
-              {netlifyConfig.siteUrl}
-            </a>
-          </div>
-          {netlifyConfig.siteId && (
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, color:C2.t3, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>Site ID</div>
-              <span style={{ fontSize:12, color:C2.t2, fontFamily:'monospace' }}>{netlifyConfig.siteId}</span>
+      {/* ── Summary tab ── */}
+      {tab === 'summary' && (
+        <div>
+
+          {/* Google Place ID */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+              Google Reviews (Automatic)
             </div>
+            {field('Google Place ID', 'googlePlaceId', 'e.g. ChIJN1t_tDeuEmsRUsoyG83frY4',
+              { mono: true,
+                hint: 'Find at maps.google.com → search your restaurant → share → copy the Place ID. Reviews will be fetched automatically.' })}
+            <div style={{ marginTop:14, display:'flex', gap:10, alignItems:'center' }}>
+              <input type="checkbox"
+                checked={f.enableHeader !== false}
+                onChange={e => s('enableHeader', e.target.checked)}
+                style={{ accentColor: C.acc, width:14, height:14 }}/>
+              <label style={{ fontSize:13, color:C.t1 }}>Enable Reviews in Header</label>
+            </div>
+            <div style={{ marginTop:8, display:'flex', gap:10, alignItems:'center' }}>
+              <input type="checkbox"
+                checked={f.enableFooter === true}
+                onChange={e => s('enableFooter', e.target.checked)}
+                style={{ accentColor: C.acc, width:14, height:14 }}/>
+              <label style={{ fontSize:13, color:C.t1 }}>Enable Reviews in Footer</label>
+            </div>
+            <div style={{ marginTop:8, display:'flex', gap:10, alignItems:'center' }}>
+              <input type="checkbox"
+                checked={f.enableFloating === true}
+                onChange={e => s('enableFloating', e.target.checked)}
+                style={{ accentColor: C.acc, width:14, height:14 }}/>
+              <label style={{ fontSize:13, color:C.t1 }}>Enable Floating Reviews Widget</label>
+            </div>
+          </div>
+
+          {/* Minimum Star Rating */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>
+              Minimum Star Rating
+            </div>
+            <div style={{ fontSize:12, color:C.t3, marginBottom:14 }}>
+              Only show reviews with this rating or above.
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              {[1,2,3,4,5].map(star => {
+                const isSelected = (f.minStars || 3) === star
+                return (
+                  <button key={star} onClick={() => s('minStars', star)}
+                    style={{ width:44, height:44, borderRadius:8, cursor:'pointer',
+                      fontFamily:'inherit', fontSize:16, fontWeight:700,
+                      border:`2px solid ${isSelected ? '#F5A623' : C.border}`,
+                      background: isSelected ? '#2A1A00' : 'transparent',
+                      color: isSelected ? '#F5A623' : C.t2,
+                      transition:'all 0.15s' }}>
+                    {star}★
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Reviews carousel section heading */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+              Reviews Carousel Content
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+              {field('Heading',     'carouselHeading',    'e.g. What Our Customers Say')}
+              {field('Sub Heading', 'carouselSubHeading', 'e.g. Real reviews from real customers')}
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                textTransform:'uppercase', letterSpacing:'0.06em',
+                display:'block', marginBottom:5 }}>Content</label>
+              <textarea
+                value={f.carouselContent || ''}
+                onChange={e => s('carouselContent', e.target.value)}
+                rows={4}
+                placeholder="Optional introductory text shown above the reviews carousel..."
+                style={{ width:'100%', padding:'9px 11px', fontSize:13,
+                  background:C.input, border:`1px solid ${C.border}`,
+                  borderRadius:7, color:C.t0, fontFamily:'inherit',
+                  resize:'vertical', outline:'none', boxSizing:'border-box' }}
+                onFocus={e => e.target.style.borderColor = C.acc}
+                onBlur={e  => e.target.style.borderColor = C.border}
+              />
+            </div>
+            
+            {/* Reviews display options */}
+            <div style={{ marginTop:16, padding:12, background:C.panel, borderRadius:8, border:`1px solid ${C.border}20` }}>
+              <div style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:10 }}>Display Options</div>
+              
+              <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:8 }}>
+                <input type="checkbox"
+                  checked={f.showReviewsCarousel === true}
+                  onChange={e => s('showReviewsCarousel', e.target.checked)}
+                  style={{ accentColor: C.acc, width:14, height:14 }}/>
+                <label style={{ fontSize:13, color:C.t1 }}>Show Reviews Carousel</label>
+              </div>
+              
+              <div style={{ fontSize:11, color:C.t3, marginTop:8, marginBottom:4 }}>When enabled, displays real-time Google reviews on the homepage</div>
+              
+              <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                <input type="checkbox"
+                  checked={f.alternateStyles === true}
+                  onChange={e => s('alternateStyles', e.target.checked)}
+                  style={{ accentColor: C.acc, width:14, height:14 }}/>
+                <label style={{ fontSize:13, color:C.t1 }}>Use Alternate Styles (Dark Background)</label>
+              </div>
+            </div>
+          </div>
+
+          <SaveRow/>
+        </div>
+      )}
+
+      {/* ── CTAs tab ── */}
+      {tab === 'ctas' && (
+        <div>
+          <div style={{ display:'flex', justifyContent:'space-between',
+            alignItems:'center', marginBottom:16 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:C.t0 }}>
+                Reviews CTAs
+              </div>
+              <div style={{ fontSize:12, color:C.t3, marginTop:2 }}>
+                Buttons shown in the reviews section — e.g. Leave a Review, Read More
+              </div>
+            </div>
+            <button onClick={() => setCtaModal('new')}
+              style={{ padding:'8px 18px', background:C.acc, border:'none',
+                borderRadius:8, color:'#fff', fontWeight:700, fontSize:13,
+                cursor:'pointer', fontFamily:'inherit' }}>
+              + Add CTA
+            </button>
+          </div>
+
+          {/* CTAs table */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, overflow:'hidden', marginBottom:20 }}>
+            <div style={{ display:'grid',
+              gridTemplateColumns:'1fr 130px 180px 70px 70px 60px',
+              padding:'8px 16px', background:'#0A0F1A',
+              borderBottom:`1px solid ${C.border}`,
+              fontSize:11, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.05em' }}>
+              <span>Label</span>
+              <span>Type</span>
+              <span>Link</span>
+              <span>Variant</span>
+              <span>Active</span>
+              <span></span>
+            </div>
+
+            {ctas.length === 0 ? (
+              <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>
+                No CTAs yet. Click + Add CTA to create one.
+              </div>
+            ) : ctas.map((cta, i) => (
+              <div key={cta.id}
+                style={{ display:'grid',
+                  gridTemplateColumns:'1fr 130px 180px 70px 70px 60px',
+                  padding:'11px 16px', alignItems:'center',
+                  borderBottom: i < ctas.length-1 ? `1px solid ${C.border}15` : 'none' }}
+                onMouseEnter={e => e.currentTarget.style.background=C.hover}
+                onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>
+                    {cta.label || cta.workingTitle}
+                  </div>
+                  {cta.workingTitle && cta.label && (
+                    <div style={{ fontSize:11, color:C.t3 }}>{cta.workingTitle}</div>
+                  )}
+                </div>
+                <span style={{ fontSize:11, color:C.t2 }}>
+                  {CTA_TYPES.find(t => t.key === cta.type)?.label || cta.type}
+                </span>
+                <span style={{ fontSize:11, color:C.cyan, fontFamily:'monospace',
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {cta.value}
+                </span>
+                <span style={{ fontSize:11, color:C.t3, textTransform:'capitalize' }}>
+                  {cta.variant || 'primary'}
+                </span>
+                <div onClick={() => toggleCta(cta.id)}
+                  style={{ width:36, height:20, borderRadius:10, cursor:'pointer',
+                    background: cta.active ? C.acc : C.hover, position:'relative',
+                    border:`1px solid ${cta.active ? C.acc : C.border2}`,
+                    transition:'background 0.15s' }}>
+                  <div style={{ width:14, height:14, borderRadius:'50%', background:'#fff',
+                    position:'absolute', top:2,
+                    left: cta.active ? 18 : 2, transition:'left 0.15s' }}/>
+                </div>
+                <div style={{ display:'flex', gap:5 }}>
+                  <button onClick={() => setCtaModal(cta)}
+                    style={{ padding:'4px 8px', background:'transparent',
+                      border:`1px solid ${C.border2}`, borderRadius:4,
+                      color:C.t2, fontSize:11, cursor:'pointer' }}>Edit</button>
+                  <button onClick={() => deleteCta(cta.id)}
+                    style={{ padding:'4px 8px', background:'transparent',
+                      border:'1px solid #EF444440', borderRadius:4,
+                      color:'#EF4444', fontSize:11, cursor:'pointer' }}>Del</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <SaveRow/>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Footer Config ───────────────────────────────────────────
+function FooterConfig({ clientId, config, draft, setDraft }) {
+  const qc = useQueryClient()
+  const [f,     setF]     = useState(draft || config.footer || {})
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => { 
+    if (!draft) setF(config.footer || {}) 
+  }, [config])
+
+  useEffect(() => {
+    setDraft(f)
+  }, [f])
+
+  const s = (k, v) => setF(p => ({...p, [k]: v}))
+
+  const mutation = useMutation({
+    mutationFn: () => saveConfig(clientId, { footer: f }),
+    onSuccess: () => {
+      qc.invalidateQueries(['config', clientId])
+            clearDraft(activeKey)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    }
+  })
+
+  const inp = (label, key, placeholder, hint='') => (
+    <div key={key}>
+      <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+        textTransform:'uppercase', letterSpacing:'0.06em',
+        display:'block', marginBottom:5 }}>{label}</label>
+      <input value={f[key] || ''} onChange={e => s(key, e.target.value)}
+        placeholder={placeholder}
+        style={{ width:'100%', padding:'9px 11px', background:C.input,
+          border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+          fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+        onFocus={e => e.target.style.borderColor = C.acc}
+        onBlur={e  => e.target.style.borderColor = C.border}
+      />
+      {hint && <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>{hint}</div>}
+    </div>
+  )
+
+  const setSocial = (k, v) => setF(p => ({
+    ...p, 
+    socialLinks: { ...(p.socialLinks || {}), [k]: v }
+  }))
+
+  const SOCIAL_PLATFORMS = [
+    { key:'facebook',    label:'Facebook',    placeholder:'https://facebook.com/yourpage'    },
+    { key:'instagram',   label:'Instagram',   placeholder:'https://instagram.com/yourhandle' },
+    { key:'google',      label:'Google',      placeholder:'https://g.page/r/...'             },
+    { key:'tripadvisor', label:'TripAdvisor', placeholder:'https://tripadvisor.com/...'      },
+    { key:'twitter',     label:'X / Twitter', placeholder:'https://twitter.com/yourhandle'  },
+    { key:'youtube',     label:'YouTube',     placeholder:'https://youtube.com/...'          },
+    { key:'tiktok',      label:'TikTok',      placeholder:'https://tiktok.com/@yourhandle'  },
+  ]
+
+  return (
+    <div>
+      <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
+        Footer
+      </h2>
+      <p style={{ margin:'0 0 24px', fontSize:13, color:C.t3 }}>
+        Footer content, social links and legal links for the restaurant site.
+      </p>
+
+      {/* Brand */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Brand
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {inp('Tagline', 'tagline',
+            'e.g. Proudly serving Melbourne since 2012',
+            'Shown below the logo in the footer')}
+          {inp('Copyright Text', 'copyrightText',
+            `e.g. © ${new Date().getFullYear()} Urban Eats Melbourne. All rights reserved.`,
+            'Leave blank to auto-generate from restaurant name')}
+        </div>
+      </div>
+
+      {/* Social Links */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Social Links
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+          {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                textTransform:'uppercase', letterSpacing:'0.06em',
+                display:'block', marginBottom:5 }}>{label}</label>
+              <input
+                value={f.socialLinks?.[key] || ''}
+                onChange={e => setSocial(key, e.target.value)}
+                placeholder={placeholder}
+                style={{ width:'100%', padding:'9px 11px', background:C.input,
+                  border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                  fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                onFocus={e => e.target.style.borderColor = C.acc}
+                onBlur={e  => e.target.style.borderColor = C.border}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Legal Links */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:24 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Legal Links
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+          {(f.legalLinks || [
+            { label:'Privacy Policy', href:'/privacy' },
+            { label:'Terms',          href:'/terms'   },
+          ]).map((link, i) => (
+            <div key={i} style={{ display:'grid',
+              gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.06em',
+                  display:'block', marginBottom:5 }}>Label</label>
+                <input
+                  value={link.label || ''}
+                  onChange={e => {
+                    const links = [...(f.legalLinks || [
+                      { label:'Privacy Policy', href:'/privacy' },
+                      { label:'Terms',          href:'/terms'   },
+                    ])]
+                    links[i] = { ...links[i], label: e.target.value }
+                    s('legalLinks', links)
+                  }}
+                  style={{ width:'100%', padding:'9px 11px', background:C.input,
+                    border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                    fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  onFocus={e => e.target.style.borderColor = C.acc}
+                  onBlur={e  => e.target.style.borderColor = C.border}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.06em',
+                  display:'block', marginBottom:5 }}>URL</label>
+                <input
+                  value={link.href || ''}
+                  onChange={e => {
+                    const links = [...(f.legalLinks || [
+                      { label:'Privacy Policy', href:'/privacy' },
+                      { label:'Terms',          href:'/terms'   },
+                    ])]
+                    links[i] = { ...links[i], href: e.target.value }
+                    s('legalLinks', links)
+                  }}
+                  style={{ width:'100%', padding:'9px 11px', background:C.input,
+                    border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                    fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  onFocus={e => e.target.style.borderColor = C.acc}
+                  onBlur={e  => e.target.style.borderColor = C.border}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Save */}
+      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+        <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
+          style={{ padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
+            border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
+            cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+            boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
+          {mutation.isPending ? 'Saving…' : 'Save Footer'}
+        </button>
+        {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+      </div>
+    </div>
+  )
+}
+
+// ── Booking & Ordering Config ───────────────────────────────────────────
+function BookingConfig({ clientId, config, draft, setDraft }) {
+  const qc = useQueryClient()
+  const [tab,   setTab]   = useState(draft?.tab || 'booking')
+  const [f,     setF]     = useState(draft?.f || config.booking || {})
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => { 
+    if (!draft) setF(config.booking || {}) 
+  }, [config])
+
+  useEffect(() => {
+    setDraft({ tab, f })
+  }, [tab, f])
+
+  const s = (k, v) => setF(p => ({...p, [k]: v}))
+
+  const mutation = useMutation({
+    mutationFn: () => saveConfig(clientId, { booking: f }),
+    onSuccess: () => {
+      qc.invalidateQueries(['config', clientId])
+            clearDraft(activeKey)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    }
+  })
+
+  const tabs = [
+    { key:'booking',  label:'Table Booking'  },
+    { key:'ordering', label:'Online Ordering' },
+    { key:'display',  label:'Display Options' },
+  ]
+
+  const inp = (label, key, placeholder, opts={}) => (
+    <div key={key}>
+      <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+        textTransform:'uppercase', letterSpacing:'0.06em',
+        display:'block', marginBottom:5 }}>{label}</label>
+      <input
+        value={f[key] || ''}
+        onChange={e => s(key, e.target.value)}
+        placeholder={placeholder}
+        style={{ width:'100%', padding:'9px 11px', background:C.input,
+          border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+          fontSize:13,
+          fontFamily: opts.mono ? "'Fira Code',monospace" : 'inherit',
+          outline:'none', boxSizing:'border-box' }}
+        onFocus={e => e.target.style.borderColor = C.acc}
+        onBlur={e  => e.target.style.borderColor = C.border}
+      />
+      {opts.hint && (
+        <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>{opts.hint}</div>
+      )}
+    </div>
+  )
+
+  const toggle = (label, key, hint='') => (
+    <div style={{ display:'flex', alignItems:'center',
+      justifyContent:'space-between', padding:'12px 0',
+      borderBottom:`1px solid ${C.border}20` }}>
+      <div>
+        <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>{label}</div>
+        {hint && <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>{hint}</div>}
+      </div>
+      <div onClick={() => s(key, !f[key])}
+        style={{ width:44, height:24, borderRadius:12, cursor:'pointer',
+          background: f[key] ? C.acc : C.hover, flexShrink:0,
+          position:'relative',
+          border:`1px solid ${f[key] ? C.acc : C.border2}`,
+          transition:'background 0.15s' }}>
+        <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff',
+          position:'absolute', top:2,
+          left: f[key] ? 22 : 2, transition:'left 0.15s' }}/>
+      </div>
+    </div>
+  )
+
+  const SaveRow = () => (
+    <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:24 }}>
+      <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
+        style={{ padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
+          border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
+          cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+          boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+      {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+    </div>
+  )
+
+  return (
+    <div>
+      <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
+        Booking & Ordering
+      </h2>
+      <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
+        Controls every booking and order button across the entire site.
+        Change once — updates everywhere instantly.
+      </p>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`,
+        marginBottom:24 }}>
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            style={{ padding:'9px 20px', border:'none',
+              borderBottom: tab===t.key ? `2px solid ${C.acc}` : '2px solid transparent',
+              background:'none', color: tab===t.key ? C.t0 : C.t2,
+              fontWeight: tab===t.key ? 700 : 400, fontSize:13,
+              cursor:'pointer', fontFamily:'inherit', marginBottom:-1 }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Table Booking ── */}
+      {tab === 'booking' && (
+        <div>
+          {/* Booking method */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>
+              Booking Method
+            </div>
+            <div style={{ fontSize:12, color:C.t3, marginBottom:14 }}>
+              The site uses whichever you fill in — URL takes priority over phone.
+            </div>
+
+            {/* Platform selector */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)',
+              gap:8, marginBottom:16 }}>
+              {[
+                { key:'opentable',  label:'OpenTable'   },
+                { key:'resdiary',   label:'ResDiary'    },
+                { key:'quandoo',    label:'Quandoo'     },
+                { key:'nowbookit',  label:'NowBookIt'   },
+                { key:'custom',     label:'Custom URL'  },
+                { key:'phone',      label:'Phone Only'  },
+              ].map(p => {
+                const isSelected = (f.bookingPlatform || 'custom') === p.key
+                return (
+                  <button key={p.key}
+                    onClick={() => s('bookingPlatform', p.key)}
+                    style={{ padding:'8px', borderRadius:7, cursor:'pointer',
+                      fontFamily:'inherit', fontSize:12, fontWeight:600,
+                      border:`1px solid ${isSelected ? C.acc : C.border}`,
+                      background: isSelected ? C.accBg : 'transparent',
+                      color: isSelected ? C.acc : C.t2 }}>
+                    {p.label}
+                    {isSelected && ' ✓'}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              {inp('Booking URL', 'bookingUrl',
+                'https://www.opentable.com.au/...',
+                { mono: true,
+                  hint: 'Paste your OpenTable, ResDiary, Quandoo or custom booking page URL' })}
+              {inp('Phone Booking Number', 'bookingPhone',
+                '+61 3 9123 4567',
+                { hint: 'Used as fallback if no URL — clicking Book a Table will call this number' })}
+            </div>
+          </div>
+
+          {/* Button labels */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+              Button Labels
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+              {inp('Book Button Text', 'bookLabel', 'e.g. Book a Table',
+                { hint: 'Shown on every booking CTA across the site' })}
+              {inp('Confirmation Message', 'bookConfirmMsg',
+                'e.g. Thanks! We\'ll see you soon.',
+                { hint: 'Shown after a booking is made (if using direct form)' })}
+            </div>
+          </div>
+
+          {/* Direct booking form settings */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ display:'flex', alignItems:'center',
+              justifyContent:'space-between', marginBottom: f.useDirectForm ? 16 : 0 }}>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>
+                  Direct Booking Form
+                </div>
+                <div style={{ fontSize:12, color:C.t3 }}>
+                  Use a built-in form instead of an external platform
+                </div>
+              </div>
+              <div onClick={() => s('useDirectForm', !f.useDirectForm)}
+                style={{ width:44, height:24, borderRadius:12, cursor:'pointer',
+                  background: f.useDirectForm ? C.acc : C.hover, flexShrink:0,
+                  position:'relative',
+                  border:`1px solid ${f.useDirectForm ? C.acc : C.border2}`,
+                  transition:'background 0.15s' }}>
+                <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff',
+                  position:'absolute', top:2,
+                  left: f.useDirectForm ? 22 : 2, transition:'left 0.15s' }}/>
+              </div>
+            </div>
+
+            {f.useDirectForm && (
+              <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                  {inp('Min Party Size', 'minParty', 'e.g. 1')}
+                  {inp('Max Party Size', 'maxParty', 'e.g. 20')}
+                  {inp('Advance Notice (hours)', 'advanceNotice', 'e.g. 2',
+                    { hint: 'How many hours ahead a booking can be made' })}
+                  {inp('Max Days Ahead', 'maxDaysAhead', 'e.g. 60',
+                    { hint: 'How far in advance customers can book' })}
+                  {inp('Time Slot Interval (mins)', 'slotInterval', 'e.g. 30',
+                    { hint: '30 = slots at 6:00, 6:30, 7:00 etc' })}
+                  {inp('Notification Email', 'notifyEmail',
+                    'e.g. bookings@restaurant.com',
+                    { hint: 'Where booking notifications are sent' })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <SaveRow/>
+        </div>
+      )}
+
+      {/* ── Online Ordering ── */}
+      {tab === 'ordering' && (
+        <div>
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+              Ordering Platforms
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              {inp('Uber Eats URL', 'uberEatsUrl',
+                'https://www.ubereats.com/...',
+                { mono:true, hint:'Your restaurant\'s Uber Eats page' })}
+              {inp('DoorDash URL', 'doorDashUrl',
+                'https://www.doordash.com/...',
+                { mono:true, hint:'Your restaurant\'s DoorDash page' })}
+              {inp('Menulog URL', 'menulogUrl',
+                'https://www.menulog.com.au/...',
+                { mono:true, hint:'Your restaurant\'s Menulog page' })}
+              {inp('Custom Order URL', 'orderUrl',
+                'https://order.yourrestaurant.com.au',
+                { mono:true, hint:'Your own ordering system — overrides platform links if set' })}
+              {inp('Order Button Label', 'orderLabel', 'e.g. Order Online',
+                { hint:'Text shown on the Order Online button' })}
+            </div>
+          </div>
+
+          {/* Pickup / Delivery toggle */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+              Service Types
+            </div>
+            {toggle('Pickup Available',  'pickupEnabled',
+              'Customers can order for pickup')}
+            {toggle('Delivery Available', 'deliveryEnabled',
+              'Customers can order for delivery')}
+            {toggle('Dine-in Ordering',  'dineInEnabled',
+              'Customers can order from table via QR code')}
+
+            {f.pickupEnabled && (
+              <div style={{ marginTop:14 }}>
+                {inp('Estimated Pickup Time', 'pickupTime',
+                  'e.g. 15-20 minutes',
+                  { hint:'Shown to customer after ordering' })}
+              </div>
+            )}
+            {f.deliveryEnabled && (
+              <div style={{ marginTop:14,
+                display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                {inp('Minimum Order ($)', 'minOrder', 'e.g. 30')}
+                {inp('Delivery Fee ($)',  'deliveryFee', 'e.g. 5')}
+                {inp('Estimated Delivery Time', 'deliveryTime', 'e.g. 30-45 minutes')}
+                {inp('Free Delivery Over ($)', 'freeDeliveryOver',
+                  'e.g. 60', { hint:'Leave blank to always charge delivery fee' })}
+              </div>
+            )}
+          </div>
+
+          <SaveRow/>
+        </div>
+      )}
+
+      {/* ── Display Options ── */}
+      {tab === 'display' && (
+        <div>
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+              Show / Hide Booking Elements
+            </div>
+            {toggle('Show Book Button in Header',
+              'showInHeader', 'CTA button in the site header')}
+            {toggle('Show Book Button in Utility Belt',
+              'showInUtility', 'Quick book link in the top bar')}
+            {toggle('Show Book Button in Hero',
+              'showInHero', 'CTA on the homepage hero section')}
+            {toggle('Show Book Button on Location Cards',
+              'showOnLocations', 'Book button on each location card')}
+            {toggle('Show Book Button in Footer',
+              'showInFooter', 'CTA in the site footer')}
+            {toggle('Show Order Online Button',
+              'showOrderBtn', 'Show or hide the Order Online button globally')}
+          </div>
+
+          <SaveRow/>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Netlify Config ─────────────────────────────────────────
+function NetlifyConfig({ clientId, config, draft, setDraft }) {
+  const qc = useQueryClient()
+  const [tab,      setTab]      = useState(draft?.tab || 'setup')
+  const [form,     setForm]     = useState(draft?.form || config.netlify || {})
+  const [saved,    setSaved]    = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createMsg,setCreateMsg]= useState('')
+  const [deploys,  setDeploys]  = useState([])
+  const [loadingD, setLoadingD] = useState(false)
+  const [domainVal,setDomainVal]= useState('')
+  const [addingDomain, setAddingDomain] = useState(false)
+  
+  // Build status tracking
+  const [buildStatus, setBuildStatus] = useState(null) // null | 'creating' | 'building' | 'ready' | 'error'
+  const [buildStartTime, setBuildStartTime] = useState(null)
+  const [actualPreviewUrl, setActualPreviewUrl] = useState(null)
+  
+  // Live build timer (seconds elapsed, updated every second while building)
+  const [buildElapsed, setBuildElapsed] = useState(0)
+
+  // Site verification
+  const [verifying, setVerifying] = useState(false)
+  const [verifyStatus, setVerifyStatus] = useState(null) // null | 'exists' | 'not_found' | 'error'
+  const [verifyMessage, setVerifyMessage] = useState('')
+  const [rebuilding, setRebuilding] = useState(false)
+
+  // Repo / setup status
+  const [setupStatus,   setSetupStatus]   = useState(null)
+  const [linkingRepo,   setLinkingRepo]   = useState(false)
+  const [linkRepoMsg,   setLinkRepoMsg]   = useState('')
+  const [linkRepoBranch, setLinkRepoBranch] = useState('main')
+
+  // Environment variables tab
+  const [envVars,    setEnvVars]    = useState([])
+  const [loadingEnv, setLoadingEnv] = useState(false)
+  const [savingEnv,  setSavingEnv]  = useState(false)
+  const [envMsg,     setEnvMsg]     = useState('')
+  const [newEnvKey,  setNewEnvKey]  = useState('')
+  const [newEnvVal,  setNewEnvVal]  = useState('')
+  const [deletingEnvKey, setDeletingEnvKey] = useState(null)
+
+  // Rollback
+  const [rollingBack, setRollingBack] = useState(null) // deployId being rolled back
+
+  useEffect(() => { 
+    if (config.netlify && !draft) setForm(config.netlify) 
+  }, [config])
+
+  useEffect(() => {
+    setDraft({ tab, form })
+  }, [tab, form])
+
+  // Live build timer — ticks every second while building
+  useEffect(() => {
+    if (buildStatus !== 'building') { setBuildElapsed(0); return }
+    setBuildElapsed(buildStartTime ? Math.floor((Date.now() - buildStartTime) / 1000) : 0)
+    const id = setInterval(() => {
+      setBuildElapsed(buildStartTime ? Math.floor((Date.now() - buildStartTime) / 1000) : 0)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [buildStatus, buildStartTime])
+
+  const s = (k, v) => setForm(p => ({...p, [k]: v}))
+  const token = () => localStorage.getItem('dd_token')
+
+  const mutation = useMutation({
+    mutationFn: () => saveConfig(clientId, { netlify: form }),
+    onSuccess: () => {
+      qc.invalidateQueries(['config', clientId])
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    }
+  })
+
+  const createNetlifySite = async () => {
+    setCreating(true)
+    setCreateMsg('⏳ Creating Netlify site...')
+    setBuildStatus('creating') // creating | building | ready | error
+    setBuildStartTime(Date.now())
+    
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/create`, {
+        method:  'POST',
+        headers: { 'Content-Type':'application/json', Authorization:'Bearer '+token() },
+        body: JSON.stringify({ template: form.template || 'urban-bistro' })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      
+      // Site created successfully
+      setCreateMsg(data.repoLinked
+        ? '✅ Site created & repo linked! Build in progress…'
+        : '⚠️ Site created but repo not linked — see Setup warning above.')
+      setBuildStatus(data.repoLinked ? 'building' : 'error')
+
+      // Update form with site details
+      setForm(p => ({
+        ...p,
+        siteId:       data.siteId,
+        previewUrl:   data.netlifyAppUrl || data.previewUrl,
+        buildHook:    data.buildHook,
+        customDomain: data.customDomain,
+      }))
+
+      await loadSetupStatus()
+
+      if (data.repoLinked) {
+        pollDeployStatus(data.siteId, data.netlifyAppUrl || data.previewUrl)
+      } else {
+        setCreating(false)
+      }
+
+      qc.invalidateQueries(['config', clientId])
+    } catch (err) {
+      setCreateMsg('❌ Error: ' + err.message)
+      setBuildStatus('error')
+      setCreating(false)
+    }
+  }
+  
+  // Poll Netlify deploy status
+  const pollDeployStatus = async (siteId, previewUrl) => {
+    const maxAttempts = 30 // 5 minutes max (30 * 10s)
+    let attempts = 0
+    
+    const checkStatus = async () => {
+      attempts++
+      try {
+        const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/deploys`, {
+          headers: { Authorization: 'Bearer ' + token() }
+        })
+        const deploys = await res.json()
+        
+        if (deploys && deploys.length > 0) {
+          const latestDeploy = deploys[0]
+          const state = latestDeploy.state // 'building' | 'ready' | 'error' | 'enqueued' | 'processing'
+
+          const fmtSecs = (s) => s >= 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`
+
+          if (state === 'ready') {
+            // Use Netlify's actual reported deploy_time (seconds) if available
+            const actualSecs = latestDeploy.deploy_time
+              || Math.floor((Date.now() - buildStartTime) / 1000)
+            setBuildStatus('ready')
+            setCreateMsg(`✅ Done! Built in ${fmtSecs(actualSecs)}`)
+            setActualPreviewUrl(previewUrl)
+            setCreating(false)
+            setRebuilding(false)
+          } else if (state === 'building' || state === 'enqueued' || state === 'processing') {
+            setBuildStatus('building')
+            // createMsg not needed — live counter handles display
+            setTimeout(checkStatus, 10000)
+          } else if (state === 'error') {
+            setBuildStatus('error')
+            setCreateMsg('❌ Build failed. Check Netlify dashboard for logs.')
+            setCreating(false)
+            setRebuilding(false)
+          } else {
+            // Unknown state, keep polling
+            setTimeout(checkStatus, 10000)
+          }
+        } else {
+          // No deploys yet, keep polling
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, 10000)
+          } else {
+            setCreateMsg('⏱️ Build taking longer than expected. Check Netlify dashboard.')
+            setCreating(false)
+            setRebuilding(false)
+          }
+        }
+      } catch (err) {
+        console.error('Polling error:', err)
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 10000)
+        } else {
+          setCreateMsg('⚠️ Could not track build status. Site may still be building.')
+          setCreating(false)
+          setRebuilding(false)
+        }
+      }
+    }
+    
+    // Start polling after 10 seconds (give Netlify time to start build)
+    setTimeout(checkStatus, 10000)
+  }
+  
+  // Verify if site actually exists on Netlify
+  const verifySiteExists = async () => {
+    setVerifying(true)
+    setVerifyStatus(null)
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/verify`, {
+        headers: { Authorization: 'Bearer ' + token() }
+      })
+      const data = await res.json()
+      
+      if (data.exists) {
+        setVerifyStatus('exists')
+        setVerifyMessage('✅ Site exists on Netlify and is accessible')
+      } else {
+        setVerifyStatus('not_found')
+        setVerifyMessage('❌ Site not found on Netlify. It may have been deleted.')
+      }
+    } catch (err) {
+      setVerifyStatus('error')
+      setVerifyMessage(`❌ Verification failed: ${err.message}`)
+    } finally {
+      setVerifying(false)
+    }
+  }
+  
+  // Trigger Netlify rebuild
+  const triggerRebuild = async () => {
+    setRebuilding(true)
+    setBuildStatus('building')
+    setBuildStartTime(Date.now())
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/rebuild`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token() }
+      })
+      const data = await res.json()
+      
+      if (res.ok) {
+        setCreateMsg('🔄 Rebuild triggered! Building...')
+        // Reset rebuilding flag since polling will handle completion
+        setRebuilding(false)
+        // Start polling for deploy status
+        pollDeployStatus(form.siteId, form.previewUrl)
+      } else {
+        throw new Error(data.error || 'Failed to trigger rebuild')
+      }
+    } catch (err) {
+      setCreateMsg(`❌ Rebuild failed: ${err.message}`)
+      setBuildStatus('error')
+      setRebuilding(false)
+    }
+  }
+
+  const loadEnvVars = async () => {
+    if (!form.siteId) return
+    setLoadingEnv(true)
+    setEnvMsg('')
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/env`,
+        { headers: { Authorization: 'Bearer ' + token() } })
+      const data = await res.json()
+      if (res.ok) {
+        const mapped = Array.isArray(data)
+          ? data.map(v => ({ key: v.key, value: v.values?.[0]?.value ?? '', id: v.key }))
+          : []
+        setEnvVars(mapped)
+      } else {
+        setEnvMsg('⚠️ ' + (data.error || 'Failed to load env vars'))
+      }
+    } catch (err) {
+      setEnvMsg('❌ ' + err.message)
+    } finally {
+      setLoadingEnv(false)
+    }
+  }
+
+  const saveEnvVars = async (triggerRebuildAfter = false) => {
+    const toSave = [...envVars]
+    if (newEnvKey.trim()) toSave.push({ key: newEnvKey.trim(), value: newEnvVal })
+    if (toSave.length === 0) return
+    setSavingEnv(true)
+    setEnvMsg('')
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/env`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+        body: JSON.stringify({ vars: toSave.map(({ key, value }) => ({ key, value })) })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setEnvMsg(`✅ ${data.updated} variable${data.updated !== 1 ? 's' : ''} updated`)
+      setNewEnvKey('')
+      setNewEnvVal('')
+      await loadEnvVars()
+      if (triggerRebuildAfter) {
+        setTimeout(() => {
+          setEnvMsg(prev => prev + ' — triggering rebuild…')
+          triggerRebuild()
+        }, 800)
+      }
+    } catch (err) {
+      setEnvMsg('❌ ' + err.message)
+    } finally {
+      setSavingEnv(false)
+    }
+  }
+
+  const deleteEnvVarFn = async (key) => {
+    setDeletingEnvKey(key)
+    try {
+      const res = await fetch(
+        `http://localhost:3001/api/clients/${clientId}/netlify/env/${encodeURIComponent(key)}`,
+        { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }
+      )
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed')
+      }
+      setEnvVars(prev => prev.filter(v => v.key !== key))
+      setEnvMsg(`✅ Deleted "${key}"`)
+    } catch (err) {
+      setEnvMsg('❌ ' + err.message)
+    } finally {
+      setDeletingEnvKey(null)
+    }
+  }
+
+  const rollback = async (deployId) => {
+    setRollingBack(deployId)
+    try {
+      const res = await fetch(
+        `http://localhost:3001/api/clients/${clientId}/netlify/rollback/${deployId}`,
+        { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      await loadDeploys()
+    } catch (err) {
+      alert('Rollback failed: ' + err.message)
+    } finally {
+      setRollingBack(null)
+    }
+  }
+
+  useEffect(() => { if (tab === 'env') loadEnvVars() }, [tab])
+
+  const loadSetupStatus = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/setup-status`,
+        { headers: { Authorization: 'Bearer ' + token() } })
+      if (res.ok) setSetupStatus(await res.json())
+    } catch { /* non-critical */ }
+  }
+
+  const linkRepo = async () => {
+    setLinkingRepo(true)
+    setLinkRepoMsg('')
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/link-repo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+        body: JSON.stringify({ branch: linkRepoBranch.trim() || 'main' })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setLinkRepoMsg('✅ ' + data.message)
+      await loadSetupStatus()
+    } catch (err) {
+      setLinkRepoMsg('❌ ' + err.message)
+    } finally {
+      setLinkingRepo(false)
+    }
+  }
+
+  useEffect(() => { loadSetupStatus() }, [])
+
+  const attachDomain = async () => {
+    if (!domainVal.trim()) return
+    setAddingDomain(true)
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/domain`, {
+        method:  'POST',
+        headers: { 'Content-Type':'application/json', Authorization:'Bearer '+token() },
+        body: JSON.stringify({ domain: domainVal.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setForm(p => ({...p, primaryDomain: domainVal.trim(), domainLive: false}))
+      qc.invalidateQueries(['config', clientId])
+      setDomainVal('')
+    } catch (err) {
+      alert('Error: ' + err.message)
+    } finally {
+      setAddingDomain(false)
+    }
+  }
+
+  const loadDeploys = async () => {
+    setLoadingD(true)
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/deploys`,
+        { headers: { Authorization:'Bearer '+token() } })
+      const data = await res.json()
+      setDeploys(Array.isArray(data) ? data : [])
+    } catch { setDeploys([]) }
+    finally { setLoadingD(false) }
+  }
+
+  useEffect(() => { if (tab === 'status') loadDeploys() }, [tab])
+
+  const TEMPLATES = [
+    { key:'urban-bistro',   label:'Urban Bistro',   desc:'Warm modern Australian'   },
+    { key:'noir-fine-dine', label:'Noir Fine Dine',  desc:'Dark luxury editorial'    },
+    { key:'garden-fresh',   label:'Garden Fresh',    desc:'Bright clean plant-forward'},
+    { key:'food-truck',     label:'Food Truck',      desc:'Fast + location-based'    },
+    { key:'cloud-kitchen',  label:'Cloud Kitchen',   desc:'Delivery only'            },
+    { key:'quick-service',  label:'Quick Service',   desc:'Fast food + combos'       },
+    { key:'catering',       label:'Catering Co',     desc:'Events + quotes'          },
+    { key:'meal-prep',      label:'Meal Prep',       desc:'Subscriptions + delivery' },
+  ]
+
+  const siteExists = !!form.siteId
+
+  const SaveRow = () => (
+    <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:20 }}>
+      <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
+        style={{ padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
+          border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
+          cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+          boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+      {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+    </div>
+  )
+
+  return (
+    <div>
+      <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
+        Deployment
+      </h2>
+      <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
+        Manage your live website — preview builds, custom domains, and deploy status.
+      </p>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
+        {[
+          { key:'setup',  label:'Setup'         },
+          { key:'env',    label:'Env Vars'       },
+          { key:'domain', label:'Domain'         },
+          { key:'status', label:'Deploy Status'  },
+        ].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            style={{ padding:'9px 20px', border:'none',
+              borderBottom: tab===t.key ? `2px solid ${C.acc}` : '2px solid transparent',
+              background:'none', color: tab===t.key ? C.t0 : C.t2,
+              fontWeight: tab===t.key ? 700 : 400, fontSize:13,
+              cursor:'pointer', fontFamily:'inherit', marginBottom:-1 }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Setup Tab ── */}
+      {tab === 'setup' && (
+        <div>
+          {/* ── Repo-not-linked warning ── */}
+          {setupStatus && siteExists && !setupStatus.repoLinked && (
+            <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid #EF444460',
+              borderRadius:10, padding:'14px 16px', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+                <span style={{ fontSize:18, flexShrink:0 }}>⚠️</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#EF4444', marginBottom:4 }}>
+                    GitHub repo not linked — this causes "Site not found"
+                  </div>
+                  <div style={{ fontSize:12, color:C.t3, lineHeight:1.7, marginBottom:10 }}>
+                    Netlify build hooks only work when a GitHub repo is connected. Without it the site
+                    has zero deployments and shows "Site not found".
+                    {!setupStatus.hasRepo ? (
+                      <span> Add <code style={{ color:C.cyan }}>SITE_TEMPLATE_REPO=owner/dinedesk</code> to
+                      your API <code style={{ color:C.cyan }}>.env</code> file, then click <strong>Link Repo</strong>.</span>
+                    ) : (
+                      <span> Repo <code style={{ color:C.cyan }}>{setupStatus.repoPath}</code> is
+                      configured — set the branch below and click <strong>Link Repo</strong>.</span>
+                    )}
+                  </div>
+                  {setupStatus.hasRepo && (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:11, color:C.t3 }}>Branch:</span>
+                        <input
+                          value={linkRepoBranch}
+                          onChange={e => setLinkRepoBranch(e.target.value)}
+                          placeholder="main"
+                          style={{ padding:'5px 10px', background:C.card, border:`1px solid ${C.border2}`,
+                            borderRadius:6, color:C.t0, fontSize:12, fontFamily:'monospace',
+                            width:110 }}/>
+                      </div>
+                      <button onClick={linkRepo} disabled={linkingRepo}
+                        style={{ padding:'8px 18px', background:'#EF4444', border:'none',
+                          borderRadius:7, color:'#fff', fontWeight:700, fontSize:12,
+                          cursor: linkingRepo ? 'not-allowed' : 'pointer',
+                          fontFamily:'inherit', opacity: linkingRepo ? 0.7 : 1 }}>
+                        {linkingRepo ? 'Linking…' : 'Link Repo Now'}
+                      </button>
+                    </div>
+                  )}
+                  {linkRepoMsg && (
+                    <div style={{ marginTop:8, fontSize:12,
+                      color: linkRepoMsg.startsWith('✅') ? C.green : '#EF4444' }}>
+                      {linkRepoMsg}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* Status banner with verification */}
+          {siteExists ? (
+            <div style={{ background:'#052010', border:`1px solid ${C.green}40`,
+              borderRadius:10, padding:'12px 16px', marginBottom:20 }}>
+              
+              {/* Main status row - changes during build */}
+              {buildStatus === 'building' ? (
+                <div style={{ padding:'12px 0' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+                    <div style={{ width:10, height:10, borderRadius:'50%',
+                      background:'#3B82F6', flexShrink:0,
+                      animation:'pulse 1.5s infinite' }}/>
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:'flex', alignItems:'baseline', gap:10 }}>
+                        <span style={{ fontSize:13, fontWeight:700, color:'#3B82F6' }}>⚙️ Building…</span>
+                        <span style={{ fontSize:13, fontWeight:700, color:'#60A5FA', fontVariantNumeric:'tabular-nums' }}>
+                          {buildElapsed >= 60
+                            ? `${Math.floor(buildElapsed/60)}m ${buildElapsed%60}s`
+                            : `${buildElapsed}s`}
+                        </span>
+                      </div>
+                      <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
+                        Netlify is building your site — usually 2–5 min for Next.js
+                      </div>
+                    </div>
+                    <button onClick={() => pollDeployStatus(form.siteId, form.previewUrl)}
+                      style={{ padding:'6px 12px', background:'transparent',
+                        border:`1px solid ${C.cyan}`, borderRadius:6,
+                        color:C.cyan, fontSize:11, fontWeight:600,
+                        cursor:'pointer', fontFamily:'inherit' }}
+                      title="Force recheck build status">
+                      🔄 Refresh
+                    </button>
+                  </div>
+
+                  {/* Animated progress bar — width grows with elapsed time, caps at 95% */}
+                  <div style={{ height:4, background:'rgba(255,255,255,0.1)',
+                    borderRadius:2, overflow:'hidden' }}>
+                    <div style={{
+                      height:'100%', borderRadius:2, background:'#3B82F6',
+                      width: `${Math.min(95, (buildElapsed / 300) * 100)}%`,
+                      transition:'width 1s linear'
+                    }} />
+                  </div>
+
+                  {/* Site not found explanation */}
+                  <div style={{ marginTop:10, padding:'8px 12px',
+                    background:'rgba(251,191,36,0.08)', border:'1px solid #FBBF2440',
+                    borderRadius:7, fontSize:11, color:'#FBBF24', lineHeight:1.6 }}>
+                    ⚠️ <strong>"Site not found" is expected right now.</strong> The preview URL
+                    won't load until this build finishes. Once Netlify deploys the code,
+                    the URL becomes live automatically — no action needed.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%',
+                      background:C.green, flexShrink:0 }}/>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:700, color:C.green }}>
+                        Netlify site connected
+                      </div>
+                      <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
+                        Site ID: <code style={{ color:C.cyan, fontFamily:'monospace' }}>{form.siteId}</code>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Action buttons - hidden during build */}
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={verifySiteExists} disabled={verifying}
+                      style={{ padding:'8px 14px', background: verifying ? '#1E2D4A' : '#1E2D4A',
+                        border:`1px solid ${verifying ? '#445572' : C.cyan}`,
+                        borderRadius:6, color: verifying ? '#445572' : C.cyan,
+                        fontWeight:600, fontSize:12, cursor: verifying ? 'not-allowed' : 'pointer',
+                        fontFamily:'inherit', transition:'all 0.2s' }}
+                      title="Check if site exists on Netlify">
+                      {verifying ? '⏳ Checking...' : '🔍 Verify'}
+                    </button>
+                    <button onClick={triggerRebuild}
+                      style={{ padding:'8px 14px', background: C.acc,
+                        border:'none', borderRadius:6, color:'#fff',
+                        fontWeight:600, fontSize:12, cursor: 'pointer',
+                        fontFamily:'inherit' }}
+                      title="Build and deploy your changes">
+                      🚀 Build & Deploy
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Verification result message */}
+              {verifyMessage && (
+                <div style={{ marginTop:12, padding:10, borderRadius:6, fontSize:12,
+                  background: verifyStatus === 'exists' ? 'rgba(34, 197, 94, 0.1)' :
+                           verifyStatus === 'not_found' ? 'rgba(239, 68, 68, 0.1)' :
+                           'rgba(255, 165, 0, 0.1)',
+                  border: `1px solid ${
+                    verifyStatus === 'exists' ? '#22C55E' :
+                    verifyStatus === 'not_found' ? '#EF4444' :
+                    '#FFA500'}` }}>
+                  {verifyMessage}
+                  {verifyStatus === 'not_found' && (
+                    <div style={{ marginTop:6, fontWeight:600 }}>
+                      💡 Tip: Use the "Create Netlify Site" button below to recreate it
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Preview link */}
+              {form.previewUrl && (
+                <a href={form.previewUrl} target="_blank" rel="noreferrer"
+                  style={{ marginLeft:'auto', padding:'6px 14px', background:'transparent',
+                    border:`1px solid ${C.border2}`, borderRadius:6,
+                    color:C.t2, fontSize:12, textDecoration:'none' }}>
+                  Open Preview ↗
+                </a>
+              )}
+            </div>
+          ) : (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`,
+              borderRadius:10, padding:'12px 16px', marginBottom:20,
+              display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ width:8, height:8, borderRadius:'50%',
+                background:C.amber, flexShrink:0 }}/>
+              <span style={{ fontSize:13, color:C.amber, fontWeight:600 }}>
+                No Netlify site yet — select a template and click Create Site below
+              </span>
+            </div>
+          )}
+
+          {/* Theme info — reads from Design > Theme */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+              Active Theme
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ 
+                padding:'10px 16px', 
+                borderRadius:8,
+                border:`1px solid ${C.acc}`,
+                background: C.accBg 
+              }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.acc }}>
+                  {THEMES.find(t => t.key === (config.colours?.theme || 'none'))?.label || 'Custom'}
+                </div>
+              </div>
+              <span style={{ fontSize:12, color:C.t3 }}>
+                Set in <strong>Design → Theme</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Create/Recreate site button - shows ONLY when site doesn't exist OR verification shows deleted */}
+          {(!siteExists || verifyStatus === 'not_found') && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`,
+              borderRadius:12, padding:20, marginBottom:16 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                {verifyStatus === 'not_found' ? '🔄 Recreate Netlify Site' : '✨ Create Netlify Site'}
+              </div>
+              <div style={{ fontSize:12, color:C.t3, marginBottom:16, lineHeight:1.7 }}>
+                {verifyStatus === 'not_found' 
+                  ? 'Site was deleted from Netlify. Click to create a fresh site with new build.'
+                  : 'This will create a new site under your Netlify account, set the correct env vars (SITE_ID, SITE_TEMPLATE, CMS_API_URL), create a build hook, and trigger the first build automatically.'}
+              </div>
+              
+              <button onClick={createNetlifySite} disabled={creating || buildStatus === 'building'}
+                style={{ padding:'11px 28px', 
+                  background: (creating || buildStatus === 'building') ? C.card : C.acc,
+                  border:'none', borderRadius:8, color:'#fff', fontWeight:700,
+                  fontSize:14, cursor: (creating || buildStatus === 'building') ? 'not-allowed' : 'pointer',
+                  fontFamily:'inherit', opacity: (creating || buildStatus === 'building') ? 0.6 : 1 }}>
+                {buildStatus === 'creating' ? '⏳ Creating...' : 
+                 buildStatus === 'building' ? '⚙️ Building...' : 
+                 creating ? 'Creating…' : (verifyStatus === 'not_found' ? '🔄 Recreate Site' : '✨ Create Netlify Site')}
+              </button>
+              
+              {/* Build status display */}
+              {(buildStatus || createMsg) && (
+                <div style={{ marginTop:16, padding:14,
+                  background: buildStatus === 'ready'    ? 'rgba(34,197,94,0.1)'   :
+                              buildStatus === 'error'    ? 'rgba(239,68,68,0.1)'   :
+                              buildStatus === 'building' ? 'rgba(59,130,246,0.08)' :
+                                                          'rgba(59,130,246,0.1)',
+                  borderRadius:8, border: `1px solid ${
+                    buildStatus === 'ready' ? '#22C55E' :
+                    buildStatus === 'error' ? '#EF4444' : '#3B82F6'}` }}>
+
+                  {/* Building state — live counter + progress bar */}
+                  {buildStatus === 'building' && (
+                    <>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                        <div style={{ width:8, height:8, borderRadius:'50%', background:'#3B82F6',
+                          flexShrink:0, animation:'pulse 1.5s infinite' }}/>
+                        <span style={{ fontSize:13, fontWeight:600, color:'#3B82F6' }}>
+                          ⚙️ Building…&nbsp;
+                          <span style={{ fontVariantNumeric:'tabular-nums' }}>
+                            {buildElapsed >= 60
+                              ? `${Math.floor(buildElapsed/60)}m ${buildElapsed%60}s`
+                              : `${buildElapsed}s`}
+                          </span>
+                        </span>
+                      </div>
+                      <div style={{ height:4, background:'rgba(255,255,255,0.1)',
+                        borderRadius:2, overflow:'hidden' }}>
+                        <div style={{
+                          height:'100%', borderRadius:2, background:'#3B82F6',
+                          width:`${Math.min(95,(buildElapsed/300)*100)}%`,
+                          transition:'width 1s linear'
+                        }}/>
+                      </div>
+                      <div style={{ marginTop:6, fontSize:11, color:C.t3 }}>
+                        Usually 2–5 min · "Site not found" is normal until the build finishes
+                      </div>
+                    </>
+                  )}
+
+                  {/* Done state */}
+                  {buildStatus === 'ready' && (
+                    <>
+                      <div style={{ fontSize:15, fontWeight:700, color:'#22C55E', marginBottom:10 }}>
+                        {createMsg}
+                      </div>
+                      {actualPreviewUrl && (
+                        <a href={actualPreviewUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ display:'inline-flex', alignItems:'center', gap:8,
+                            padding:'10px 18px', background:'#22C55E', borderRadius:8,
+                            color:'#fff', textDecoration:'none', fontWeight:600, fontSize:13 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth="2.5">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                          </svg>
+                          Open Preview Site →
+                        </a>
+                      )}
+                    </>
+                  )}
+
+                  {/* Error / other states */}
+                  {buildStatus !== 'building' && buildStatus !== 'ready' && createMsg && (
+                    <div style={{ fontSize:13, fontWeight:600,
+                      color: buildStatus === 'error' ? '#EF4444' : '#3B82F6' }}>
+                      {createMsg}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* If site exists — show details + Build & Deploy button */}
+          {siteExists && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`,
+              borderRadius:12, padding:20, marginBottom:16 }}>
+              
+              {/* Site already exists message */}
+              {verifyStatus === 'exists' && (
+                <div style={{ marginBottom:14, padding:10, background:'rgba(34, 197, 94, 0.1)',
+                  border:'1px solid #22C55E', borderRadius:6 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:'#22C55E' }}>
+                    ✅ Site already created on Netlify
+                  </div>
+                  <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>
+                    Your preview site is live. Use "Build & Deploy" to push CMS changes to your live site.
+                  </div>
+                </div>
+              )}
+              
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                  Site Details
+                </div>
+                
+                {/* Build & Deploy button - disabled while building */}
+                <button onClick={triggerRebuild} 
+                  disabled={rebuilding || buildStatus === 'building'}
+                  style={{ padding:'9px 18px', 
+                    background: (rebuilding || buildStatus === 'building') ? '#1E2D4A' : '#22C55E',
+                    border:'none', borderRadius:6, 
+                    color: (rebuilding || buildStatus === 'building') ? '#445572' : '#fff',
+                    fontWeight:700, fontSize:12, 
+                    cursor: (rebuilding || buildStatus === 'building') ? 'not-allowed' : 'pointer',
+                    fontFamily:'inherit', 
+                    opacity: (rebuilding || buildStatus === 'building') ? 0.6 : 1,
+                    boxShadow: (rebuilding || buildStatus === 'building') ? 'none' : '0 4px 16px rgba(34, 197, 94, 0.4)' }}>
+                  {buildStatus === 'building' ? '⚙️ Building in Progress...' : 
+                   rebuilding ? '⏳ Starting Build...' : '🚀 Build & Deploy'}
+                </button>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {[
+                  ['Preview URL', form.previewUrl, true],
+                  ['Build Hook',  form.buildHook,  true],
+                ].map(([label, val, mono]) => val ? (
+                  <div key={label}>
+                    <div style={{ fontSize:11, fontWeight:700, color:C.t3,
+                      textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>
+                      {label}
+                    </div>
+                    <div style={{ fontSize:12, color:C.cyan,
+                      fontFamily: mono ? 'monospace' : 'inherit',
+                      background:'#0A0F1A', padding:'7px 12px',
+                      borderRadius:6, wordBreak:'break-all' }}>
+                      {val}
+                    </div>
+                  </div>
+                ) : null)}
+              </div>
+            </div>
+          )}
+
+          {/* GitHub Repo — manual connection guide */}
+          {siteExists && (() => {
+            const siteName = form.previewUrl
+              ? form.previewUrl.replace('https://','').replace('.netlify.app','')
+              : null
+            const netlifySettingsUrl = siteName
+              ? `https://app.netlify.com/sites/${siteName}/settings/deploys#repository`
+              : 'https://app.netlify.com'
+            return (
+              <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                borderRadius:12, padding:16, marginBottom:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>
+                  GitHub Repo Connection
+                </div>
+                <div style={{ fontSize:12, color:'#FBBF24', background:'rgba(251,191,36,0.07)',
+                  border:'1px solid #FBBF2440', borderRadius:7, padding:'8px 12px', marginBottom:12, lineHeight:1.7 }}>
+                  ⚠️ GitHub access must be set up through <strong>Netlify's UI</strong> — the API cannot store OAuth tokens.
+                  Once connected via UI, all future builds will work automatically.
+                </div>
+                <div style={{ fontSize:12, color:C.t2, lineHeight:2, marginBottom:12 }}>
+                  <div>1. Click <strong style={{ color:C.cyan }}>Open Netlify Settings ↗</strong> below</div>
+                  <div>2. Click <strong>Link repository</strong> → choose <strong>GitHub</strong></div>
+                  <div>3. Select repo: <code style={{ color:C.cyan }}>{setupStatus?.repoPath || 'hetdinedesk/DineDesk'}</code></div>
+                  <div>4. Branch: <code style={{ color:C.cyan }}>master</code></div>
+                  <div>5. Base directory: <code style={{ color:C.cyan }}>packages/site-template</code></div>
+                  <div>6. Build command: <code style={{ color:C.cyan }}>npm install &amp;&amp; npm run build</code></div>
+                  <div>7. Publish directory: <code style={{ color:C.cyan }}>.next</code></div>
+                  <div>8. Save → then click <strong>🚀 Build &amp; Deploy</strong> here</div>
+                </div>
+                <a href={netlifySettingsUrl} target="_blank" rel="noreferrer"
+                  style={{ display:'inline-flex', alignItems:'center', gap:8,
+                    padding:'8px 16px', background:C.acc, borderRadius:7,
+                    color:'#fff', textDecoration:'none', fontWeight:600, fontSize:12 }}>
+                  Open Netlify Settings ↗
+                </a>
+              </div>
+            )
+          })()}
+
+          {/* Client ID reference */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:16, marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>
+              Client ID (SITE_ID)
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <code style={{ fontSize:12, color:C.cyan, fontFamily:'monospace',
+                background:'#0A0F1A', padding:'7px 12px', borderRadius:6, flex:1 }}>
+                {clientId}
+              </code>
+              <button onClick={() => { navigator.clipboard.writeText(clientId) }}
+                style={{ padding:'7px 14px', background:'transparent',
+                  border:`1px solid ${C.border2}`, borderRadius:6,
+                  color:C.t2, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <SaveRow/>
+        </div>
+      )}
+
+      {/* ── Domain Tab ── */}
+      {tab === 'domain' && (
+        <div>
+          {!siteExists && (
+            <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13,
+              background:C.card, border:`1px solid ${C.border}`, borderRadius:12 }}>
+              Create a Netlify site in the Setup tab first.
+            </div>
+          )}
+
+          {siteExists && (
+            <>
+              {/* Current domain status */}
+              {form.primaryDomain && (
+                <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                  borderRadius:12, padding:20, marginBottom:16 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+                    Current Domain
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%',
+                      background: form.domainLive ? C.green : C.amber }}/>
+                    <span style={{ fontSize:14, fontWeight:700,
+                      color: form.domainLive ? C.green : C.amber }}>
+                      {form.primaryDomain}
+                    </span>
+                    <span style={{ fontSize:11, color:C.t3 }}>
+                      {form.domainLive ? 'Live' : 'Pending DNS'}
+                    </span>
+                    <button onClick={() => { s('domainLive', !form.domainLive); mutation.mutate() }}
+                      style={{ marginLeft:'auto', padding:'5px 12px', background:'transparent',
+                        border:`1px solid ${C.border2}`, borderRadius:6,
+                        color:C.t2, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                      {form.domainLive ? 'Mark Pending' : 'Mark Live'}
+                    </button>
+                    <a href={`https://${form.primaryDomain}`} target="_blank" rel="noreferrer"
+                      style={{ padding:'5px 12px', background:'transparent',
+                        border:`1px solid ${C.border2}`, borderRadius:6,
+                        color:C.t2, fontSize:11, textDecoration:'none' }}>
+                      Open ↗
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Add domain */}
+              <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                borderRadius:12, padding:20, marginBottom:16 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                  {form.primaryDomain ? 'Change Domain' : 'Add Live Domain'}
+                </div>
+                <div style={{ fontSize:12, color:C.t3, marginBottom:14, lineHeight:1.7 }}>
+                  After adding the domain here, give the client these DNS instructions:
+                  point their domain's CNAME record to <code style={{ color:C.cyan }}>
+                  {form.previewUrl?.replace('https://', '') || 'yoursite.netlify.app'}</code>.
+                  Netlify handles SSL automatically once DNS propagates (up to 24h).
+                </div>
+                <div style={{ display:'flex', gap:10 }}>
+                  <input value={domainVal} onChange={e => setDomainVal(e.target.value)}
+                    placeholder="e.g. www.urbaneatsmcl.com.au"
+                    onKeyDown={e => e.key === 'Enter' && attachDomain()}
+                    style={{ flex:1, padding:'9px 11px', background:C.input,
+                      border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                      fontSize:13, fontFamily:'monospace', outline:'none' }}
+                    onFocus={e => e.target.style.borderColor = C.acc}
+                    onBlur={e  => e.target.style.borderColor = C.border}
+                  />
+                  <button onClick={attachDomain} disabled={addingDomain || !domainVal.trim()}
+                    style={{ padding:'9px 20px', background: C.acc, border:'none',
+                      borderRadius:7, color:'#fff', fontWeight:700, fontSize:13,
+                      cursor: addingDomain ? 'not-allowed' : 'pointer',
+                      fontFamily:'inherit', opacity: addingDomain ? 0.7 : 1 }}>
+                    {addingDomain ? 'Adding…' : 'Add Domain'}
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* Action buttons */}
-      <div style={{ display:'flex', gap:12, marginBottom:24, flexWrap:'wrap' }}>
-
-        {/* Deploy Live button */}
-        <button
-          onClick={() => { setDeployResult(null); deployMutation.mutate() }}
-          disabled={deployMutation.isPending || !netlifyConfig.buildHook}
-          style={{ padding:'12px 28px',
-            background: deployMutation.isPending ? C2.card : '#1A3FAB',
-            border:'1px solid #3B6FF0', borderRadius:8, color:'#fff',
-            fontWeight:700, fontSize:14, fontFamily:'inherit',
-            cursor: (deployMutation.isPending || !netlifyConfig.buildHook) ? 'not-allowed' : 'pointer',
-            opacity: !netlifyConfig.buildHook ? 0.5 : 1 }}>
-          {deployMutation.isPending ? '⏳ Deploying...' : '🚀 Deploy Live'}
-        </button>
-
-        {/* Create Netlify Site button — shown when no site ID yet */}
-        {!netlifyConfig.siteId && (
-          <button
-            onClick={() => createMutation.mutate()}
-            disabled={creating}
-            style={{ padding:'12px 22px', background:'transparent',
-              border:`1px solid ${C2.border}`, borderRadius:8, color:C2.t1,
-              fontWeight:600, fontSize:13, fontFamily:'inherit',
-              cursor: creating ? 'not-allowed' : 'pointer' }}>
-            {creating ? 'Creating...' : '+ Create Netlify Site'}
-          </button>
-        )}
-      </div>
-
-      {/* No build hook warning */}
-      {!netlifyConfig.buildHook && (
-        <div style={{ background:'#1C1000', border:`1px solid ${C2.amber}40`,
-          borderRadius:8, padding:'11px 16px', marginBottom:16, fontSize:13, color:C2.amber }}>
-          ⚠️ No build hook URL saved. Go to Config → Netlify Setup and paste your Build Hook URL first.
-        </div>
-      )}
-
-      {/* Deploy result message */}
-      {deployResult && deployResult !== 'triggering' && (
-        <div style={{ padding:'11px 16px', borderRadius:8, marginBottom:16,
-          background: deployResult === 'success' ? '#052010' : '#1A0505',
-          border:`1px solid ${deployResult === 'success' ? C2.green : C2.red}40`,
-          fontSize:13,
-          color: deployResult === 'success' ? C2.green : C2.red }}>
-          {deployResult === 'success'
-            ? '✅ Deploy triggered! Check your Netlify dashboard — the build should start within 10 seconds.'
-            : deployResult}
-        </div>
-      )}
-
-      {/* Create site result message */}
-      {createResult && (
-        <div style={{ padding:'11px 16px', borderRadius:8, marginBottom:16,
-          background: createResult.startsWith('✅') ? '#052010' : '#1A0505',
-          border:`1px solid ${createResult.startsWith('✅') ? C2.green : C2.red}40`,
-          fontSize:13,
-          color: createResult.startsWith('✅') ? C2.green : C2.red }}>
-          {createResult}
-        </div>
-      )}
-
-      {/* Deployment history table */}
-      {deploys.length > 0 && (
+      {/* ── Env Vars Tab ── */}
+      {tab === 'env' && (
         <div>
-          <div style={{ fontSize:13, fontWeight:700, color:C2.t0, marginBottom:10 }}>
-            Recent Deployments
-          </div>
-          <div style={{ background:C2.panel, border:`1px solid ${C2.border}`, borderRadius:10, overflow:'hidden' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ background:C2.card }}>
-                  {['Time','Status','Triggered By'].map(h => (
-                    <th key={h} style={{ padding:'9px 14px', textAlign:'left', fontSize:11,
-                      fontWeight:700, color:C2.t3, borderBottom:`1px solid ${C2.border}`,
-                      textTransform:'uppercase', letterSpacing:'0.05em' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {deploys.map((d, i) => (
-                  <tr key={d.id}
-                    style={{ borderBottom: i < deploys.length-1 ? `1px solid ${C2.border}20` : 'none' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#1A2540'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding:'10px 14px', fontSize:12, color:C2.t3 }}>
-                      {new Date(d.createdAt).toLocaleString()}
-                    </td>
-                    <td style={{ padding:'10px 14px' }}>
-                      <span style={{
-                        background: d.status === 'triggered' ? '#052010' : '#141C2E',
-                        color: d.status === 'triggered' ? C2.green : C2.t2,
-                        padding:'2px 8px', borderRadius:4, fontSize:11, fontWeight:700 }}>
-                        {d.status}
-                      </span>
-                    </td>
-                    <td style={{ padding:'10px 14px', fontSize:13, color:C2.t1 }}>
-                      {d.triggeredBy}
-                    </td>
-                  </tr>
+          {!siteExists && (
+            <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13,
+              background:C.card, border:`1px solid ${C.border}`, borderRadius:12 }}>
+              Create a Netlify site in the Setup tab first.
+            </div>
+          )}
+
+          {siteExists && (
+            <>
+              {/* Header row */}
+              <div style={{ display:'flex', justifyContent:'space-between',
+                alignItems:'center', marginBottom:16 }}>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Environment Variables</div>
+                  <div style={{ fontSize:11, color:C.t3, marginTop:3 }}>
+                    Variables are injected at build time. Save changes then rebuild to apply them.
+                  </div>
+                </div>
+                <button onClick={loadEnvVars} disabled={loadingEnv}
+                  style={{ padding:'7px 14px', background:'transparent',
+                    border:`1px solid ${C.border2}`, borderRadius:7,
+                    color: loadingEnv ? C.t3 : C.t2, fontSize:12,
+                    cursor: loadingEnv ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                  {loadingEnv ? 'Loading…' : '↻ Refresh'}
+                </button>
+              </div>
+
+              {/* Existing variables */}
+              <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                borderRadius:12, overflow:'hidden', marginBottom:16 }}>
+                {/* Column headers */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 48px',
+                  padding:'8px 16px', background:'#0A0F1A',
+                  borderBottom:`1px solid ${C.border}`,
+                  fontSize:11, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                  <span>Key</span><span>Value</span><span></span>
+                </div>
+
+                {loadingEnv ? (
+                  <div style={{ padding:24, textAlign:'center', color:C.t3, fontSize:13 }}>
+                    Loading variables…
+                  </div>
+                ) : envVars.length === 0 ? (
+                  <div style={{ padding:24, textAlign:'center', color:C.t3, fontSize:13 }}>
+                    No variables found. Add one below.
+                  </div>
+                ) : envVars.map((v, i) => (
+                  <div key={v.key} style={{ display:'grid', gridTemplateColumns:'1fr 1fr 48px',
+                    padding:'8px 12px', alignItems:'center',
+                    borderBottom: i < envVars.length - 1 ? `1px solid ${C.border}20` : 'none',
+                    gap:8 }}>
+                    <code style={{ fontSize:12, color:C.cyan, fontFamily:'monospace',
+                      background:'#0A0F1A', padding:'5px 8px', borderRadius:4 }}>
+                      {v.key}
+                    </code>
+                    <input
+                      value={v.value}
+                      onChange={e => setEnvVars(prev => prev.map(x =>
+                        x.key === v.key ? { ...x, value: e.target.value } : x))}
+                      style={{ padding:'5px 8px', fontSize:12, background:C.input,
+                        border:`1px solid ${C.border}`, borderRadius:5, color:C.t0,
+                        fontFamily:'monospace', outline:'none', width:'100%', boxSizing:'border-box' }}
+                      onFocus={e => e.target.style.borderColor = C.acc}
+                      onBlur={e  => e.target.style.borderColor = C.border}
+                    />
+                    <button onClick={() => deleteEnvVarFn(v.key)}
+                      disabled={deletingEnvKey === v.key}
+                      title="Delete variable"
+                      style={{ width:32, height:32, display:'flex', alignItems:'center',
+                        justifyContent:'center', background:'transparent',
+                        border:`1px solid ${C.border}`, borderRadius:5,
+                        color: deletingEnvKey === v.key ? C.t3 : '#EF4444',
+                        cursor: deletingEnvKey === v.key ? 'not-allowed' : 'pointer',
+                        fontSize:14, fontFamily:'inherit' }}>
+                      {deletingEnvKey === v.key ? '…' : '✕'}
+                    </button>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+
+                {/* Add new variable row */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 48px',
+                  padding:'8px 12px', alignItems:'center',
+                  borderTop:`1px solid ${C.border}`, gap:8,
+                  background:'#0A0F1A08' }}>
+                  <input value={newEnvKey} onChange={e => setNewEnvKey(e.target.value)}
+                    placeholder="NEW_VARIABLE_KEY"
+                    style={{ padding:'5px 8px', fontSize:12, background:C.input,
+                      border:`1px solid ${C.border}`, borderRadius:5, color:C.t0,
+                      fontFamily:'monospace', outline:'none', width:'100%', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor = C.green}
+                    onBlur={e  => e.target.style.borderColor = C.border}
+                  />
+                  <input value={newEnvVal} onChange={e => setNewEnvVal(e.target.value)}
+                    placeholder="value"
+                    style={{ padding:'5px 8px', fontSize:12, background:C.input,
+                      border:`1px solid ${C.border}`, borderRadius:5, color:C.t0,
+                      fontFamily:'monospace', outline:'none', width:'100%', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor = C.green}
+                    onBlur={e  => e.target.style.borderColor = C.border}
+                  />
+                  <div style={{ width:32, height:32, display:'flex', alignItems:'center',
+                    justifyContent:'center', fontSize:18, color:C.t3 }}>+</div>
+                </div>
+              </div>
+
+              {/* Status message */}
+              {envMsg && (
+                <div style={{ marginBottom:14, padding:'10px 14px', borderRadius:7, fontSize:13,
+                  background: envMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' :
+                              envMsg.startsWith('❌') ? 'rgba(239,68,68,0.1)' :
+                              'rgba(245,158,11,0.1)',
+                  border:`1px solid ${
+                    envMsg.startsWith('✅') ? C.green :
+                    envMsg.startsWith('❌') ? '#EF4444' : C.amber}`,
+                  color: envMsg.startsWith('✅') ? C.green :
+                         envMsg.startsWith('❌') ? '#EF4444' : C.amber }}>
+                  {envMsg}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                <button onClick={() => saveEnvVars(false)} disabled={savingEnv}
+                  style={{ padding:'10px 22px', background: savingEnv ? C.card : C.acc,
+                    border:'none', borderRadius:8, color:'#fff', fontWeight:700,
+                    fontSize:13, cursor: savingEnv ? 'not-allowed' : 'pointer',
+                    fontFamily:'inherit', opacity: savingEnv ? 0.7 : 1 }}>
+                  {savingEnv ? 'Saving…' : 'Update Environment Variables'}
+                </button>
+                <button onClick={() => saveEnvVars(true)} disabled={savingEnv}
+                  style={{ padding:'10px 22px', background:'transparent',
+                    border:`1px solid ${C.border2}`, borderRadius:8,
+                    color:C.t2, fontWeight:600, fontSize:13,
+                    cursor: savingEnv ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                  Save & Rebuild
+                </button>
+              </div>
+
+              {/* Info box */}
+              <div style={{ marginTop:20, padding:'12px 16px', background:C.card,
+                border:`1px solid ${C.border}`, borderRadius:10, fontSize:12, color:C.t3, lineHeight:1.7 }}>
+                <strong style={{ color:C.t2 }}>Protected variables</strong> (set automatically):<br/>
+                <code style={{ color:C.cyan }}>NEXT_PUBLIC_SITE_ID</code> · <code style={{ color:C.cyan }}>SITE_TEMPLATE</code> · <code style={{ color:C.cyan }}>NEXT_PUBLIC_CMS_API_URL</code>
+                <br/>Do not delete these — they are required for the site to function.
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Deploy Status Tab ── */}
+      {tab === 'status' && (
+        <div>
+          <div style={{ display:'flex', justifyContent:'space-between',
+            alignItems:'center', marginBottom:16 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Recent Deploys</div>
+            <button onClick={loadDeploys}
+              style={{ padding:'7px 16px', background:'transparent',
+                border:`1px solid ${C.border2}`, borderRadius:7,
+                color:C.t2, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+              Refresh
+            </button>
           </div>
+
+          {!siteExists && (
+            <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13,
+              background:C.card, border:`1px solid ${C.border}`, borderRadius:12 }}>
+              Create a Netlify site first to see deploy history.
+            </div>
+          )}
+
+          {siteExists && loadingD && (
+            <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>
+              Loading…
+            </div>
+          )}
+
+          {siteExists && !loadingD && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`,
+              borderRadius:12, overflow:'hidden' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'110px 80px 1fr 150px 140px',
+                padding:'8px 16px', background:'#0A0F1A',
+                borderBottom:`1px solid ${C.border}`,
+                fontSize:11, fontWeight:700, color:C.t3,
+                textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                <span>Status</span><span>Duration</span><span>Branch / ID</span><span>Time</span><span>Actions</span>
+              </div>
+              {deploys.length === 0 ? (
+                <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>
+                  No deploys yet — click Build &amp; Deploy in the Setup tab.
+                </div>
+              ) : deploys.map((d, i) => {
+                const col = { ready:C.green, building:C.amber,
+                  error:'#EF4444', failed:'#EF4444' }[d.state] || C.t3
+                const adminUrl = form.siteId
+                  ? `https://app.netlify.com/sites/${form.siteId}/deploys/${d.id}`
+                  : null
+                return (
+                  <div key={d.id || i} style={{ display:'grid',
+                    gridTemplateColumns:'110px 80px 1fr 150px 140px',
+                    padding:'10px 16px', alignItems:'center', gap:8,
+                    borderBottom: i < deploys.length-1
+                      ? `1px solid ${C.border}20` : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background=C.hover}
+                    onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                    <span style={{ fontSize:11, fontWeight:700, color:col,
+                      background:col+'20', padding:'2px 8px',
+                      borderRadius:4, display:'inline-block', whiteSpace:'nowrap' }}>
+                      {d.state || 'unknown'}
+                    </span>
+                    <span style={{ fontSize:11, color:C.t3 }}>
+                      {d.deploy_time ? `${d.deploy_time}s` : '—'}
+                    </span>
+                    <div>
+                      <div style={{ fontSize:12, color:C.t1 }}>{d.branch || 'main'}</div>
+                      <div style={{ fontSize:10, color:C.t3, fontFamily:'monospace', marginTop:2 }}>
+                        {d.id ? d.id.slice(0,8) : '—'}
+                      </div>
+                    </div>
+                    <span style={{ fontSize:11, color:C.t3 }}>
+                      {d.created_at
+                        ? new Date(d.created_at).toLocaleString('en-AU',
+                            { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+                        : '—'}
+                    </span>
+                    <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                      {adminUrl && (
+                        <a href={adminUrl} target="_blank" rel="noreferrer"
+                          title="View build logs"
+                          style={{ padding:'4px 10px', background:'transparent',
+                            border:`1px solid ${C.border2}`, borderRadius:5,
+                            color:C.t2, fontSize:11, textDecoration:'none',
+                            whiteSpace:'nowrap' }}>
+                          Logs ↗
+                        </a>
+                      )}
+                      {d.state === 'ready' && i > 0 && (
+                        <button
+                          onClick={() => rollback(d.id)}
+                          disabled={rollingBack === d.id}
+                          title="Rollback to this deploy"
+                          style={{ padding:'4px 10px', background:'transparent',
+                            border:`1px solid ${C.amber}`, borderRadius:5,
+                            color: rollingBack === d.id ? C.t3 : C.amber,
+                            fontSize:11, cursor: rollingBack === d.id ? 'not-allowed' : 'pointer',
+                            fontFamily:'inherit', whiteSpace:'nowrap' }}>
+                          {rollingBack === d.id ? '…' : '↩ Rollback'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {(form.previewUrl || form.primaryDomain) && (
+            <div style={{ display:'flex', gap:10, marginTop:16 }}>
+              {form.previewUrl && (
+                <a href={form.previewUrl} target="_blank" rel="noreferrer"
+                  style={{ padding:'8px 16px', background:'transparent',
+                    border:`1px solid ${C.border2}`, borderRadius:7,
+                    color:C.t2, fontSize:12, textDecoration:'none' }}>
+                  Open Preview ↗
+                </a>
+              )}
+              {form.primaryDomain && (
+                <a href={`https://${form.primaryDomain}`} target="_blank" rel="noreferrer"
+                  style={{ padding:'8px 16px', background:C.acc, border:'none',
+                    borderRadius:7, color:'#fff', fontSize:12,
+                    textDecoration:'none', fontWeight:700 }}>
+                  Open Live Site ↗
+                </a>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
+
+
+

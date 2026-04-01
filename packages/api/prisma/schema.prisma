@@ -22,6 +22,12 @@ model User {
   createdAt    DateTime @default(now())
 }
 
+model GlobalConfig {
+  id        String   @id @default("global")
+  settings  Json?
+  updatedAt DateTime @updatedAt
+}
+
 model Group {
   id      String   @id @default(cuid())
   name    String
@@ -163,7 +169,7 @@ model Page {
   id              String           @id @default(cuid())
   clientId        String
   client          Client           @relation(fields: [clientId], references: [id])
-  slug            String           @unique
+  slug            String
   title           String
   content         String?
   metaTitle       String?
@@ -180,6 +186,10 @@ model Page {
   banner          Banner?          @relation(fields: [bannerId], references: [id], onDelete: SetNull)
   footerLinks     FooterLink[]
 
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+
+  @@unique([clientId, slug])
   @@index([clientId])
   @@index([slug])
   @@index([bannerId])
@@ -200,6 +210,9 @@ model Banner {
   widthPx    Int?
   heightPx   Int?
   pages      Page[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   @@index([clientId])
 }

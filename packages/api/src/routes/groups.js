@@ -1,8 +1,9 @@
 const express = require('express')
-const { authenticateToken } = require('../middleware/auth')
-const prisma = require('../lib/prisma')
+const { authenticateToken, requireRole } = require('../middleware/auth')
+const { prisma } = require('../lib/prisma')
 const router = express.Router()
 router.use(authenticateToken)
+router.use(requireRole('SUPER_ADMIN', 'MANAGER'))
 
 router.get('/', async (req, res) => {
   const groups = await prisma.group.findMany({ include: { clients: true } })

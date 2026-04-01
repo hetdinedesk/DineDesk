@@ -1,8 +1,9 @@
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') })
-const { PrismaPg } = require('@prisma/adapter-pg')
 const { PrismaClient } = require('@prisma/client')
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
-const prisma = new PrismaClient({ adapter })
+const globalForPrisma = globalThis
 
-module.exports = prisma
+const prisma = globalForPrisma.prisma || new PrismaClient()
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+module.exports = { prisma }

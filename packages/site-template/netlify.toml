@@ -1,0 +1,31 @@
+[build]
+  # Build command for Next.js
+  command = "npm run build"
+  # Next.js builds to .next directory by default
+  publish = ".next"
+
+[build.environment]
+  # Set Node.js version
+  NODE_VERSION = "18"
+  # Enable Next.js static export if needed
+  # NEXT_PUBLIC_SITE_TEMPLATE = "theme-v1"
+
+# Plugins
+[[plugins]]
+  # Netlify Next.js plugin for optimized builds
+  package = "@netlify/plugin-nextjs"
+
+# Headers for security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Redirects for SPA behavior (if using client-side routing)
+[[redirects]]
+  from = "/*"
+  to = "/404.html"
+  status = 404
+  force = false

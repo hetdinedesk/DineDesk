@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { DDLogo } from './Components/Layout'
+import { apiFetch as baseApiFetch } from './api/utils'
 
 const SA_TOKEN_KEY = 'dd_sa_token'
-const API = 'http://localhost:3001/api'
 
 const C = {
   page:'#080C14', panel:'#0E1420', card:'#141C2E', hover:'#1A2540',
@@ -15,31 +16,8 @@ const C = {
   purple:'#A78BFA', input:'#111827',
 }
 
-function apiFetch(path, method='GET', body=null) {
-  const token = localStorage.getItem(SA_TOKEN_KEY)
-  return fetch(API + path, {
-    method,
-    headers: { 'Content-Type':'application/json', Authorization:'Bearer '+token },
-    body: body ? JSON.stringify(body) : null
-  }).then(r => r.json())
-}
-
-// ── DD Logo SVG ─────────────────────────────────────────────────
-function DDLogo({ size=32 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-      <defs>
-        <linearGradient id="sadd" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FFA733"/>
-          <stop offset="100%" stopColor="#C0310A"/>
-        </linearGradient>
-      </defs>
-      <path d="M8 15 L8 85 L32 85 Q60 85 60 50 Q60 15 32 15 Z M22 30 L30 30 Q44 30 44 50 Q44 70 30 70 L22 70 Z" fill="url(#sadd)"/>
-      <rect x="16" y="46" width="18" height="8" rx="4" fill="url(#sadd)"/>
-      <path d="M54 22 L54 78 L72 78 Q94 78 94 50 Q94 22 72 22 Z M66 35 L71 35 Q80 35 80 50 Q80 65 71 65 L66 65 Z" fill="url(#sadd)"/>
-    </svg>
-  )
-}
+const apiFetch = (path, method = 'GET', body = null) => baseApiFetch(path, method, body, SA_TOKEN_KEY)
+const API = 'http://localhost:3001/api'
 
 // ── Login Page ──────────────────────────────────────────────────
 function SALogin({ onLogin }) {
@@ -52,14 +30,10 @@ function SALogin({ onLogin }) {
     if (!email || !password) return
     setLoading(true); setError('')
     try {
-      const data = await fetch(API + '/auth/login', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ email, password })
-      }).then(r => r.json())
+      const data = await baseApiFetch('/auth/login', 'POST', { email, password })
 
       if (data.error) { setError('Invalid credentials.'); setLoading(false); return }
-      if (data.user.role !== 'SUPER_ADMIN') {
+      if (data.user.role !== 'SUPER_ADMIN' && data.user.role !== 'MANAGER') {
         setError('Access denied. This portal is for staff only.'); setLoading(false); return
       }
       localStorage.setItem(SA_TOKEN_KEY, data.token)
@@ -169,13 +143,14 @@ function SALogin({ onLogin }) {
 // ── Main Site Admin Shell ───────────────────────────────────────
 function SAShell({ user, onLogout }) {
   const [tab, setTab] = useState('dashboard')
+  const isSuperAdmin = user.role === 'SUPER_ADMIN'
 
   const tabs = [
     { key:'dashboard', label:'Dashboard',         icon:'📊' },
-    { key:'users',     label:'Users',             icon:'👥' },
+    ...(isSuperAdmin ? [{ key:'users',     label:'Users',             icon:'👥' }] : []),
     { key:'groups',    label:'Groups',            icon:'📁' },
-    { key:'activity',  label:'Activity Log',      icon:'📋' },
-    { key:'settings',  label:'Platform Settings', icon:'⚙️' },
+    ...(isSuperAdmin ? [{ key:'activity',  label:'Activity Log',      icon:'📋' }] : []),
+    ...(isSuperAdmin ? [{ key:'settings',  label:'Platform Settings', icon:'⚙️' }] : []),
   ]
 
   return (
@@ -187,7 +162,7 @@ function SAShell({ user, onLogout }) {
       {/* Top nav */}
       <div style={{ height:52, background:C.panel, borderBottom:`2px solid ${C.acc}`,
         display:'flex', alignItems:'center', justifyContent:'space-between',
-        padding:'0 24px', flexShrink:0 }}>
+        padding:'0 32px', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginRight:8 }}>
             <DDLogo size={28}/>
@@ -226,7 +201,7 @@ function SAShell({ user, onLogout }) {
           </a>
           <div style={{ textAlign:'right' }}>
             <div style={{ fontSize:13, color:C.t0, fontWeight:600 }}>{user.name}</div>
-            <div style={{ fontSize:11, color:C.t3 }}>Staff</div>
+            <div style={{ fontSize:11, color:C.t3 }}>{user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Manager'}</div>
           </div>
           <div style={{ width:32, height:32, borderRadius:'50%',
             background:`linear-gradient(135deg,${C.acc},${C.accHov})`,
@@ -246,10 +221,10 @@ function SAShell({ user, onLogout }) {
       {/* Content */}
       <div style={{ flex:1, overflow:'hidden' }}>
         {tab==='dashboard' && <SADashboard />}
-        {tab==='users'     && <SAUsers     />}
+        {tab==='users'     && isSuperAdmin && <SAUsers     />}
         {tab==='groups'    && <SAGroups    />}
-        {tab==='activity'  && <SAActivity  />}
-        {tab==='settings'  && <SASettings  />}
+        {tab==='activity'  && isSuperAdmin && <SAActivity  />}
+        {tab==='settings'  && isSuperAdmin && <SASettings  />}
       </div>
     </div>
   )
@@ -373,17 +348,38 @@ function SAUsers() {
   const [users,    setUsers]    = useState([])
   const [clients,  setClients]  = useState([])
   const [loading,  setLoading]  = useState(true)
-  const [showAdd,  setShowAdd]  = useState(false)
-  const [editUser, setEditUser] = useState(null)
+  const [showAdd,  setShowAdd]  = useState(() => sessionStorage.getItem('sa_users_show_add') === 'true')
+  const [editUser, setEditUser] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('sa_users_edit_user')
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
+  })
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
 
   // New user form
-  const [newName,     setNewName]     = useState('')
-  const [newEmail,    setNewEmail]    = useState('')
-  const [newPassword, setNewPassword] = useState('')
+  const [newName,     setNewName]     = useState(() => sessionStorage.getItem('sa_users_new_name') || '')
+  const [newEmail,    setNewEmail]    = useState(() => sessionStorage.getItem('sa_users_new_email') || '')
+  const [newPassword, setNewPassword] = useState(() => sessionStorage.getItem('sa_users_new_password') || '')
+  const [newRole,     setNewRole]     = useState(() => sessionStorage.getItem('sa_users_new_role') || 'EDITOR')
   // clientAccess: { siteId: ['items','cms','config','dashboard'], ... }
-  const [newAccess,   setNewAccess]   = useState({})
+  const [newAccess,   setNewAccess]   = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('sa_users_new_access')
+      return saved ? JSON.parse(saved) : {}
+    } catch { return {} }
+  })
+
+  useEffect(() => {
+    sessionStorage.setItem('sa_users_show_add', showAdd)
+    sessionStorage.setItem('sa_users_edit_user', JSON.stringify(editUser))
+    sessionStorage.setItem('sa_users_new_name', newName)
+    sessionStorage.setItem('sa_users_new_email', newEmail)
+    sessionStorage.setItem('sa_users_new_password', newPassword)
+    sessionStorage.setItem('sa_users_new_role', newRole)
+    sessionStorage.setItem('sa_users_new_access', JSON.stringify(newAccess))
+  }, [showAdd, editUser, newName, newEmail, newPassword, newRole, newAccess])
 
   const TABS = ['items', 'cms', 'config', 'dashboard']
 
@@ -427,13 +423,20 @@ function SAUsers() {
         Authorization: 'Bearer ' + localStorage.getItem(SA_TOKEN_KEY) },
       body: JSON.stringify({
         name: newName, email: newEmail, password: newPassword,
-        role: 'EDITOR', clientAccess: newAccess
+        role: newRole, clientAccess: newAccess
       })
     })
     const data = await res.json()
     if (!res.ok) { setError(data.error || 'Failed'); setSaving(false); return }
-    setNewName(''); setNewEmail(''); setNewPassword(''); setNewAccess({})
-    setShowAdd(false); setSaving(false); load()
+    setNewName(''); setNewEmail(''); setNewPassword(''); setNewRole('EDITOR'); setNewAccess({})
+    setShowAdd(false); setSaving(false);
+    sessionStorage.removeItem('sa_users_show_add')
+    sessionStorage.removeItem('sa_users_new_name')
+    sessionStorage.removeItem('sa_users_new_email')
+    sessionStorage.removeItem('sa_users_new_password')
+    sessionStorage.removeItem('sa_users_new_role')
+    sessionStorage.removeItem('sa_users_new_access')
+    load()
   }
 
   const saveEdit = async () => {
@@ -556,7 +559,7 @@ function SAUsers() {
           </div>
 
           {/* Basic fields */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr',
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr',
             gap:12, marginBottom:20 }}>
             {[['Full Name','text',newName,setNewName,'e.g. Marco Rossi'],
               ['Email Address','email',newEmail,setNewEmail,'marco@restaurant.com'],
@@ -577,6 +580,22 @@ function SAUsers() {
                 />
               </div>
             ))}
+            {/* Role selector */}
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                textTransform:'uppercase', letterSpacing:'0.06em',
+                display:'block', marginBottom:5 }}>Role</label>
+              <select value={newRole} onChange={e => setNewRole(e.target.value)}
+                style={{ width:'100%', padding:'9px 11px', background:C.input,
+                  border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                  fontSize:13, fontFamily:'inherit', outline:'none',
+                  boxSizing:'border-box', cursor:'pointer' }}
+                onFocus={e => e.target.style.borderColor=C.acc}
+                onBlur={e  => e.target.style.borderColor=C.border}>
+                <option value="EDITOR">Editor (Limited access)</option>
+                <option value="MANAGER">Manager (Full client access)</option>
+              </select>
+            </div>
           </div>
 
           {/* Site access picker */}
@@ -976,15 +995,35 @@ function SASettings() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const s = localStorage.getItem('dd_platform_settings')
-    if (s) setForm(JSON.parse(s))
+    // Load from API
+    const token = localStorage.getItem(SA_TOKEN_KEY)
+    fetch(API + '/platform', { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.settings) setForm(prev => ({ ...prev, ...d.settings }))
+      })
+      .catch(err => console.error('Load platform settings failed:', err))
   }, [])
 
   const save = async () => {
     setSaving(true)
-    localStorage.setItem('dd_platform_settings', JSON.stringify(form))
-    await new Promise(r => setTimeout(r,600))
-    setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),3000)
+    const token = localStorage.getItem(SA_TOKEN_KEY)
+    try {
+      const res = await fetch(API + '/platform', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify(form)
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setSaved(true); setTimeout(()=>setSaved(false),3000)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const fields = [

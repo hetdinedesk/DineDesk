@@ -1,8 +1,9 @@
 const express = require('express')
-const { authenticateToken } = require('../middleware/auth')
-const prisma = require('../lib/prisma')
+const { authenticateToken, requireRole } = require('../middleware/auth')
+const { prisma } = require('../lib/prisma')
 const router = express.Router()
 router.use(authenticateToken)
+router.use(requireRole('SUPER_ADMIN'))
 
 router.get('/', async (req, res) => {
   try {

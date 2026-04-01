@@ -1,34 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-
-const C = {
-  page:'#080C14', panel:'#0E1420', card:'#141C2E',
-  border:'#1E2D4A', border2:'#2A3F63',
-  t0:'#F1F5FF', t1:'#B8C5E0', t2:'#7A8BAD', t3:'#445572',
-  acc:'#FF6B2B', accHov:'#E85A1A', accBg:'#2A1200',
-  cyan:'#00D4FF', green:'#22C55E',
-  red:'#EF4444', redBg:'#1A0505',
-  input:'#111827',
-}
-
-function DDLogo({ size = 48 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-      <defs>
-        <linearGradient id="ddGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FFA733"/>
-          <stop offset="100%" stopColor="#C0310A"/>
-        </linearGradient>
-      </defs>
-      <path d="M8 15 L8 85 L32 85 Q60 85 60 50 Q60 15 32 15 Z M22 30 L30 30 Q44 30 44 50 Q44 70 30 70 L22 70 Z"
-        fill="url(#ddGrad)"/>
-      <rect x="16" y="46" width="18" height="8" rx="4" fill="url(#ddGrad)"/>
-      <path d="M54 22 L54 78 L72 78 Q94 78 94 50 Q94 22 72 22 Z M66 35 L71 35 Q80 35 80 50 Q80 65 71 65 L66 65 Z"
-        fill="url(#ddGrad)"/>
-    </svg>
-  )
-}
+import { C } from '../theme'
+import { DDLogo } from '../Components/Layout'
 
 export default function LoginPage() {
   const [email,    setEmail]    = useState('')
@@ -46,7 +20,7 @@ export default function LoginPage() {
       setError(''); setLoading(true)
       const user = await login(email, password)
       // Redirect based on role — no manual selection needed
-      if (user.role === 'SUPER_ADMIN') {
+      if (user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
         navigate('/home')
       } else {
         // EDITOR goes to sites (their assigned sites only)

@@ -4,19 +4,20 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
+import Placeholder from '@tiptap/extension-placeholder'
 import LoadingSpinner from '../Components/LoadingSpinner'
 import ImageUpload from '../Components/ImageUpload'
 import ConfirmationModal from '../Components/ConfirmationModal'
 import { getNavbar, saveNavbar as saveNavbarApi } from '../api/navbar'
 import { createPage, updatePage, deletePage } from '../api/pages'
 import { createBanner, updateBanner, deleteBanner } from '../api/banners'
-
-const C = {
-  page: '#080C14', panel: '#0E1420', card: '#141C2E', hover: '#1A2540',
-  border: '#1E2D4A', border2: '#2A3F63', input: '#111827',
-  t0: '#F1F5FF', t1: '#B8C5E0', t2: '#7A8BAD', t3: '#445572',
-  acc: '#FF6B2B', cyan: '#00D4FF', green: '#22C55E', amber: '#F59E0B', red: '#EF4444'
-}
+import { C } from '../theme'
 
 const ToggleSwitch = memo(({ checked, onChange, size = 'small', label }) => (
   <div
@@ -157,11 +158,13 @@ function serializeHeaderSections (sections) {
           isActive: c.isActive !== false,
           pageId: c.pageId || null
         }
-        if (!isTempId(c.id)) child.id = c.id
+        // Use c.id if it's not a temp-h- or temp-pg- id
+        if (c.id && !String(c.id).startsWith('temp-')) child.id = c.id
         return child
       })
     }
-    if (!isTempId(h.id)) row.id = h.id
+    // Use h.id if it's not a temp-h- id
+    if (h.id && !String(h.id).startsWith('temp-')) row.id = h.id
     return row
   })
 }
@@ -178,6 +181,11 @@ function serializeFooterSections (sections) {
 }
 
 export default function NavbarSection ({ clientId, subsection = 'header-sections' }) {
+  useEffect(() => {
+    if (!clientId) console.warn('NavbarSection: clientId is missing!')
+    else console.log('NavbarSection: active clientId is', clientId)
+  }, [clientId])
+
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['navbar', clientId],
@@ -414,83 +422,60 @@ function HeaderSectionsPanel ({ clientId, data, qc }) {
     }
     setPageHeaderId(headerId)
     setPageModal({
-      title: '',
-      slug: '',
-      content: '',
-      status: 'published',
-      bannerId: '',
-      metaTitle: '',
-      metaDesc: '',
-      ogImage: ''
+      pageId: '',
+      label: ''
     })
   }
 
-  const saveNewPage = async () => {
-    if (!pageModal?.title?.trim()) return
-    if (!pageHeaderId || isTempId(pageHeaderId)) {
-      setNavError('Select a saved header (not pending). Add headers in the first tab and wait for sync.')
-      return
-    }
-    const slug = pageModal.slug?.trim() || slugify(pageModal.title)
-    setNavError('')
-    try {
-      await createPage(clientId, {
-        title: pageModal.title.trim(),
-        slug,
-        content: pageModal.content || '',
-        status: pageModal.status || 'published',
-        bannerId: pageModal.bannerId || null,
-        metaTitle: pageModal.metaTitle || null,
-        metaDesc: pageModal.metaDesc || null,
-        ogImage: pageModal.ogImage || null,
-        inNavigation: true,
-        navigationRootId: pageHeaderId
+  const saveAddNavPage = async () => {
+    if (!pageModal?.pageId) return alert('Select a page')
+    const p = (data?.pages || []).find(x => x.id === pageModal.pageId)
+    if (!p) return
+
+    const label = pageModal.label?.trim() || p.title
+    const url = `/${String(p.slug || '').replace(/^\//, '')}`
+
+    const next = sections.map((h) => {
+      if (h.id !== pageHeaderId) return h
+      const children = [...(h.children || [])]
+      children.push({
+        id: `temp-pg-${Date.now()}`,
+        label,
+        url,
+        pageId: p.id,
+        isActive: true
       })
-      setPageModal(null)
-      setPageHeaderId(null)
-      qc.invalidateQueries({ queryKey: ['navbar', clientId] })
-    } catch (e) {
-      setNavError(e?.response?.data?.error || e?.message || 'Could not create page')
-    }
+      return { ...h, children }
+    })
+    
+    persist(next)
+    setPageModal(null)
+    setPageHeaderId(null)
   }
 
   const editPage = (child, headerId) => {
-    const p = (data?.pages || []).find((x) => x.id === child.pageId)
-    if (!p) return
     setPageHeaderId(headerId)
-    setPageModal({ ...p, _editing: true })
+    setPageModal({ ...child, _editing: true })
   }
 
   const saveEditPage = async () => {
-    if (!pageModal?.title?.trim()) return
-    setNavError('')
-    try {
-      await updatePage(clientId, pageModal.id, {
-        title: pageModal.title.trim(),
-        slug: pageModal.slug?.trim() || slugify(pageModal.title),
-        content: pageModal.content || '',
-        status: pageModal.status || 'published',
-        bannerId: pageModal.bannerId || null,
-        metaTitle: pageModal.metaTitle || null,
-        metaDesc: pageModal.metaDesc || null,
-        ogImage: pageModal.ogImage || null
-      })
-      const slug = pageModal.slug?.trim() || slugify(pageModal.title)
-      const url = `/${String(slug).replace(/^\//, '')}`
-      const next = sections.map((s) => ({
-        ...s,
-        children: (s.children || []).map((c) =>
-          c.pageId === pageModal.id
-            ? { ...c, label: pageModal.title.trim(), url }
-            : c
-        )
-      }))
-      setPageModal(null)
-      await saveNavbarApi(clientId, { headerSections: serializeHeaderSections(next) })
-      qc.invalidateQueries({ queryKey: ['navbar', clientId] })
-    } catch (e) {
-      setNavError(e?.response?.data?.error || e?.message || 'Could not save page')
-    }
+    if (!pageModal?.pageId) return
+    const p = (data?.pages || []).find(x => x.id === pageModal.pageId)
+    
+    const label = pageModal.label?.trim() || (p ? p.title : pageModal.label)
+    const url = p ? `/${String(p.slug || '').replace(/^\//, '')}` : pageModal.url
+
+    const next = sections.map((s) => ({
+      ...s,
+      children: (s.children || []).map((c) =>
+        c.id === pageModal.id
+          ? { ...c, label, url, pageId: pageModal.pageId }
+          : c
+      )
+    }))
+    persist(next)
+    setPageModal(null)
+    setPageHeaderId(null)
   }
 
   const deletePageFull = async (child) => {
@@ -692,28 +677,29 @@ function HeaderSectionsPanel ({ clientId, data, qc }) {
         isOpen={!!pageModal && !pageModal._editing}
         onClose={() => { setPageModal(null); setPageHeaderId(null) }}
         title="Add page under heading"
-        onSave={saveNewPage}
-        saveLabel="Create page"
+        onSave={saveAddNavPage}
+        saveLabel="Add to Menu"
       >
         <PageModalFields
+          clientId={clientId}
           pageModal={pageModal}
           setPageModal={setPageModal}
-          banners={banners}
-          parentHeading={sections.find((s) => s.id === pageHeaderId)}
+          pages={pages}
         />
       </Modal>
 
       <Modal
         isOpen={!!pageModal && pageModal._editing}
         onClose={() => setPageModal(null)}
-        title="Edit page"
+        title="Edit menu item"
         onSave={saveEditPage}
-        saveLabel="Save page"
+        saveLabel="Save changes"
       >
         <PageModalFields
+          clientId={clientId}
           pageModal={pageModal}
           setPageModal={setPageModal}
-          banners={banners}
+          pages={pages}
         />
       </Modal>
     </div>
@@ -778,64 +764,135 @@ function HeaderModalFields ({ headerModal, setHeaderModal, pages }) {
   )
 }
 
-function PageModalFields ({ pageModal, setPageModal, banners, parentHeading }) {
+function PageModalFields ({ clientId, pageModal, setPageModal, pages }) {
   if (!pageModal) return null
   return (
     <>
-      {parentHeading && (
-        <div style={{ marginBottom: 16, padding: 12, background: C.card, borderRadius: 8, fontSize: 13, color: C.t1 }}>
-          <strong style={{ color: C.t0 }}>Heading:</strong> {parentHeading.label}
-        </div>
-      )}
-      <InputField
-        label="Title"
-        value={pageModal.title}
-        onChange={(e) => setPageModal({ ...pageModal, title: e.target.value })}
-        required
-      />
-      <InputField
-        label="URL slug"
-        value={pageModal.slug}
-        onChange={(e) => setPageModal({ ...pageModal, slug: e.target.value })}
-        placeholder="auto from title"
-      />
       <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>Top banner (library)</label>
+        <label style={labelStyle}>Select Page *</label>
         <select
-          value={pageModal.bannerId || ''}
-          onChange={(e) => setPageModal({ ...pageModal, bannerId: e.target.value || null })}
+          value={pageModal.pageId || ''}
+          onChange={(e) => setPageModal({ ...pageModal, pageId: e.target.value })}
           style={selectStyle}
         >
-          <option value="">None</option>
-          {banners.map((b) => (
-            <option key={b.id} value={b.id}>{b.title || b.text || b.id}</option>
+          <option value="">Select a page...</option>
+          {pages.map(p => (
+            <option key={p.id} value={p.id}>{p.title} ({p.slug})</option>
           ))}
         </select>
-        <div style={{ fontSize: 11, color: C.t3, marginTop: 6 }}>
-          Banners are managed under Navigation → Banners. The selected image shows at the top of this page when the site is built to use it.
-        </div>
       </div>
-      <TextArea
-        label="Content"
-        value={pageModal.content}
-        onChange={(e) => setPageModal({ ...pageModal, content: e.target.value })}
-        rows={10}
+      <InputField
+        label="Custom Label (leave blank to use page title)"
+        value={pageModal.label}
+        onChange={(e) => setPageModal({ ...pageModal, label: e.target.value })}
+        placeholder="e.g. Our History"
       />
-      <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>Status</label>
-        <select
-          value={pageModal.status || 'draft'}
-          onChange={(e) => setPageModal({ ...pageModal, status: e.target.value })}
-          style={selectStyle}
-        >
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-        </select>
-      </div>
-      <InputField label="Meta title" value={pageModal.metaTitle} onChange={(e) => setPageModal({ ...pageModal, metaTitle: e.target.value })} />
-      <TextArea label="Meta description" value={pageModal.metaDesc} onChange={(e) => setPageModal({ ...pageModal, metaDesc: e.target.value })} rows={2} />
-      <InputField label="OG image URL" value={pageModal.ogImage} onChange={(e) => setPageModal({ ...pageModal, ogImage: e.target.value })} />
     </>
+  )
+}
+
+function PageContentEditor ({ clientId, value, onChange }) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Link.configure({ openOnClick: false }),
+      Image,
+      Placeholder.configure({ placeholder: 'Write your page content…' }),
+    ],
+    content: value || '',
+    editorProps: { attributes: { style: 'text-align:left' } }
+  })
+
+  useEffect(() => {
+    if (!editor) return
+    const current = editor.getHTML() || ''
+    if (value !== undefined && value !== null && value !== current) {
+      editor.commands.setContent(value || '', false)
+    }
+  }, [editor, value])
+
+  useEffect(() => {
+    if (!editor) return
+    const update = () => onChange?.(editor.getHTML() || '')
+    editor.on('update', update)
+    return () => editor.off('update', update)
+  }, [editor, onChange])
+
+  const insertImageFile = async (file) => {
+    const localUrl = URL.createObjectURL(file)
+    editor?.chain().focus().setImage({ src: localUrl }).run()
+
+    const formData = new FormData()
+    formData.append('file', file)
+    const token = localStorage.getItem('dd_token')
+    try {
+      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/images`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: formData
+      })
+      const data = await res.json()
+      if (data?.url) {
+        const current = editor?.getHTML() || ''
+        const updated = current.replace(localUrl, data.url)
+        editor?.commands.setContent(updated, false)
+      }
+    } catch {}
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label style={labelStyle}>Content</label>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} style={btnSmGhost}>B</button>
+        <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} style={btnSmGhost}>I</button>
+        <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} style={btnSmGhost}>U</button>
+        <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} style={btnSmGhost}>• List</button>
+        <button
+          type="button"
+          onClick={() => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = 'image/*'
+            input.onchange = () => {
+              const f = input.files?.[0]
+              if (f) insertImageFile(f)
+            }
+            input.click()
+          }}
+          style={btnSmGhost}
+        >
+          + Image
+        </button>
+      </div>
+      <div
+        style={{
+          minHeight: 220,
+          padding: '12px 14px',
+          background: C.input,
+          border: `1px solid ${C.border}`,
+          borderRadius: 10,
+          color: C.t0,
+          fontSize: 13,
+          lineHeight: 1.7,
+          cursor: 'text'
+        }}
+        onClick={() => editor?.commands.focus()}
+        onDrop={(e) => {
+          e.preventDefault()
+          const file = e.dataTransfer.files?.[0]
+          if (file?.type?.startsWith('image/')) insertImageFile(file)
+        }}
+        onDragOver={(e) => e.preventDefault()}
+      >
+        <EditorContent editor={editor} />
+      </div>
+      <div style={{ marginTop: 8, fontSize: 11, color: C.t3 }}>
+        Tip: drag & drop images into the editor.
+      </div>
+    </div>
   )
 }
 
@@ -1023,6 +1080,7 @@ function SortableFooterSection ({ section, pages, onEdit, onDelete }) {
 function FooterSectionsPanel ({ clientId, data, qc }) {
   const [sections, setSections] = useState(data?.footerSections || [])
   const [modal, setModal] = useState(null)
+  const [footerSubTab, setFooterSubTab] = useState('headings')
 
   useEffect(() => {
     setSections(data?.footerSections || [])
@@ -1076,6 +1134,17 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     persist(sections.filter((s) => s.id !== id))
   }
 
+  const openLinks = (section) => {
+    setModal({ ...section, links: section.links || [] })
+  }
+
+  const openAddLinkTo = (section) => {
+    setModal({
+      ...section,
+      links: [...(section.links || []), { id: `l-${Date.now()}`, label: '', pageId: '', externalUrl: '' }]
+    })
+  }
+
   const addLink = () => {
     setModal({
       ...modal,
@@ -1097,31 +1166,105 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
 
   return (
     <div>
-      <SectionHeader title="Footer columns" icon="🦶" onAdd={addSection} addLabel="Add column" />
-      <p style={{ fontSize: 13, color: C.t2, marginBottom: 20, lineHeight: 1.5 }}>
-        Each column has a title and links (to site pages or external URLs). Drag columns to reorder.
-      </p>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: `1px solid ${C.border}`, paddingBottom: 4 }}>
+        {[
+          { key: 'headings', label: '1. Footer headings' },
+          { key: 'links', label: '2. Links under headings' }
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setFooterSubTab(t.key)}
+            style={{
+              padding: '10px 16px',
+              border: 'none',
+              borderRadius: '8px 8px 0 0',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 13,
+              fontWeight: footerSubTab === t.key ? 700 : 500,
+              background: footerSubTab === t.key ? '#1F2D4A' : 'transparent',
+              color: footerSubTab === t.key ? C.t0 : C.t2,
+              borderBottom: footerSubTab === t.key ? `2px solid ${C.acc}` : '2px solid transparent'
+            }}
+          >{t.label}</button>
+        ))}
+      </div>
 
-      {sections.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: C.t3, border: `1px dashed ${C.border}`, borderRadius: 12 }}>
-          No footer columns yet.
-        </div>
-      ) : (
-        <DndContext collisionDetection={closestCenter} onDragEnd={onDragEndKit}>
-          <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+      {footerSubTab === 'headings' && (
+        <>
+          <SectionHeader title="Footer headings" icon="🦶" onAdd={addSection} addLabel="Add heading" />
+          <p style={{ fontSize: 13, color: C.t2, marginBottom: 20, lineHeight: 1.5 }}>
+            Create footer headings like “Legal”, then add page links under them in the next tab. Drag headings to reorder.
+          </p>
+
+          {sections.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: C.t3, border: `1px dashed ${C.border}`, borderRadius: 12 }}>
+              No footer headings yet.
+            </div>
+          ) : (
+            <DndContext collisionDetection={closestCenter} onDragEnd={onDragEndKit}>
+              <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {sections.map((s) => (
+                    <SortableFooterSection
+                      key={s.id}
+                      section={s}
+                      pages={pages}
+                      onEdit={() => setModal({ ...s, links: s.links || [] })}
+                      onDelete={deleteSection}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </>
+      )}
+
+      {footerSubTab === 'links' && (
+        <>
+          <SectionHeader title="Footer links" icon="🔗" />
+          <p style={{ fontSize: 13, color: C.t2, marginBottom: 20, lineHeight: 1.5 }}>
+            Add links under headings (for example: Legal → Privacy Policy, Terms, Policies). Each link can point to a page or an external URL.
+          </p>
+
+          {sections.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: C.t3, border: `1px dashed ${C.border}`, borderRadius: 12 }}>
+              Create footer headings first.
+            </div>
+          ) : (
             <div style={{ display: 'grid', gap: 12 }}>
               {sections.map((s) => (
-                <SortableFooterSection
-                  key={s.id}
-                  section={s}
-                  pages={pages}
-                  onEdit={() => setModal({ ...s, links: s.links || [] })}
-                  onDelete={deleteSection}
-                />
+                <div key={s.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 14px', background: C.card, borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontWeight: 800, color: C.t0 }}>{s.title}</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={() => openAddLinkTo(s)} style={btnCyan}>+ Link</button>
+                      <button type="button" onClick={() => openLinks(s)} style={btnGhost}>Edit</button>
+                    </div>
+                  </div>
+                  <div style={{ padding: 12 }}>
+                    {(s.links || []).length === 0 ? (
+                      <div style={{ fontSize: 12, color: C.t3, padding: 6 }}>No links yet.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {(s.links || []).map((l) => (
+                          <div key={l.id || l.label} style={{ background: C.card, border: `1px solid ${C.border2}`, borderRadius: 10, padding: '10px 12px' }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.t0 }}>{l.label}</div>
+                            <div style={{ fontSize: 12, color: C.t2, marginTop: 4 }}>
+                              {l.pageId ? (pages.find((p) => p.id === l.pageId)?.title || 'Page') : (l.externalUrl || '—')}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
-          </SortableContext>
-        </DndContext>
+          )}
+        </>
       )}
 
       <Modal isOpen={!!modal} onClose={() => setModal(null)} title={modal?.id?.startsWith('temp') ? 'Add footer column' : 'Edit footer column'} onSave={saveModal}>

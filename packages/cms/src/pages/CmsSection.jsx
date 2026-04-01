@@ -3,17 +3,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Table from '../Components/Table'
 import NavbarSection from './NavbarSection'
 import HomePageSection from './HomePageSection'
+import TeamSection from './TeamSection'
+import PageEditor from '../Components/PageEditor'
 import { getLocations, updateLocation, deleteLocation } from '../api/locations'
-import { getPages, updatePage, deletePage } from '../api/pages'
+import { getPages, updatePage, deletePage, createPage } from '../api/pages'
 import { getBanners, updateBanner, deleteBanner } from '../api/banners'
 import { getSpecials } from '../api/specials'
-
-const C = { page:'#080C14',panel:'#0E1420',card:'#141C2E',hover:'#1A2540',border:'#1E2D4A',border2:'#2A3F63',t0:'#F1F5FF',t1:'#B8C5E0',t2:'#7A8BAD',t3:'#445572',acc:'#FF6B2B',cyan:'#00D4FF',green:'#22C55E',amber:'#F59E0B',red:'#EF4444' }
+import { C } from '../theme'
 
 const LEFT = [
   { key:'locations', label:'Locations', icon:'📍' },
   { key:'navigation', label:'Navigation', icon:'☰' },
+  { key:'pages', label:'Pages', icon:'📄' },
   { key:'homepage', label:'Homepage', icon:'🏠' },
+  { key:'team', label:'Meet the Team', icon:'👥' },
   { key:'specials', label:'Specials', icon:'🏷️' },
   { key:'settings', label:'Settings', icon:'⚙️' },
 ]
@@ -24,6 +27,8 @@ const RIGHT = {
     { key:'banners', label:'Banners', icon:'🖼️' },
     { key:'footer-sections', label:'Footer Sections', icon:'🦶' }
   ],
+  pages: [{ key:'pages-list', label:'All Pages', icon:'📄' }],
+  team: [{ key:'team-list', label:'Team Members', icon:'👥' }],
   homepage: [
     { key:'promo-tiles', label:'Promo Tiles (Coming Soon)', icon:'🏷️' },
     { key:'homepage-banners', label:'Homepage Banners (Coming Soon)', icon:'🖼️' },
@@ -37,14 +42,26 @@ const RIGHT = {
 }
 
 export default function CmsSection({ clientId }) {
-  const [lnav, setLnav] = useState('locations')
-  const [rnav, setRnav] = useState('loc-list')
-  const handleLeft = key => { setLnav(key); setRnav(RIGHT[key]?.[0]?.key || key) }
+  const [lnav, setLnav] = useState(() => sessionStorage.getItem('dd_cms_lnav') || 'locations')
+  const [rnav, setRnav] = useState(() => sessionStorage.getItem('dd_cms_rnav') || 'loc-list')
+
+  useEffect(() => {
+    sessionStorage.setItem('dd_cms_lnav', lnav)
+    sessionStorage.setItem('dd_cms_rnav', rnav)
+  }, [lnav, rnav])
+
+  const handleLeft = key => {
+    setLnav(key)
+    const firstRight = RIGHT[key]?.[0]?.key || key
+    setRnav(firstRight)
+  }
   const render = () => {
     if(lnav==='locations') return <LocationsList clientId={clientId}/>
     if(lnav==='navigation') {
       return <NavbarSection clientId={clientId} subsection={rnav} />
     }
+    if(lnav==='pages') return <PagesManager clientId={clientId}/>
+    if(lnav==='team') return <TeamSection clientId={clientId}/>
     if(lnav==='homepage') {
       if(rnav==='promo-tiles') return <div style={{color:C.t2,fontSize:14}}>Promo Tiles - Content coming soon.</div>
       if(rnav==='homepage-banners') return <div style={{color:C.t2,fontSize:14}}>Homepage Banners - Content coming soon.</div>
@@ -197,12 +214,35 @@ function LocationsList({ clientId }) {
 
 function PagesManager({ clientId }) {
   const qc = useQueryClient()
-  const { data:pages=[] } = useQuery({ queryKey:['pages',clientId], queryFn:()=>getPages(clientId) })
+  const { data:pages=[], isLoading } = useQuery({ queryKey:['pages',clientId], queryFn:()=>getPages(clientId) })
   const del = useMutation({ mutationFn:id=>deletePage(clientId,id), onSuccess:()=>qc.invalidateQueries(['pages',clientId]) })
+  
+  const [modal, setModal] = useState(null) // { id?, title, slug, content, status }
+
+  const handleSave = async () => {
+    if (!modal.title.trim()) return alert('Title is required')
+    if (!modal.slug.trim()) modal.slug = modal.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    
+    try {
+      if (modal.id) {
+        await updatePage(clientId, modal.id, modal)
+      } else {
+        await createPage(clientId, modal)
+      }
+      qc.invalidateQueries(['pages',clientId])
+      setModal(null)
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  if (isLoading) return <LoadingSpinner />
+
   return (
     <div>
       <h2 style={{ margin:'0 0 16px',fontSize:17,fontWeight:700,color:C.t0 }}>Pages ({pages.length})</h2>
-      <button style={{ display:'flex',alignItems:'center',gap:7,background:'none',border:'none',color:C.acc,fontSize:13,cursor:'pointer',fontFamily:'inherit',padding:'4px 0',marginBottom:16,fontWeight:600 }}>
+      <button onClick={() => setModal({ title:'', slug:'', content:'', status:'draft' })}
+        style={{ display:'flex',alignItems:'center',gap:7,background:'none',border:'none',color:C.acc,fontSize:13,cursor:'pointer',fontFamily:'inherit',padding:'4px 0',marginBottom:16,fontWeight:600 }}>
         ＋ Add a Page
       </button>
       <Table 
@@ -221,11 +261,52 @@ function PagesManager({ clientId }) {
         data={pages}
         empty="No pages yet"
         onDelete={(row) => window.confirm(`Delete "${row.title}"?`) && del.mutate(row.id)}
-        onEdit={(row) => alert(`Edit page ${row.title} (TODO)`)}
+        onEdit={(row) => setModal({ ...row })}
       />
+
+      {modal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, width:'100%', maxWidth:900, maxHeight:'90vh', overflow:'auto', display:'flex', flexDirection:'column' }}>
+            <div style={{ padding:20, borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <h3 style={{ margin:0, color:C.t0 }}>{modal.id ? 'Edit' : 'Create'} Page</h3>
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={() => setModal(null)} style={{ padding:'8px 16px', background:'transparent', border:`1px solid ${C.border2}`, color:C.t2, borderRadius:8, cursor:'pointer' }}>Cancel</button>
+                <button onClick={handleSave} style={{ padding:'8px 20px', background:C.green, border:'none', color:'#fff', borderRadius:8, fontWeight:700, cursor:'pointer' }}>Save Page</button>
+              </div>
+            </div>
+            <div style={{ padding:24, overflowY:'auto' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Title *</label>
+                  <input value={modal.title} onChange={e => setModal({...modal, title:e.target.value})} style={inpStyle} placeholder="Page Title" />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Slug (URL Path)</label>
+                  <input value={modal.slug} onChange={e => setModal({...modal, slug:e.target.value})} style={inpStyle} placeholder="e.g. about-us" />
+                </div>
+              </div>
+              <div style={{ marginBottom:20 }}>
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Content</label>
+                <div style={{ border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
+                  <PageEditor clientId={clientId} content={modal.content} onUpdate={c => setModal({...modal, content:c})} />
+                </div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase' }}>Status:</label>
+                <select value={modal.status} onChange={e => setModal({...modal, status:e.target.value})} style={{ ...inpStyle, width:'auto' }}>
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
+const inpStyle = { width: '100%', padding: '10px 12px', background: '#111827', border: `1px solid ${C.border}`, borderRadius: 8, color: '#F1F5FF', fontSize: 14, boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }
 
 function BannersManager({ clientId }) {
   const qc = useQueryClient()

@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const rateLimit = require('express-rate-limit')
 const { authenticateToken } = require('../middleware/auth')
-const prisma = require('../lib/prisma')
+const { prisma } = require('../lib/prisma')
 const router = express.Router()
 const loginLimit = rateLimit({ windowMs: 60000, max: 10 })
 

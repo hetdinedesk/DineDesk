@@ -1,9 +1,12 @@
 const express = require('express')
 const { BetaAnalyticsDataClient } = require('@google-analytics/data')
 const { authenticateToken } = require('../middleware/auth')
-const prisma = require('../lib/prisma')
-const router = express.Router()
+const { prisma } = require('../lib/prisma')
+const router = express.Router({ mergeParams: true })
 router.use(authenticateToken)
+
+// Helper to get clientId from params (handles both /:clientId and /:id)
+const getClientId = (req) => req.params.clientId || req.params.id
 
 // Build the GA4 client from the base64 encoded service account key
 let analyticsClient
@@ -16,10 +19,11 @@ try {
   console.warn('GA4: could not parse service account key', e.message)
 }
 
-router.get('/:clientId/analytics', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
+    const clientId = getClientId(req)
     // Get the GA4 property ID saved in Config > Analytics
-    const config = await prisma.siteConfig.findUnique({ where: { clientId: req.params.clientId } })
+    const config = await prisma.siteConfig.findUnique({ where: { clientId } })
     const propertyId = config && config.analytics && config.analytics.ga4PropertyId
 
     if (!propertyId) {

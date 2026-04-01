@@ -4,49 +4,60 @@ import { getAnalytics } from '../api/analytics'
 import { getMenuItems } from '../api/menuItems'
 import { getPages } from '../api/pages'
 import { getSpecials } from '../api/specials'
-
-const C = {
-  page:'#080C14', panel:'#0E1420', card:'#141C2E', active:'#1F2D4A',
-  border:'#1E2D4A', border2:'#2A3F63',
-  t0:'#F1F5FF', t1:'#B8C5E0', t2:'#7A8BAD', t3:'#445572',
-  acc:'#FF6B2B', green:'#22C55E', amber:'#F59E0B', red:'#EF4444'
-}
+import { C } from '../theme'
+import { useMediaQuery } from '../Components/Layout'
 
 const DASH_NAV = [
-  { key:'overview',    label:'Overview',    icon:'📊' },
-  { key:'analytics',   label:'Analytics',   icon:'📈' },
-  { key:'engagements', label:'Engagements', icon:'👆' },
-  { key:'content',     label:'Content',     icon:'📝' },
-  { key:'traffic',     label:'Traffic',     icon:'🔄' },
-  { key:'report',      label:'Report',      icon:'📋' },
+  { key: 'overview', label: 'Overview', icon: '📊' },
+  { key: 'analytics', label: 'Analytics', icon: '📈' },
+  { key: 'engagements', label: 'Engagements', icon: '👆' },
+  { key: 'content', label: 'Content', icon: '📝' },
+  { key: 'traffic', label: 'Traffic', icon: '🔄' },
+  { key: 'report', label: 'Report', icon: '📋' },
 ]
 
 export default function DashboardSection({ clientId }) {
   const [subNav, setSubNav] = useState('analytics')
   const [period, setPeriod] = useState('M')
+  const isMobile = useMediaQuery('(max-width: 768px)')
 
   return (
-    <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden' }}>
+    <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
 
-      {/* Left sidebar nav */}
-      <div style={{ width:160, minWidth:160, background:C.panel,
-        borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column' }}>
+      {/* Sidebar nav */}
+      <div style={{
+        width: isMobile ? '100%' : 160,
+        minWidth: isMobile ? '100%' : 160,
+        background: C.panel,
+        borderRight: isMobile ? 'none' : `1px solid ${C.border}`,
+        borderBottom: isMobile ? `1px solid ${C.border}` : 'none',
+        display: 'flex',
+        flexDirection: isMobile ? 'row' : 'column',
+        overflowX: isMobile ? 'auto' : 'visible',
+        flexShrink: 0
+      }}>
         {DASH_NAV.map(item => (
           <button key={item.key} onClick={() => setSubNav(item.key)}
-            style={{ display:'flex', alignItems:'center', gap:10, width:'100%',
-              padding:'9px 14px', border:'none',
-              background: subNav===item.key ? C.active : 'transparent',
-              color: subNav===item.key ? C.t0 : C.t2,
-              fontWeight: subNav===item.key ? 700 : 400, fontSize:13,
-              cursor:'pointer', fontFamily:'inherit', textAlign:'left',
-              borderLeft:`2px solid ${subNav===item.key ? C.acc : 'transparent'}` }}>
-            <span style={{ fontSize:14 }}>{item.icon}</span>{item.label}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: isMobile ? 'auto' : '100%',
+              padding: isMobile ? '12px 16px' : '9px 14px',
+              border: 'none',
+              background: subNav === item.key ? C.active : 'transparent',
+              color: subNav === item.key ? C.t0 : C.t2,
+              fontWeight: subNav === item.key ? 700 : 400, fontSize: 13,
+              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+              borderLeft: isMobile ? 'none' : `2px solid ${subNav === item.key ? C.acc : 'transparent'}`,
+              borderBottom: isMobile ? `2px solid ${subNav === item.key ? C.acc : 'transparent'}` : 'none',
+              whiteSpace: 'nowrap'
+            }}>
+            <span style={{ fontSize: 14 }}>{item.icon}</span>{!isMobile && item.label}
           </button>
         ))}
       </div>
 
       {/* Main content area */}
-      <div style={{ flex:1, padding:'28px 32px', overflowY:'auto', background:C.page }}>
+      <div style={{ flex: 1, padding: isMobile ? '16px' : '28px 32px', overflowY: 'auto', background: C.page }}>
         {subNav === 'analytics' && (
           <AnalyticsTab clientId={clientId} period={period} setPeriod={setPeriod}/>
         )}

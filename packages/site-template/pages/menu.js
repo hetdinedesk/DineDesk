@@ -1,88 +1,44 @@
 import Head from 'next/head'
 import { getSiteData } from '../lib/api'
-import UtilityBelt      from '../components/UtilityBelt'
-import SiteHeader       from '../components/SiteHeader'
-import Navbar           from '../components/Navbar'
-import SiteFooter       from '../components/SiteFooter'
+import { replaceShortcodes } from '../lib/shortcodes'
+import { CMSProvider } from '../contexts/CMSContext'
+import { Header } from '../components/theme-d1/Header'
+import { Footer } from '../components/theme-d1/Footer'
+import { MenuTemplate } from '../templates/theme-d1/MenuTemplate'
 
-export async function getStaticProps() {
-  const data = await getSiteData()
-  return {
-    props:      { data, colours: data.colours || null },
-    revalidate: 60
-  }
+export async function getServerSideProps({ query }) {
+  const siteId = query.site || process.env.SITE_ID || ''
+  const data = await getSiteData(siteId)
+  return { props: { data } }
 }
 
-export default function MenuPage({ data }) {
-  const { settings={}, booking={}, menuCategories=[] } = data
-  const name = settings.restaurantName || data.client?.name || 'Our Restaurant'
+export default function Page({ data }) {
+  const pages = data?.pages || []
+  const shortcodes = data?.shortcodes || {}
+  const settings = data?.settings || {}
+  const slug = 'menu'
+
+  const norm = (s) => String(s || '').replace(/^\//, '')
+  const page = pages.find((p) => norm(p.slug) === norm(slug))
+  const sc = (text) => replaceShortcodes(text || '', shortcodes)
+
+  const siteName = settings.displayName || settings.restaurantName || data?.client?.name || ''
+  const title = page?.metaTitle || page?.title || siteName || 'Our Menu'
+  const desc = page?.metaDesc || ''
+  const ogImage = page?.ogImage || null
 
   return (
-    <>
+    <CMSProvider data={data}>
       <Head>
-        <title>Menu — {name}</title>
-        <meta name="description" content={`View the full menu at ${name}`}/>
+        <title>{`${sc(title)}`}</title>
+        {desc && <meta name="description" content={sc(desc)} />}
+        <meta property="og:title" content={sc(title)} />
+        {desc && <meta property="og:description" content={sc(desc)} />}
+        {ogImage && <meta property="og:image" content={ogImage} />}
       </Head>
-
-      <UtilityBelt settings={settings} booking={booking} data={data}/>
-      <SiteHeader  settings={settings} booking={booking} data={data}/>
-      <Navbar      settings={settings} booking={booking}/>
-
-      <main style={{ maxWidth:960, margin:'0 auto', padding:'56px 32px' }}>
-        <h1 style={{ fontFamily:'Georgia,serif', fontSize:40, fontWeight:900,
-          color:'var(--color-text,#1A1A1A)', marginBottom:8 }}>Our Menu</h1>
-        <p style={{ fontSize:15, color:'#888', marginBottom:48 }}>
-          Fresh ingredients, crafted with care
-        </p>
-
-        {menuCategories.length === 0 && (
-          <p style={{ color:'#888' }}>Menu coming soon.</p>
-        )}
-
-        {menuCategories.map(cat => (
-          <section key={cat.id} style={{ marginBottom:56 }}>
-            <h2 style={{ fontFamily:'Georgia,serif', fontSize:26, fontWeight:800,
-              color:'var(--color-primary)', marginBottom:6, paddingBottom:12,
-              borderBottom:'2px solid var(--color-primary)' }}>
-              {cat.name}
-            </h2>
-            {cat.description && (
-              <p style={{ fontSize:13, color:'#888', marginBottom:20 }}>{cat.description}</p>
-            )}
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {cat.items.filter(i => i.isAvailable !== false).map(item => (
-                <div key={item.id} style={{ display:'flex', justifyContent:'space-between',
-                  alignItems:'flex-start', padding:'16px 20px',
-                  background:'#F9F9F9', borderRadius:10,
-                  border:'1px solid #EFEFEF' }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
-                      <span style={{ fontWeight:700, fontSize:16,
-                        color:'var(--color-text,#1A1A1A)' }}>{item.name}</span>
-                      {item.isFeatured && (
-                        <span style={{ background:'var(--color-primary)', color:'#fff',
-                          fontSize:10, fontWeight:700, padding:'2px 8px',
-                          borderRadius:20 }}>Featured</span>
-                      )}
-                    </div>
-                    {item.description && (
-                      <p style={{ fontSize:13, color:'#888', margin:0, lineHeight:1.5 }}>
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
-                  <span style={{ fontWeight:800, fontSize:18,
-                    color:'var(--color-primary)', marginLeft:24, flexShrink:0 }}>
-                    ${item.price}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
-      </main>
-
-      <SiteFooter settings={settings} data={data}/>
-    </>
+      <Header />
+      <MenuTemplate />
+      <Footer />
+    </CMSProvider>
   )
 }

@@ -1,4 +1,4 @@
-const prisma = require('./prisma')
+const { prisma } = require('./prisma')
 
 async function log({ action, entity, entityName, userId, userName, clientId, clientName, metadata }) {
   try {
