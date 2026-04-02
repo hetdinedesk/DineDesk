@@ -4,11 +4,11 @@ import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
 import { Header } from '../components/theme-d1/Header'
 import { Footer } from '../components/theme-d1/Footer'
-import { AboutTemplate } from '../templates/theme-d1/AboutTemplate'
-import { MenuTemplate } from '../templates/theme-d1/MenuTemplate'
-import { ContactTemplate } from '../templates/theme-d1/ContactTemplate'
-import { LocationsTemplate } from '../templates/theme-d1/LocationsTemplate'
-import { SpecialsTemplate } from '../templates/theme-d1/SpecialsTemplate'
+import AboutTemplate from '../templates/theme-d1/AboutTemplate.jsx'
+import MenuTemplate from '../templates/theme-d1/MenuTemplate.jsx'
+import ContactTemplate from '../templates/theme-d1/ContactTemplate.jsx'
+import LocationsTemplate from '../templates/theme-d1/LocationsTemplate.jsx'
+import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate.jsx'
 
 export async function getServerSideProps({ query, params }) {
   const slugParts = Array.isArray(params?.slug) ? params.slug : []

@@ -4,7 +4,7 @@ import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
 import { Header } from '../components/theme-d1/Header'
 import { Footer } from '../components/theme-d1/Footer'
-import { ContactTemplate } from '../templates/theme-d1/ContactTemplate'
+import ContactTemplate from '../templates/theme-d1/ContactTemplate.jsx'
 
 export async function getServerSideProps({ query }) {
   const siteId = query.site || process.env.SITE_ID || ''
