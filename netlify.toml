@@ -1,7 +1,9 @@
 [build]
-  # Build command for Next.js
+  # Set base directory to the site-template package
+  base = "packages/site-template"
+  # Build command for Next.js (runs from base directory)
   command = "npm run build"
-  # Next.js builds to .next directory by default
+  # Next.js builds to .next directory by default (relative to base)
   publish = ".next"
 
 [build.environment]

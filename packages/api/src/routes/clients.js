@@ -1005,19 +1005,10 @@ router.post('/:id/netlify/create', async (req, res) => {
     const netlifyData = await netlifyService.createSite(siteName, null)
     console.log('✅ Site created:', netlifyData.id)
 
-    // 1.5 — Link site to the site-template GitHub repo
-    // Without this, the build hook fires but has nothing to build → "Site not found"
-    console.log('⏳ Step 1.5/7: Linking GitHub repo...')
-    let repoLinked = false
-    try {
-      await netlifyService.linkRepoToSite(netlifyData.id)
-      console.log('🔗 Repo linked successfully')
-      repoLinked = true
-    } catch (err) {
-      console.warn('⚠️  Could not link GitHub repo:', err.message)
-      console.warn('   → Add SITE_TEMPLATE_REPO=owner/repo to your API .env')
-      console.warn('   → Without this, the Netlify site will show "Site not found"')
-    }
+    // 1.5 — Repo linking via API breaks Netlify's GitHub OAuth connection.
+    // Users must connect the repo manually via Netlify UI (Site settings → Build & deploy → Link repository).
+    const repoLinked = false
+    console.log('ℹ️  Skipping API repo link — connect via Netlify UI to preserve OAuth token.')
 
     // 2 — Set env vars so the build knows which client/template to use
     console.log('⏳ Step 2/7: Setting environment variables...')
@@ -1376,20 +1367,11 @@ router.post('/:id/netlify/link-repo', async (req, res) => {
     const siteId = config?.netlify?.siteId
     if (!siteId) return res.status(400).json({ error: 'No Netlify site configured. Create one first.' })
 
-    const branchOverride = req.body?.branch || null
-    await netlifyService.linkRepoToSite(siteId, branchOverride)
-
-    await prisma.siteConfig.update({
-      where: { clientId: req.params.id },
-      data: { netlify: { ...config.netlify, repoLinked: true } }
+    // Linking via API overwrites Netlify's GitHub OAuth token and breaks builds.
+    // Connect the repo through Netlify UI: Site settings → Build & deploy → Link repository.
+    return res.status(400).json({
+      error: 'Repo linking via API is disabled. Connect GitHub through Netlify UI instead: Site settings → Build & deploy → Link repository → GitHub → select repo → master branch.'
     })
-
-    log({
-      action: 'NETLIFY_REPO_LINKED', entity: 'Deployment',
-      userId: req.user.id, userName: req.user.name, clientId: req.params.id
-    })
-
-    res.json({ success: true, message: 'Repo linked. Trigger a rebuild to deploy.' })
   } catch (err) {
     console.error('❌ link-repo error:', err.message)
     res.status(500).json({ error: err.message })
