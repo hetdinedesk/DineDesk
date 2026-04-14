@@ -36,18 +36,20 @@ model Group {
 }
 
 model Client {
-  id              String           @id @default(cuid())
+  id              String           @id
   name            String
   domain          String?
   status          String           @default("draft")
   groupId         String?
   group           Group?           @relation(fields: [groupId], references: [id])
+  clonable        Boolean          @default(false)
   locations       Location[]
   pages           Page[]
   navigationItems NavigationItem[]
   homeSections    HomeSection[]
   alerts          AlertPopup[]
   paymentGateway  PaymentGateway?
+  orders          Order[]
   legalDocs       LegalDoc[]
   siteConfig      SiteConfig?
   deployments     Deployment[]
@@ -56,7 +58,16 @@ model Client {
   specials        Special[]
   banners         Banner[]
   footerSections  FooterSection[]
+  footerLinks     FooterLink[]
   formSubmissions FormSubmission[]
+  promoTiles      PromoTile[]
+  promoConfig     PromoConfig?
+  specialsConfig  SpecialsConfig?
+  featuredConfig  FeaturedConfig?
+  welcomeContent  WelcomeContent?
+  teamDepartments TeamDepartment[]
+  homepageLayout  HomepageLayout?
+  customTextBlocks CustomTextBlock[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -79,6 +90,7 @@ model SiteConfig {
   footer     Json?
   headerCtas Json?
   social     Json?
+  ordering   Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 }
@@ -101,7 +113,8 @@ model Location {
   lat            String?
   lng            String?
   hours          Json?
-  exteriorImage      String?
+  exteriorImage      String?     // @deprecated - use exteriorImages instead
+  exteriorImages     Json?       @default("[]")  // Array of exterior image URLs
   formEmail          String?
   showInFooter       Boolean  @default(false)
   alternateStyling   Boolean  @default(false)  
@@ -111,7 +124,8 @@ model Location {
 
   isActive           Boolean  @default(true)
   deliveryZone       Boolean  @default(false)
-  menuCategories     Json[]   @default([])
+  menuCategories     String[] @default([])
+  servicesAvailable  String[] @default([])
 
   // Single primary per client enforced in API routes
   @@index([clientId])
@@ -171,6 +185,7 @@ model Page {
   client          Client           @relation(fields: [clientId], references: [id])
   slug            String
   title           String
+  subtitle        String?
   content         String?
   metaTitle       String?
   metaDesc        String?
@@ -182,8 +197,11 @@ model Page {
   parentPage      Page?            @relation("PageChildren", fields: [parentId], references: [id])
   childPages      Page[]           @relation("PageChildren")
   navigationItems NavigationItem[] @relation
+  pageType        String           @default("custom")
   bannerId        String?
   banner          Banner?          @relation(fields: [bannerId], references: [id], onDelete: SetNull)
+  showEnquiryForm Boolean          @default(false)
+  showLocationMap Boolean          @default(false)
   footerLinks     FooterLink[]
 
   createdAt       DateTime         @default(now())
@@ -196,20 +214,23 @@ model Page {
 }
 
 model Banner {
-  id         String  @id @default(cuid())
-  clientId   String
-  client     Client  @relation(fields: [clientId], references: [id])
-  title      String?
-  text       String
-  imageUrl   String?
-  buttonText String?
-  buttonUrl  String?
-  isActive   Boolean @default(true)
-  assignTo   Json[]  @default([]) // ["hero", "pages:/about", "specials"]
-  sortOrder  Int     @default(0)
-  widthPx    Int?
-  heightPx   Int?
-  pages      Page[]
+  id          String  @id @default(cuid())
+  clientId    String
+  client      Client  @relation(fields: [clientId], references: [id])
+  title       String?
+  subtitle    String? // Subheading for banner
+  text        String?
+  imageUrl    String?
+  buttonText  String?
+  buttonUrl   String? // Can be internal (/about) or external (https://...)
+  isExternal  Boolean @default(false) // Flag to indicate external link
+  isActive    Boolean @default(true)
+  location    String  @default("home") // "home", "pages", "both"
+  assignTo    Json[]  @default([]) // Legacy: ["hero", "pages:/about"]
+  sortOrder   Int     @default(0)
+  widthPx     Int?
+  heightPx    Int?
+  pages       Page[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -217,11 +238,108 @@ model Banner {
   @@index([clientId])
 }
 
+model PromoTile {
+  id          String  @id @default(cuid())
+  clientId    String
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  heading     String?
+  subheading  String?
+  imageUrl    String?
+  linkUrl     String?
+  linkLabel   String?
+  isExternal  Boolean @default(false)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([clientId])
+}
+
+model PromoConfig {
+  id          String  @id @default(cuid())
+  clientId    String  @unique
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  heading     String?
+  subheading  String?
+  isActive    Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model SpecialsConfig {
+  id              String  @id @default(cuid())
+  clientId        String  @unique
+  client          Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  heading         String?
+  subheading      String?
+  showOnHomepage  Boolean @default(false)
+  maxItems        Int     @default(2)
+  isActive        Boolean @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+}
+
+model FeaturedConfig {
+  id          String  @id @default(cuid())
+  clientId    String  @unique
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  heading     String?
+  subheading  String?
+  isActive    Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model HomepageLayout {
+  id          String  @id @default(cuid())
+  clientId    String  @unique
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  components  Json    @default("[]") // Array of component objects: { id, type, visible, order }
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model CustomTextBlock {
+  id          String  @id @default(cuid())
+  clientId    String
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String?
+  content     String?
+  isActive    Boolean @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model WelcomeContent {
+  id          String  @id @default(cuid())
+  clientId    String  @unique
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  subtitle    String? // Small tag like "Est. 2010"
+  heading     String? // Main heading like "Welcome to Savoria"
+  text        String? // Main text content
+  imageUrl    String?
+  ctaText     String? // Button text like "Learn Our Story"
+  ctaUrl      String? // Button link
+  isExternal  Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
 model FooterSection {
   id        String       @id @default(cuid())
   clientId  String
   client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   title     String
+  isActive  Boolean      @default(true)
   sortOrder Int          @default(0)
   links     FooterLink[]
 
@@ -230,14 +348,18 @@ model FooterSection {
 
 model FooterLink {
   id              String        @id @default(cuid())
-  footerSectionId String
-  footerSection   FooterSection @relation(fields: [footerSectionId], references: [id], onDelete: Cascade)
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  footerSectionId String?
+  footerSection   FooterSection? @relation(fields: [footerSectionId], references: [id], onDelete: Cascade)
   label           String
   pageId          String?
   page            Page?         @relation(fields: [pageId], references: [id], onDelete: SetNull)
   externalUrl     String?
   sortOrder       Int           @default(0)
+  isActive        Boolean       @default(true)
 
+  @@index([clientId])
   @@index([footerSectionId])
 }
 
@@ -247,6 +369,7 @@ model NavigationItem {
   client    Client           @relation(fields: [clientId], references: [id])
   label     String
   url       String
+  imageUrl  String?
   isActive  Boolean          @default(true)
   sortOrder Int              @default(0)
   parentId  String?
@@ -259,21 +382,50 @@ model NavigationItem {
   @@index([parentId])
 }
 
+model TeamDepartment {
+  id            String       @id @default(cuid())
+  clientId      String
+  client        Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name          String
+  sortOrder     Int          @default(0)
+  isActive      Boolean      @default(true)
+  homeSections  HomeSection[]
+  memberDepartments MemberDepartment[]
+
+  @@index([clientId])
+}
+
+model MemberDepartment {
+  id              String        @id @default(cuid())
+  homeSectionId   String
+  homeSection     HomeSection   @relation(fields: [homeSectionId], references: [id], onDelete: Cascade)
+  departmentId    String
+  department      TeamDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([homeSectionId, departmentId])
+  @@index([homeSectionId])
+  @@index([departmentId])
+}
+
 model HomeSection {
-  id         String  @id @default(cuid())
-  clientId   String
-  client     Client  @relation(fields: [clientId], references: [id])
-  type       String // "hero", "featured-menu", "specials", "cta", "reviews"
-  title      String?
-  content    String?
-  imageUrl   String?
-  buttonText String?
-  buttonUrl  String?
-  sortOrder  Int     @default(0)
-  isActive   Boolean @default(true)
+  id            String           @id @default(cuid())
+  clientId      String
+  client        Client           @relation(fields: [clientId], references: [id])
+  type          String           // "hero", "featured-menu", "specials", "cta", "reviews", "about"
+  title         String?
+  content       String?
+  imageUrl      String?
+  buttonText    String?
+  buttonUrl     String?
+  sortOrder     Int              @default(0)
+  isActive      Boolean          @default(true)
+  departmentId  String?          // @deprecated - use memberDepartments for multiple departments
+  department    TeamDepartment?  @relation(fields: [departmentId], references: [id])
+  memberDepartments MemberDepartment[]
 
   @@index([clientId])
   @@index([sortOrder])
+  @@index([departmentId])
 }
 
 model AlertPopup {
@@ -292,23 +444,59 @@ model AlertPopup {
 }
 
 model PaymentGateway {
-  id       String  @id @default(cuid())
-  clientId String  @unique
-  client   Client  @relation(fields: [clientId], references: [id])
-  provider String // "stripe", "paypal"
-  config   Json // API keys, etc.
-  isActive Boolean @default(false)
-  currency String  @default("AUD")
-  taxRate  Float   @default(0.1)
+  id           String  @id @default(cuid())
+  clientId     String  @unique
+  client       Client  @relation(fields: [clientId], references: [id])
+  provider     String  @default("stripe") // "stripe", "paypal"
+  config       Json // API keys, etc.
+  isActive     Boolean @default(false)
+  currency     String  @default("AUD")
+  taxRate      Float   @default(0.1)
+  cashEnabled  Boolean @default(true)
+  cashLabel    String  @default("Pay at Pickup")
+  testMode     Boolean @default(true)
+  orders       Order[]
 
   @@index([clientId])
+}
+
+model Order {
+  id                    String         @id @default(cuid())
+  clientId              String
+  client                Client         @relation(fields: [clientId], references: [id])
+  orderNumber           Int
+  status                String         @default("new") // "new", "preparing", "ready", "completed", "cancelled"
+  items                 Json // Snapshot of cart items with quantities, prices, options
+  subtotal              Float
+  taxAmount             Float
+  total                 Float
+  currency              String         @default("AUD")
+  customerName          String
+  customerEmail         String
+  customerPhone         String
+  orderType             String         @default("pickup") // "pickup", "delivery", "dine-in"
+  pickupTime            DateTime?
+  paymentMethod         String         @default("cash") // "stripe", "cash"
+  paymentStatus         String         @default("pending") // "pending", "paid", "failed"
+  stripePaymentIntentId String?
+  note                  String?
+  deliveryFee           Float          @default(0)
+  paymentGatewayId      String?
+  paymentGateway        PaymentGateway? @relation(fields: [paymentGatewayId], references: [id])
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([clientId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([paymentGatewayId])
 }
 
 model LegalDoc {
   id       String  @id @default(cuid())
   clientId String
   client   Client  @relation(fields: [clientId], references: [id])
-  type     String // "privacy", "terms", "cookies"
+  type     String // "privacy", "terms", "restaurant-terms", "cookies"
   title    String
   content  String
   urlSlug  String?

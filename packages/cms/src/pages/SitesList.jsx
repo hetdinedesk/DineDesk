@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { C } from '../theme'
+import { API } from '../api/utils'
 
 export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {}, show = true }) {
   const [clients, setClients] = useState([])
@@ -13,7 +14,7 @@ export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {},
     sessionStorage.setItem('dd_new_site_adding', adding)
   }, [name, domain, adding])
 
-  const reload = () => fetch('http://localhost:3001/api/clients', {
+  const reload = () => fetch(`${API}/clients`, {
     headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
   }).then(r => {
     if (r.status === 401 || r.status === 403) {
@@ -44,7 +45,7 @@ export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {},
     const finalDomain = domain.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase() || generatedDomain
 
     try {
-      const res = await fetch('http://localhost:3001/api/clients', {
+      const res = await fetch(`${API}/clients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

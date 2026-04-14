@@ -7,8 +7,78 @@ const DEFAULT_SITE_ID = process.env.NEXT_PUBLIC_SITE_ID
   || process.env.SITE_ID
   || ''
 
-// Import mock data as fallback
-import { getCMSData } from '../data/cms.js'
+// Empty state fallback data - used when no SITE_ID or API fetch fails
+const EMPTY_STATE_DATA = {
+  client: null,
+  locations: [],
+  pages: [],
+  banners: [],
+  menuCategories: [],
+  menuItems: [],
+  specials: [],
+  navigation: [],
+  homepageSections: [],
+  settings: {},
+  colours: {},
+  reviews: {},
+  booking: {
+    bookingUrl: '',
+    bookLabel: 'Book Table',
+    showInHeader: false,
+    orderUrl: '',
+    orderLabel: 'Order Online',
+    showOrderBtn: false,
+  },
+  headerCtas: [
+    {
+      id: 'primary',
+      label: 'Book Table',
+      value: '/contact',
+      variant: 'primary',
+      active: false
+    },
+    {
+      id: 'secondary',
+      label: 'Order Online',
+      value: '#',
+      variant: 'secondary',
+      active: false
+    }
+  ],
+  header: {
+    type: 'standard-full',
+    utilityBelt: true,
+    utilityItems: {
+      'contact-info': true,
+      'social-links': true,
+      reviews: true,
+      'header-ctas': true,
+    },
+  },
+  footer: {
+    theme: 'dark',
+    tagline: '',
+    socialLinks: {},
+  },
+  social: {},
+  socialLinks: {},
+  paymentGateway: {
+    isActive: false,
+    provider: 'stripe',
+    testMode: true,
+    testPublishableKey: '',
+    livePublishableKey: '',
+    currency: 'AUD',
+    cashEnabled: true,
+    cashLabel: 'Pay at Pickup'
+  },
+  ordering: {
+    enabled: true,
+    acceptingOrders: true,
+    orderTypes: ['pickup'],
+    estimatedPrepTime: '15-20 minutes'
+  }
+}
 
 // In browser, allow ?site= query param to override env var
 // This lets the CMS open a preview with ?site=CLIENT_ID without rebuilding
@@ -16,7 +86,10 @@ function getClientId() {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search)
     const siteParam = params.get('site')
-    if (siteParam) return siteParam
+    // Reject literal string "undefined" as invalid site ID
+    if (siteParam && siteParam !== 'undefined' && siteParam.trim() !== '') {
+      return siteParam
+    }
   }
   return DEFAULT_SITE_ID
 }
@@ -28,13 +101,8 @@ async function getSiteData(clientId) {
   const id = clientId || getClientId()
   
   if (!id) {
-    console.warn('No SITE_ID — using mock data. Set SITE_ID in .env.local or pass ?site=ID in the URL')
-    return getCMSData()
-  }
-
-  // LOG FOR DEBUGGING
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`[getSiteData] Fetching data for ID: "${id}" (passed clientId: "${clientId || ''}")`)
+    console.warn('No SITE_ID provided - showing empty state. Set SITE_ID in .env.local or pass ?site=ID in the URL')
+    return EMPTY_STATE_DATA
   }
 
   try {
@@ -42,13 +110,14 @@ async function getSiteData(clientId) {
       cache: 'no-store'
     })
     if (!res.ok) {
-      console.error('Export fetch failed:', res.status, 'for client:', id, '- using mock data')
-      return getCMSData()
+      console.error('Export fetch failed:', res.status, 'for client:', id, '- using empty state')
+      return EMPTY_STATE_DATA
     }
-    return res.json()
+    const data = await res.json()
+    return data
   } catch (err) {
-    console.error('getSiteData error:', err.message, '- using mock data')
-    return getCMSData()
+    console.error('getSiteData error:', err.message, '- using empty state')
+    return EMPTY_STATE_DATA
   }
 }
 

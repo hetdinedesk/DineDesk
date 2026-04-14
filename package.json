@@ -1,10 +1,15 @@
 {
   "name": "dinedesk",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev:api": "npm run dev --workspace=packages/api",
     "dev:cms": "npm run dev --workspace=packages/cms",
     "build": "npm install --prefix packages/site-template && npm run build --prefix packages/site-template"
+  },
+  "dependencies": {
+    "lucide-react": "^1.7.0"
   }
 }

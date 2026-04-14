@@ -13,6 +13,8 @@ export function buildThemeCSS(colours, settings={}) {
     ctaBg:      colours.ctaBg      || '#C8823A',
     ctaText:    colours.ctaText    || '#ffffff',
     accentBg:   colours.accentBg   || '#F7F2EA',
+    utilityBeltBg: colours.utilityBeltBg || colours.primary || '#C8823A',
+    utilityBeltText: colours.utilityBeltText || '#ffffff',
   }
 
   const fonts = {
@@ -49,6 +51,8 @@ export function buildThemeCSS(colours, settings={}) {
   --color-cta-bg:      ${c.ctaBg};
   --color-cta-text:    ${c.ctaText};
   --color-accent-bg:   ${c.accentBg};
+  --color-utility-belt-bg: ${c.utilityBeltBg};
+  --color-utility-belt-text: ${c.utilityBeltText};
   --font-heading:      ${fonts.heading};
   --font-body:         ${fonts.body};
 }

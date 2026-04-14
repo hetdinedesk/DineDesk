@@ -1,5 +1,7 @@
 import Head from 'next/head'
 import { buildThemeCSS } from '../lib/theme'
+import { CartProvider } from '../contexts/CartContext'
+import CartDrawer from '../components/theme-d1/CartDrawer'
 import '../styles/theme-d1/index.css'
 
 export default function App({ Component, pageProps }) {
@@ -98,7 +100,10 @@ export default function App({ Component, pageProps }) {
       {/* Theme CSS */}
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
-      <Component {...pageProps}/>
+      <CartProvider ordering={data.ordering}>
+        <Component {...pageProps}/>
+        <CartDrawer />
+      </CartProvider>
     </>
   )
 }

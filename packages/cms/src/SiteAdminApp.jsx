@@ -17,7 +17,7 @@ const C = {
 }
 
 const apiFetch = (path, method = 'GET', body = null) => baseApiFetch(path, method, body, SA_TOKEN_KEY)
-const API = 'http://localhost:3001/api'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 // ── Login Page ──────────────────────────────────────────────────
 function SALogin({ onLogin }) {
@@ -361,7 +361,7 @@ function SAUsers() {
   // New user form
   const [newName,     setNewName]     = useState(() => sessionStorage.getItem('sa_users_new_name') || '')
   const [newEmail,    setNewEmail]    = useState(() => sessionStorage.getItem('sa_users_new_email') || '')
-  const [newPassword, setNewPassword] = useState(() => sessionStorage.getItem('sa_users_new_password') || '')
+  const [newPassword, setNewPassword] = useState('')
   const [newRole,     setNewRole]     = useState(() => sessionStorage.getItem('sa_users_new_role') || 'EDITOR')
   // clientAccess: { siteId: ['items','cms','config','dashboard'], ... }
   const [newAccess,   setNewAccess]   = useState(() => {
@@ -376,7 +376,7 @@ function SAUsers() {
     sessionStorage.setItem('sa_users_edit_user', JSON.stringify(editUser))
     sessionStorage.setItem('sa_users_new_name', newName)
     sessionStorage.setItem('sa_users_new_email', newEmail)
-    sessionStorage.setItem('sa_users_new_password', newPassword)
+    // Never persist passwords to sessionStorage
     sessionStorage.setItem('sa_users_new_role', newRole)
     sessionStorage.setItem('sa_users_new_access', JSON.stringify(newAccess))
   }, [showAdd, editUser, newName, newEmail, newPassword, newRole, newAccess])
@@ -433,7 +433,7 @@ function SAUsers() {
     sessionStorage.removeItem('sa_users_show_add')
     sessionStorage.removeItem('sa_users_new_name')
     sessionStorage.removeItem('sa_users_new_email')
-    sessionStorage.removeItem('sa_users_new_password')
+    // password not persisted
     sessionStorage.removeItem('sa_users_new_role')
     sessionStorage.removeItem('sa_users_new_access')
     load()
@@ -1078,7 +1078,7 @@ export default function SiteAdminApp() {
       fetch(API + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
         .then(r => r.json())
         .then(u => {
-          if (u.role === 'SUPER_ADMIN') {
+          if (u.role === 'SUPER_ADMIN' || u.role === 'MANAGER') {
             setUser(u)
           } else {
             localStorage.removeItem(SA_TOKEN_KEY)

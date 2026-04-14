@@ -3,16 +3,20 @@ import { TopNav, SiteActionBar } from './Components/Navigation'
 import GlobalHome from './pages/GlobalHome'
 import SitesList from './pages/SitesList'
 import SiteAdminApp from './SiteAdminApp'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from './stores/authStore'
+import { LayoutDashboard, ClipboardList, Pencil, Settings2, Home, Building2, Users, Image } from 'lucide-react'
 import LoginPage     from './pages/LoginPage'
 import ItemsSection  from './pages/ItemsSection'
 import CmsSection    from './pages/CmsSection'
 import ConfigSection from './pages/ConfigSection'
 import DashboardSection from './pages/DashboardSection'
+import HomepageBanners from './pages/HomepageBanners'
 import { C } from './theme'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +33,8 @@ function ProtectedRoute({ children }) {
 }
 
 function MainApp() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const user = useAuthStore(s => s.user)
   const logout = useAuthStore(s => s.logout)
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
@@ -45,10 +51,82 @@ function MainApp() {
   })
   const [activeSite, setActiveSite] = useState(null)
   const [siteNav,    setSiteNav]    = useState('dashboard')
+  const [dashboardSubsection, setDashboardSubsection] = useState('analytics')
 
   // ── Ref so event listener always sees latest activeSite ──
   const activeSiteRef = useRef(null)
   activeSiteRef.current = activeSite
+
+  // ── Parse URL on mount and navigation changes ──
+  useEffect(() => {
+    const pathParts = location.pathname.split('/').filter(Boolean)
+
+    if (pathParts.length >= 2 && pathParts[0] === 'site') {
+      const siteId = pathParts[1]
+      const section = pathParts[2] || 'dashboard'
+      const subsection = pathParts[3] || 'analytics'
+
+      // Update dashboard subsection state
+      if (section === 'dashboard') {
+        setDashboardSubsection(subsection)
+      }
+
+      // Store subsection in sessionStorage if present
+      if (subsection) {
+        sessionStorage.setItem(`dd_${section}_subsection`, subsection)
+      }
+
+      // Load site if not already loaded (use ref to avoid dependency loop)
+      const current = activeSiteRef.current
+      if (!current || current.id !== siteId) {
+        const token = localStorage.getItem('dd_token')
+        if (token) {
+          fetch(`${API_URL}/clients/${siteId}`, { headers: { Authorization: 'Bearer ' + token } })
+            .then(r => {
+              if (!r.ok) throw new Error(r.status === 404 ? 'Client not found' : 'Failed to load client')
+              return r.json()
+            })
+            .then(async (site) => {
+              if (!site || !site.id) throw new Error('Invalid client data')
+              const cfgRes = await fetch(`${API_URL}/clients/${siteId}/config`, { headers: { Authorization: 'Bearer ' + token } })
+              const cfg = cfgRes.ok ? await cfgRes.json() : {}
+              const merged = {
+                ...site,
+                siteType: cfg?.settings?.siteType || 'restaurant',
+                indexing: cfg?.settings?.indexing || 'blocked'
+              }
+              setActiveSite(merged)
+              setSiteNav(section)
+              sessionStorage.setItem('dd_active_site', JSON.stringify(merged))
+              sessionStorage.setItem('dd_site_nav', section)
+              if (subsection) {
+                sessionStorage.setItem(`dd_${section}_subsection`, subsection)
+              }
+            })
+            .catch((err) => {
+              console.error('Load site error:', err.message)
+              if (err.message === 'Client not found') {
+                navigate('/sites')
+              }
+            })
+        }
+      } else {
+        setSiteNav(section)
+        if (section === 'dashboard') {
+          setDashboardSubsection(subsection)
+        }
+        if (subsection) {
+          sessionStorage.setItem(`dd_${section}_subsection`, subsection)
+        }
+      }
+    } else if (pathParts.length === 1) {
+      const section = pathParts[0]
+      if (['home', 'sites', 'users'].includes(section)) {
+        setGlobalNav(section)
+        setActiveSite(null)
+      }
+    }
+  }, [location.pathname, navigate])
 
   // ── Sync globalNav with user role when user loads ──
   useEffect(() => {
@@ -69,16 +147,18 @@ function MainApp() {
     if (saved) {
       try {
         const site = JSON.parse(saved)
+        if (!site || !site.id) throw new Error('Invalid saved site')
         const token = localStorage.getItem('dd_token')
         const h = { Authorization: 'Bearer ' + token }
 
         Promise.all([
-          fetch(`http://localhost:3001/api/clients/${site.id}`, { headers: h }).then(r => {
-            if (r.status === 404) throw new Error('Client not found')
+          fetch(`${API_URL}/clients/${site.id}`, { headers: h }).then(r => {
+            if (!r.ok) throw new Error(r.status === 404 ? 'Client not found' : 'Failed to load client')
             return r.json()
           }),
-          fetch(`http://localhost:3001/api/clients/${site.id}/config`, { headers: h }).then(r => r.json()),
+          fetch(`${API_URL}/clients/${site.id}/config`, { headers: h }).then(r => r.ok ? r.json() : {}),
         ]).then(([fresh, cfg]) => {
+          if (!fresh || !fresh.id) throw new Error('Invalid client data')
           const merged = {
             ...site, ...fresh,
             siteType: cfg?.settings?.siteType || 'restaurant',
@@ -89,17 +169,23 @@ function MainApp() {
           sessionStorage.setItem('dd_active_site', JSON.stringify(merged))
         }).catch((err) => {
           console.error('Restore site error:', err.message)
-          if (err.message === 'Client not found') {
+          if (err.message === 'Client not found' || err.message === 'Invalid client data') {
             sessionStorage.removeItem('dd_active_site')
             sessionStorage.removeItem('dd_site_nav')
             setActiveSite(null)
             setSiteNav('dashboard')
             return
           }
-          setActiveSite({ ...site, indexing: site.indexing || 'blocked' })
-          setSiteNav(savedNav || 'dashboard')
+          // Fallback: use cached data from sessionStorage
+          if (site.id) {
+            setActiveSite({ ...site, indexing: site.indexing || 'blocked' })
+            setSiteNav(savedNav || 'dashboard')
+          }
         })
-      } catch {}
+      } catch {
+        sessionStorage.removeItem('dd_active_site')
+        sessionStorage.removeItem('dd_site_nav')
+      }
     }
   }, [])
 
@@ -127,6 +213,20 @@ function MainApp() {
     return () => window.removeEventListener('client-updated', handler)
   }, [])
 
+  // ── Listen for CMS navigation from ConfigSection ──
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.section && activeSite) {
+        // Navigate to CMS section and set the correct subsection
+        setSiteNav('cms')
+        // Store the target section in sessionStorage so CmsSection can pick it up
+        sessionStorage.setItem('dd_cms_target_section', e.detail.section)
+      }
+    }
+    window.addEventListener('cms-navigate', handler)
+    return () => window.removeEventListener('cms-navigate', handler)
+  }, [activeSite, setSiteNav])
+
   // ── Save navigation state when it changes ──
   useEffect(() => {
     if (activeSite && siteNav) {
@@ -139,7 +239,7 @@ function MainApp() {
     try {
       const token = localStorage.getItem('dd_token')
       const cfg = await fetch(
-        `http://localhost:3001/api/clients/${client.id}/config`,
+        `${API_URL}/clients/${client.id}/config`,
         { headers: { Authorization: 'Bearer ' + token } }
       ).then(r => r.json())
       const merged = {
@@ -149,9 +249,17 @@ function MainApp() {
       }
       setActiveSite(merged)
       sessionStorage.setItem('dd_active_site', JSON.stringify(merged))
+      // Clear any existing subsection state
+      sessionStorage.removeItem('dd_dashboard_subsection')
+      sessionStorage.removeItem('dd_items_subsection')
+      sessionStorage.removeItem('dd_cms_subsection')
+      sessionStorage.removeItem('dd_config_subsection')
+      // Navigate to site dashboard
+      navigate(`/site/${client.id}/dashboard`)
     } catch {
       setActiveSite({ ...client, indexing: 'blocked' })
       sessionStorage.setItem('dd_active_site', JSON.stringify({ ...client, indexing: 'blocked' }))
+      navigate(`/site/${client.id}/dashboard`)
     }
   }
 
@@ -162,19 +270,42 @@ function MainApp() {
     sessionStorage.removeItem('dd_site_nav')
     sessionStorage.removeItem('dd_cms_lnav')
     sessionStorage.removeItem('dd_cms_rnav')
+    // Clear all subsection states
+    sessionStorage.removeItem('dd_dashboard_subsection')
+    sessionStorage.removeItem('dd_items_subsection')
+    sessionStorage.removeItem('dd_cms_subsection')
+    sessionStorage.removeItem('dd_config_subsection')
     setGlobalNav(canManageAll ? 'home' : 'sites')
+    // Navigate back to appropriate global section
+    navigate(canManageAll ? '/home' : '/sites')
+  }
+
+  const deleteSite = async (clientId) => {
+    try {
+      const res = await fetch(`${API_URL}/clients/${clientId}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to delete client')
+      }
+      closeSite()
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   const globalNavItems = canManageAll
-    ? [{ key:'home', label:'Home' }, { key:'sites', label:'Sites' }, ...(isSuperAdmin ? [{ key:'users', label:'Users' }] : [])]
-    : [{ key:'sites', label:'My Sites' }]
+    ? [{ key:'home', label:'Home', Icon: Home }, { key:'sites', label:'Sites', Icon: Building2 }, ...(isSuperAdmin ? [{ key:'users', label:'Users', Icon: Users }] : [])]
+    : [{ key:'sites', label:'My Sites', Icon: Building2 }]
 
   const getSiteNavItems = (site) => {
     const items = [
-      { key: 'dashboard', label: 'Home' },
-      { key: 'items', label: 'Items' },
-      { key: 'cms', label: 'CMS' },
-      { key: 'config', label: 'Config' },
+      { key: 'dashboard', label: 'Home', Icon: LayoutDashboard },
+      { key: 'items', label: 'Items', Icon: ClipboardList },
+      { key: 'cms', label: 'CMS', Icon: Pencil },
+      { key: 'config', label: 'Config', Icon: Settings2 },
     ]
 
     if (canManageAll || !site) return items
@@ -212,6 +343,7 @@ function MainApp() {
         canManageAll={canManageAll}
         isSuperAdmin={isSuperAdmin}
         isManager={isManager}
+        navigate={navigate}
       />
 
       {activeSite && (
@@ -225,6 +357,7 @@ function MainApp() {
           setDeploying={setDeploying}
           setDeployStatus={setDeployStatus}
           deploying={deploying}
+          navigate={navigate}
         />
       )}
 
@@ -255,7 +388,7 @@ function MainApp() {
           )}
           {activeSite && siteNav === 'cms'    && <CmsSection    clientId={activeSite.id} />}
           {activeSite && siteNav === 'config' && <ConfigSection clientId={activeSite.id} />}
-          {activeSite && siteNav === 'dashboard' && <DashboardSection clientId={activeSite.id} />}
+          {activeSite && siteNav === 'dashboard' && <DashboardSection key={location.pathname} clientId={activeSite.id} onDeleteSite={deleteSite} subNav={dashboardSubsection} setSubNav={setDashboardSubsection} />}
         </div>
       </Container>
     </div>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Utensils, Trash2, Image as ImageIcon } from 'lucide-react'
 import { getMenuItems, deleteMenuItem, reorderMenuItems } from '../api/menuItems'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { apiFetch } from '../api/utils'
+import ImageUpload from '../Components/ImageUpload'
 import { C } from '../theme'
 
 const inp = {
@@ -54,7 +56,7 @@ const SITE_TABS = {
 }
 
 const TAB_META = {
-  menu:      { label:'Menu Items', component: (id) => <MenuItemsTab clientId={id}/> },
+  menu:      { label:'Menu Items', Icon: Utensils, component: (id) => <MenuItemsTab clientId={id}/> },
 }
 
 export default function ItemsSection({ clientId, siteType='restaurant' }) {
@@ -71,13 +73,14 @@ export default function ItemsSection({ clientId, siteType='restaurant' }) {
     <div style={{ padding:'28px 32px', flex:1, overflowY:'auto' }}>
       <div style={{ display:'flex', gap:0, marginBottom:24,
         borderBottom:`1px solid ${C.border}` }}>
-        {tabs.map(({ key, label }) => (
+        {tabs.map(({ key, label, Icon }) => (
           <button key={key} onClick={() => setTab(key)}
-            style={{ padding:'10px 20px', border:'none',
+            style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 20px', border:'none',
               borderBottom: tab===key ? `2px solid ${C.acc}` : '2px solid transparent',
               background:'none', color: tab===key ? C.t0 : C.t2,
               fontWeight: tab===key ? 700 : 400, fontSize:13, cursor:'pointer',
               fontFamily:'inherit', marginBottom:-1 }}>
+            {Icon && <Icon size={14} />}
             {label}
           </button>
         ))}
@@ -95,25 +98,23 @@ function MenuItemsTab({ clientId }) {
   const [catFilter, setCatFilter] = useState('All')
   const [search,    setSearch]    = useState('')
   const [ordered,   setOrdered]   = useState([])
-  const [adding,    setAdding]    = useState(() => sessionStorage.getItem(`items_adding_${clientId}`) === 'true')
-  const [newItem,   setNewItem]   = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(`items_draft_${clientId}`)
-      return saved ? JSON.parse(saved) : { name:'', price:'', description:'', categoryName:'', isFeatured:false }
-    } catch {
-      return { name:'', price:'', description:'', categoryName:'', isFeatured:false }
-    }
-  })
+  const [adding,    setAdding]    = useState(false)
+  const [newItem,   setNewItem]   = useState({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
   const [formErr, setFormErr] = useState('')
 
+  // Track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const initialNewItem = { name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' }
+
   useEffect(() => {
-    sessionStorage.setItem(`items_adding_${clientId}`, adding)
-    sessionStorage.setItem(`items_draft_${clientId}`, JSON.stringify(newItem))
-  }, [adding, newItem, clientId])
+    const hasChanges = JSON.stringify(newItem) !== JSON.stringify(initialNewItem)
+    setHasUnsavedChanges(hasChanges)
+  }, [newItem, initialNewItem])
 
   const { data: items=[], isLoading } = useQuery({
     queryKey: ['menu-items', clientId],
-    queryFn:  () => apiFetch(`/clients/${clientId}/menu-items`)
+    queryFn:  () => apiFetch(`/clients/${clientId}/menu-items`),
+    enabled: !!clientId
   })
 
   useEffect(() => {
@@ -146,6 +147,7 @@ function MenuItemsTab({ clientId }) {
         name:        newItem.name.trim(),
         description: newItem.description.trim() || null,
         price:       newItem.price ? parseFloat(newItem.price) : null,
+        imageUrl:    newItem.imageUrl || null,
         isFeatured:  newItem.isFeatured,
         isAvailable: true,
         sortOrder:   0,
@@ -154,10 +156,9 @@ function MenuItemsTab({ clientId }) {
     },
     onSuccess: () => {
       qc.invalidateQueries(['menu-items', clientId])
-      setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false })
+      setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
       setAdding(false)
-      sessionStorage.removeItem(`items_adding_${clientId}`)
-      sessionStorage.removeItem(`items_draft_${clientId}`)
+      setHasUnsavedChanges(false)
       setFormErr('')
     },
     onError: (err) => setFormErr(err.message)
@@ -166,6 +167,11 @@ function MenuItemsTab({ clientId }) {
   const deleteMut = useMutation({
     mutationFn: (id) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'DELETE'),
     onSuccess:  () => qc.invalidateQueries(['menu-items', clientId])
+  })
+
+  const toggleAvailability = useMutation({
+    mutationFn: ({ id, isAvailable }) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'PUT', { isAvailable }),
+    onSuccess: () => qc.invalidateQueries(['menu-items', clientId])
   })
 
   const handleDragEnd = async ({ active, over }) => {
@@ -243,6 +249,18 @@ function MenuItemsTab({ clientId }) {
                 placeholder="e.g. 12hr braised, truffle jus..." style={inp}/>
             </div>
           </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase',
+                letterSpacing:'0.06em', display:'block', marginBottom:6 }}>Item Image</label>
+            <ImageUpload
+              clientId={clientId}
+              value={newItem.imageUrl || ''}
+              onChange={(url) => setNewItem(p => ({...p, imageUrl: url}))}
+            />
+            <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>
+              Optional image for this menu item. If not provided, a default image will be used.
+            </div>
+          </div>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
             <input type="checkbox" id="isFeatured"
               checked={newItem.isFeatured}
@@ -270,7 +288,7 @@ function MenuItemsTab({ clientId }) {
             <button onClick={() => {
               setAdding(false)
               setFormErr('')
-              setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false })
+              setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
             }}
               style={{ padding:'9px 14px', background:'transparent', border:`1px solid ${C.border}`,
                 borderRadius:7, color:C.t2, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
@@ -305,15 +323,17 @@ function MenuItemsTab({ clientId }) {
                       ${item.price}
                     </span>,
                     <span style={{ fontSize:16 }}>{item.isFeatured ? '⭐' : '—'}</span>,
-                    <span style={{ background:item.isAvailable ? C.greenBg : '#1A0505',
-                      color:item.isAvailable ? C.green : C.red,
-                      padding:'2px 8px', borderRadius:4, fontSize:11, fontWeight:700 }}>
-                      {item.isAvailable ? 'active' : 'unavailable'}
-                    </span>,
+                    <div
+                      title={item.isAvailable ? 'Click to mark unavailable' : 'Click to mark available'}
+                      onClick={() => !toggleAvailability.isPending && toggleAvailability.mutate({ id: item.id, isAvailable: !item.isAvailable })}
+                      style={{ width: 40, height: 20, borderRadius: 10, cursor: 'pointer', background: item.isAvailable ? C.green : C.border2, position: 'relative', transition: 'background 0.2s', flexShrink: 0, opacity: toggleAvailability.isPending ? 0.5 : 1 }}
+                    >
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: item.isAvailable ? 21 : 2, transition: 'left 0.2s' }} />
+                    </div>,
                     <button onClick={() => window.confirm(`Delete "${item.name}"?`) && deleteMut.mutate(item.id)}
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.red}40`, borderRadius:4,
-                        color:C.red, fontSize:11, cursor:'pointer' }}>Remove</button>
+                        color:C.red, fontSize:11, cursor:'pointer' }} title="Delete"><Trash2 size={14} /></button>
                   ]}/>
                 ))}
                 {ordered.length === 0 && (

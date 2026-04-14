@@ -10,9 +10,11 @@ export const SpecialsSection = ({ title, subtitle }) => {
   const activeSpecials = specials.filter((special) => {
     if (!special.isActive) return false;
     const now = new Date();
-    const validFrom = new Date(special.validFrom);
-    const validUntil = new Date(special.validUntil);
-    return now >= validFrom && now <= validUntil;
+    const validFrom = special.validFrom ? new Date(special.validFrom) : null;
+    const validUntil = special.validUntil ? new Date(special.validUntil) : null;
+    const afterStart = !validFrom || now >= validFrom;
+    const beforeEnd = !validUntil || now <= validUntil;
+    return afterStart && beforeEnd;
   });
 
   if (activeSpecials.length === 0) return null;

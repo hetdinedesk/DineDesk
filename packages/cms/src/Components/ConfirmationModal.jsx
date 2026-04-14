@@ -49,9 +49,9 @@ export default function ConfirmationModal({
   if (!isOpen) return null
 
   const colors = {
-    danger: { bg: C.redBg, border: C.red+'40', icon: '🗑️', confirm: C.red },
-    warning: { bg: C.amberBg, border: C.amber+'40', icon: '⚠️', confirm: C.amber },
-    success: { bg: C.greenBg, border: C.green+'40', icon: '✅', confirm: C.green }
+    danger: { bg: C.redBg, border: C.red+'40', icon: '', confirm: C.red },
+    warning: { bg: C.amberBg, border: C.amber+'40', icon: '', confirm: C.amber },
+    success: { bg: C.greenBg, border: C.green+'40', icon: '', confirm: C.green }
   }
 
   const style = colors[variant] || colors.danger

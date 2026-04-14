@@ -211,6 +211,7 @@ async function replaceFooterSections (tx, clientId, footerSections) {
     const createdSection = await tx.footerSection.create({
       data: {
         title: String(section.title || '').trim() || 'Links',
+        isActive: section.isActive !== false,
         clientId,
         sortOrder: si
       }

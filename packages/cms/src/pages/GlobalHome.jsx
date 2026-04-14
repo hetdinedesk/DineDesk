@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { C } from '../theme'
 import { Container, useMediaQuery } from '../Components/Layout'
+import { API } from '../api/utils'
 
 export function HomeInp({ label, value, onChange, placeholder, type = 'text' }) {
   return (
@@ -45,7 +46,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
 
   const loadClients = () => {
     setLoadingClients(true)
-    fetch('http://localhost:3001/api/clients', {
+    fetch(`${API}/clients`, {
       headers: { Authorization: 'Bearer ' + token() }
     }).then(r => {
       if (!r.ok) throw new Error('Failed to load clients')
@@ -60,7 +61,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
 
   const loadGroups = () => {
     setLoadingGroups(true)
-    fetch('http://localhost:3001/api/groups', {
+    fetch(`${API}/groups`, {
       headers: { Authorization: 'Bearer ' + token() }
     }).then(r => {
       if (!r.ok) throw new Error('Failed to load groups')
@@ -81,7 +82,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
     const finalDomain = clientDomain.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase() || generatedDomain
 
     try {
-      const res = await fetch('http://localhost:3001/api/clients', {
+      const res = await fetch(`${API}/clients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
         body: JSON.stringify({ name: clientName, domain: finalDomain, status: 'draft' })
@@ -95,7 +96,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
   const addGroup = async () => {
     if (!groupName) return
     try {
-      const res = await fetch('http://localhost:3001/api/groups', {
+      const res = await fetch(`${API}/groups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
         body: JSON.stringify({ name: groupName, color: groupColor })
@@ -108,7 +109,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
 
   const saveGroupEdit = async () => {
     if (!editingGroup) return
-    await fetch(`http://localhost:3001/api/groups/${editingGroup.id}`, {
+    await fetch(`${API}/groups/${editingGroup.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
       body: JSON.stringify({ name: editingGroup.name, color: editingGroup.color })
@@ -119,7 +120,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
   }
 
   const assignSiteToGroup = async (clientId, groupId) => {
-    await fetch(`http://localhost:3001/api/clients/${clientId}`, {
+    await fetch(`${API}/clients/${clientId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
       body: JSON.stringify({ groupId: groupId || null })
@@ -129,7 +130,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
 
   const deleteGroup = async (groupId) => {
     if (!window.confirm('Delete this group? Sites will be unassigned.')) return
-    await fetch(`http://localhost:3001/api/groups/${groupId}`, {
+    await fetch(`${API}/groups/${groupId}`, {
       method: 'DELETE',
       headers: { Authorization: 'Bearer ' + token() }
     })
@@ -143,10 +144,10 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
   )
 
   const metrics = [
-    { label: 'Total Sites', value: clients.length, icon: '🌐', color: C.acc },
-    { label: 'Live', value: clients.filter(c => c.status === 'live').length, icon: '✅', color: C.green },
-    { label: 'Draft', value: clients.filter(c => c.status === 'draft').length, icon: '📝', color: C.amber },
-    { label: 'Total Groups', value: groups.length, icon: '📁', color: '#A78BFA' },
+    { label: 'Total Sites', value: clients.length, icon: '', color: C.acc },
+    { label: 'Live', value: clients.filter(c => c.status === 'live').length, icon: '', color: C.green },
+    { label: 'Draft', value: clients.filter(c => c.status === 'draft').length, icon: '', color: C.amber },
+    { label: 'Total Groups', value: groups.length, icon: '', color: '#A78BFA' },
   ]
 
   return (

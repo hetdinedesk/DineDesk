@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import LoadingSpinner from './LoadingSpinner'
+import { API } from '../api/utils'
 
 const C = {
   page:'#080C14', panel:'#0E1420', card:'#141C2E', hover:'#1A2540',
@@ -35,7 +36,7 @@ export default function ImageUpload({
     formData.append('file', file)
     
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/images`, {
+      const res = await fetch(`${API}/clients/${clientId}/images`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('dd_token')}` },
         body: formData

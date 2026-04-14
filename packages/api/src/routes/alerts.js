@@ -1,5 +1,5 @@
 const express = require('express')
-const { prisma } = require('../lib/prisma.js')
+const { prisma } = require('../lib/prisma')
 const router = express.Router({ mergeParams: true })
 
 // Helper to get clientId from params (handles both /:clientId and /:id)

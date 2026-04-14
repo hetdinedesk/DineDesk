@@ -14,6 +14,9 @@ router.post('/login', loginLimit, async function(req, res) {
     if (!user) return res.status(401).json({ error: 'Invalid credentials' })
     const valid = await bcrypt.compare(req.body.password, user.password)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ error: 'Server configuration error' })
+    }
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name, clientAccess: user.clientAccess || [] },
       process.env.JWT_SECRET,

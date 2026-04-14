@@ -16,3 +16,16 @@ export const deleteHomeSection = (clientId, id) =>
 export const saveHomeSections = (clientId, sections) =>
   api.put(`/clients/${clientId}/homepage`, sections).then(r => r.data)
 
+// Department APIs
+export const getDepartments = (clientId) =>
+  api.get(`/clients/${clientId}/departments`).then(r => r.data)
+
+export const createDepartment = (clientId, data) =>
+  api.post(`/clients/${clientId}/departments`, data).then(r => r.data)
+
+export const updateDepartment = (clientId, deptId, data) =>
+  api.put(`/clients/${clientId}/departments/${deptId}`, data).then(r => r.data)
+
+export const deleteDepartment = (clientId, deptId) =>
+  api.delete(`/clients/${clientId}/departments/${deptId}`).then(r => r.data)
+

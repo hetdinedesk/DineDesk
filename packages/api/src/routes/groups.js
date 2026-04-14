@@ -10,11 +10,17 @@ router.get('/', async (req, res) => {
   res.json(groups)
 })
 router.post('/', async (req, res) => {
-  const group = await prisma.group.create({ data: req.body })
+  const { name, color } = req.body
+  if (!name) return res.status(400).json({ error: 'Group name is required' })
+  const group = await prisma.group.create({ data: { name, color } })
   res.json(group)
 })
 router.put('/:id', async (req, res) => {
-  const group = await prisma.group.update({ where: { id: req.params.id }, data: req.body })
+  const { name, color } = req.body
+  const data = {}
+  if (name !== undefined) data.name = name
+  if (color !== undefined) data.color = color
+  const group = await prisma.group.update({ where: { id: req.params.id }, data })
   res.json(group)
 })
 router.delete('/:id', async (req, res) => {

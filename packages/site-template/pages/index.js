@@ -23,9 +23,12 @@ const TEMPLATES = {
 // Netlify doesn't support query params in getStaticProps, so we use SSR for preview
 export async function getServerSideProps({ query, req }) {
   // Check for preview mode (CMS with ?site= param)
-  const isPreview = !!query.site
-  const siteId = query.site || process.env.SITE_ID || ''
-  
+  // Reject literal string "undefined" as invalid site ID
+  const rawSite = query.site
+  const isValidSite = rawSite && rawSite !== 'undefined' && rawSite.trim() !== ''
+  const isPreview = isValidSite
+  const siteId = isValidSite ? rawSite : (process.env.SITE_ID || '')
+
   const data = await getSiteData(siteId)
   
   const template = data.colours?.theme
@@ -33,18 +36,27 @@ export async function getServerSideProps({ query, req }) {
     || 'theme-v1'  // Default to Fine Dining theme
   const siteType = data.siteType || 'restaurant'
   
-  // For live site (Netlify), tell it to revalidate every 60 seconds
-  // This gives us near-real-time updates without full rebuilds
-  const revalidate = isPreview ? undefined : 60
-  
   return {
-    props: { data, template, colours: data.colours || null, siteType, isPreview },
-    ...(revalidate && { revalidate })
+    props: { data, template, colours: data.colours || null, siteType, isPreview }
   }
 }
 
 export default function HomePage({ data, template, siteType }) {
+  // Find Home page record to get its banner/settings
+  const pages = data?.pages || []
+  const homePage = pages.find((p) => p.pageType === 'home' || p.slug === '' || p.slug === '/')
+  
+  // Merge home page data into template data
+  const enhancedData = {
+    ...data,
+    _homePage: homePage || null,
+    // If home page has a banner, make it available
+    _homeBanner: homePage?.bannerId 
+      ? (data?.banners || []).find((b) => b.id === homePage.bannerId)
+      : null
+  }
+  
   // Default to theme-d1 if template not found
   const Template = TEMPLATES[template] || ThemeD1Home
-  return <Template data={data} siteType={siteType}/>
+  return <Template data={enhancedData} siteType={siteType}/>
 }

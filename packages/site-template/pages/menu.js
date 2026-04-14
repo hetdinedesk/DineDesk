@@ -7,7 +7,11 @@ import { Footer } from '../components/theme-d1/Footer'
 import MenuTemplate from '../templates/theme-d1/MenuTemplate.jsx'
 
 export async function getServerSideProps({ query }) {
-  const siteId = query.site || process.env.SITE_ID || ''
+  // Reject literal string "undefined" as invalid site ID
+  const rawSite = query.site
+  const siteId = (rawSite && rawSite !== 'undefined' && rawSite.trim() !== '')
+    ? rawSite
+    : (process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
   return { props: { data } }
 }
@@ -27,6 +31,9 @@ export default function Page({ data }) {
   const desc = page?.metaDesc || ''
   const ogImage = page?.ogImage || null
 
+  // Get banner if selected for this page
+  const banner = page?.bannerId ? (data?.banners || []).find((b) => b.id === page.bannerId) : null
+
   return (
     <CMSProvider data={data}>
       <Head>
@@ -37,7 +44,7 @@ export default function Page({ data }) {
         {ogImage && <meta property="og:image" content={ogImage} />}
       </Head>
       <Header />
-      <MenuTemplate />
+      <MenuTemplate data={data} page={page} banner={banner} />
       <Footer />
     </CMSProvider>
   )

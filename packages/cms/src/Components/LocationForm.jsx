@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { MapPin, Home, Phone, MapPinned, Settings, Utensils, Clock, Image, MapPinHouse } from 'lucide-react'
 import { getLocations, createLocation, updateLocation, deleteLocation } from '../api/locations'
 import ImageUpload from './ImageUpload'
+import MultipleImageUpload from './MultipleImageUpload'
 import LoadingSpinner from './LoadingSpinner'
 import ConfirmationModal from './ConfirmationModal'
 
@@ -66,20 +68,20 @@ function ToggleSwitch({ checked, onChange, label, description, color = C.green }
 }
 
 // Section Header Component
-function SectionHeader({ title, icon }) {
+function SectionHeader({ title, Icon }) {
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
-      marginBottom: 16,
+      gap: 10,
+      marginBottom: 20,
       paddingBottom: 12,
       borderBottom: `1px solid ${C.border}`
     }}>
-      <span style={{ fontSize: 16 }}>{icon}</span>
-      <span style={{
-        fontSize: 13,
-        fontWeight: 700,
+      {Icon && <Icon size={18} style={{ color: C.t2 }} />}
+      <span style={{ 
+        fontSize: 14, 
+        fontWeight: 700, 
         color: C.t2,
         textTransform: 'uppercase',
         letterSpacing: '0.08em'
@@ -185,44 +187,64 @@ export default function LocationForm({
     lat: '',
     lng: '',
     hours: {},
-    exteriorImage: '',
+    exteriorImages: [],
     showInFooter: false,
     alternateStyling: false,
     galleryImages: [],
     isPrimary: false,
     deliveryZone: false,
-    menuCategories: []
+    menuCategories: [],
+    servicesAvailable: []
   }
   
-  const draftKey = `location_draft_${clientId}_${isEdit ? location.id : 'new'}`
-  
   const [form, setForm] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(draftKey)
-      if (saved) return JSON.parse(saved)
-    } catch {}
-    return { ...initialForm, ...location }
+    // Handle backward compatibility for single exteriorImage
+    const locationData = { ...location }
+    if (location.exteriorImage && !location.exteriorImages) {
+      locationData.exteriorImages = [location.exteriorImage]
+    }
+    
+    return { ...initialForm, ...locationData }
   })
-
-  useEffect(() => {
-    sessionStorage.setItem(draftKey, JSON.stringify(form))
-  }, [form, draftKey])
-
-  const clearDraft = useCallback(() => {
-    sessionStorage.removeItem(draftKey)
-  }, [draftKey])
 
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedDays, setSelectedDays] = useState([])
+  const [pendingImages, setPendingImages] = useState({
+    exteriorImages: [],
+    galleryImages: []
+  })
 
   useEffect(() => {
     if (location.id && location.id !== form.id) {
-      setForm({ ...initialForm, ...location })
-      setSelectedDays(Object.keys(location.hours || {}).sort())
+      // Handle backward compatibility for single exteriorImage
+      const locationData = { ...location }
+      if (location.exteriorImage && !location.exteriorImages) {
+        locationData.exteriorImages = [location.exteriorImage]
+      }
+      
+      setForm({ ...initialForm, ...locationData })
+      // Only select days that are NOT closed (i.e., have closed !== true)
+      const openDays = Object.entries(location.hours || {})
+        .filter(([day, data]) => data && data.closed !== true)
+        .map(([day]) => day)
+        .sort()
+      setSelectedDays(openDays)
     }
   }, [location?.id])
+
+  // Keep selectedDays in sync with form.hours - only include days that are NOT closed
+  useEffect(() => {
+    const openDays = Object.entries(form.hours || {})
+      .filter(([day, data]) => data && data.closed !== true)
+      .map(([day]) => day)
+      .sort()
+    const currentDays = [...selectedDays].sort()
+    if (openDays.join(',') !== currentDays.join(',')) {
+      setSelectedDays(openDays)
+    }
+  }, [form.hours])
 
   const validate = useCallback(() => {
     const e = {}
@@ -248,7 +270,7 @@ export default function LocationForm({
     },
     onSuccess: (data) => {
       qc.invalidateQueries(['locations', clientId])
-      clearDraft()
+      clearPendingImages()
       onSave?.(data)
       onClose()
     },
@@ -262,8 +284,16 @@ export default function LocationForm({
   const handleSave = useCallback(() => {
     if (!validate()) return
     setSaving(true)
-    mutation.mutate(form)
-  }, [validate, form, mutation])
+    
+    // Include pending images in the save data
+    const saveData = {
+      ...form,
+      ...(pendingImages.exteriorImages.length > 0 && { exteriorImages: pendingImages.exteriorImages }),
+      ...(pendingImages.galleryImages.length > 0 && { galleryImages: pendingImages.galleryImages })
+    }
+    
+    mutation.mutate(saveData)
+  }, [validate, form, pendingImages, mutation])
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteLocation(clientId, location.id),
@@ -283,14 +313,42 @@ export default function LocationForm({
     if (errors[key]) {
       setErrors(prevErrors => ({ ...prevErrors, [key]: '' }))
     }
+    // Remove automatic draft saving - only save when explicitly requested
   }, [errors])
 
+  const setImageField = useCallback((key, value) => {
+    setPendingImages(prev => ({ ...prev, [key]: value }))
+  }, [])
+
+  const clearPendingImages = useCallback(() => {
+    setPendingImages({ exteriorImages: [], galleryImages: [] })
+  }, [])
+
   const toggleDay = (day) => {
-    setSelectedDays(prev => 
-      prev.includes(day) 
+    setSelectedDays(prev => {
+      const isCurrentlySelected = prev.includes(day)
+      const newSelectedDays = isCurrentlySelected
         ? prev.filter(d => d !== day)
         : [...prev, day].sort()
-    )
+      
+      // When unchecking a day, mark as closed: true (don't remove from hours)
+      // When checking a day, mark as closed: false
+      setForm(prevForm => {
+        const existingHours = prevForm.hours?.[day] || {}
+        return {
+          ...prevForm,
+          hours: {
+            ...prevForm.hours,
+            [day]: {
+              ...existingHours,
+              closed: isCurrentlySelected // true if unchecking, false if checking
+            }
+          }
+        }
+      })
+      
+      return newSelectedDays
+    })
   }
 
   const updateHour = (day, type, value) => {
@@ -307,9 +365,53 @@ export default function LocationForm({
         }
       }
     }))
+    // Remove automatic draft saving
   }
 
+  const hasPendingImages = pendingImages.exteriorImages.length > 0 || pendingImages.galleryImages.length > 0
   const hasCoordinates = form.lat && form.lng
+  
+  // Check if form has been modified from original location data
+  const hasFormChanges = useCallback(() => {
+    if (!isEdit) return false // New locations don't have original data to compare
+    
+    const originalFields = ['name', 'displayName', 'address', 'suburb', 'city', 'state', 
+                           'postcode', 'country', 'phone', 'bookingPhone', 'deliveryPhone', 
+                           'formEmail', 'showInFooter', 'alternateStyling', 'isPrimary', 
+                           'deliveryZone', 'menuCategories', 'servicesAvailable']
+    
+    // Check basic fields
+    for (const field of originalFields) {
+      if (form[field] !== location[field]) return true
+    }
+    
+    // Check hours
+    const formHoursKeys = Object.keys(form.hours || {}).sort()
+    const locationHoursKeys = Object.keys(location.hours || {}).sort()
+    if (formHoursKeys.join(',') !== locationHoursKeys.join(',')) return true
+    
+    for (const day of formHoursKeys) {
+      if (form.hours[day]?.open !== location.hours[day]?.open ||
+          form.hours[day]?.close !== location.hours[day]?.close) {
+        return true
+      }
+    }
+    
+    return false
+  }, [form, location, isEdit])
+
+  const hasUnsavedChanges = hasFormChanges() || hasPendingImages
+
+  const handleClose = useCallback(() => {
+    if (hasUnsavedChanges) {
+      if (confirm('You have unsaved changes. Are you sure you want to close without saving?')) {
+        clearPendingImages()
+        onClose()
+      }
+    } else {
+      onClose()
+    }
+  }, [hasUnsavedChanges, clearPendingImages, onClose])
 
   return (
     <div style={{ maxWidth: 800, width: '100%' }}>
@@ -322,7 +424,7 @@ export default function LocationForm({
         padding: 24,
         marginBottom: 24
       }}>
-        <SectionHeader title="Basic Information" icon="📍" />
+        <SectionHeader title="Basic Information" Icon={MapPin} />
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div>
@@ -345,14 +447,28 @@ export default function LocationForm({
         </div>
 
         <div style={{ marginTop: 20 }}>
-          <ImageUpload
+          <MultipleImageUpload
             clientId={clientId}
-            label="Exterior Photo"
-            hint="Restaurant front - shown on maps and location pages"
-            value={form.exteriorImage}
-            onChange={v => setField('exteriorImage', v)}
+            label="Exterior Photos"
+            hint="Restaurant exterior - first image will be primary. Add multiple angles and views."
+            value={pendingImages.exteriorImages.length > 0 ? pendingImages.exteriorImages : (form.exteriorImages || [])}
+            onChange={v => setImageField('exteriorImages', v)}
             aspect={16/9}
+            maxImages={8}
           />
+          {pendingImages.exteriorImages.length > 0 && (
+            <div style={{
+              marginTop: 8,
+              padding: '8px 12px',
+              background: `${C.acc}15`,
+              border: `1px solid ${C.acc}`,
+              borderRadius: 6,
+              fontSize: 12,
+              color: C.acc
+            }}>
+              ⚠️ {pendingImages.exteriorImages.length} new image{pendingImages.exteriorImages.length === 1 ? '' : 's'} uploaded - click "Update Location" to save
+            </div>
+          )}
         </div>
       </div>
 
@@ -364,7 +480,7 @@ export default function LocationForm({
         padding: 24,
         marginBottom: 24
       }}>
-        <SectionHeader title="Address" icon="🏠" />
+        <SectionHeader title="Address" Icon={Home} />
         
         <div style={{ marginBottom: 16 }}>
           <Label required>Street Address</Label>
@@ -435,35 +551,16 @@ export default function LocationForm({
         padding: 24,
         marginBottom: 24
       }}>
-        <SectionHeader title="Contact Information" icon="📞" />
+        <SectionHeader title="Contact Information" Icon={Phone} />
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
-            <Label required>Main Phone</Label>
+            <Label required>Phone</Label>
             <Input
               value={form.phone}
               onChange={e => setField('phone', e.target.value)}
               placeholder="+61 3 1234 5678"
               error={errors.phone}
-            />
-          </div>
-          <div>
-            <Label>Booking Phone</Label>
-            <Input
-              value={form.bookingPhone}
-              onChange={e => setField('bookingPhone', e.target.value)}
-              placeholder="Reservations line (optional)"
-            />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div>
-            <Label>Delivery Phone</Label>
-            <Input
-              value={form.deliveryPhone}
-              onChange={e => setField('deliveryPhone', e.target.value)}
-              placeholder="Delivery orders (optional)"
             />
           </div>
           <div>
@@ -487,7 +584,7 @@ export default function LocationForm({
         padding: 24,
         marginBottom: 24
       }}>
-        <SectionHeader title="Map Coordinates" icon="🗺️" />
+        <SectionHeader title="Map Coordinates" Icon={MapPinned} />
         
         <div style={{
           display: 'flex',
@@ -513,7 +610,7 @@ export default function LocationForm({
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
             <Label>Latitude</Label>
             <Input
@@ -531,35 +628,6 @@ export default function LocationForm({
             />
           </div>
         </div>
-
-        {hasCoordinates && (
-          <div style={{
-            borderRadius: 12,
-            overflow: 'hidden',
-            border: `1px solid ${C.border}`
-          }}>
-            <div style={{
-              padding: '12px 16px',
-              background: C.panel,
-              borderBottom: `1px solid ${C.border}`,
-              fontSize: 12,
-              color: C.t3,
-              fontWeight: 600
-            }}>
-              Map Preview
-            </div>
-            <iframe
-              src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d315511.9!2d${form.lng}!3d${form.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z${form.lat}, ${form.lng}!5e0!3m2!1sen!2sau!4v1728012345678`}
-              width="100%"
-              height="280"
-              style={{ border: 0, display: 'block' }}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              allowFullScreen
-              title="Location Preview"
-            />
-          </div>
-        )}
       </div>
 
       {/* Section 5: Operating Hours */}
@@ -589,7 +657,10 @@ export default function LocationForm({
             }}>Operating Hours</span>
           </div>
           <button
-            onClick={() => setSelectedDays([])}
+            onClick={() => {
+              setSelectedDays([])
+              setForm(prev => ({ ...prev, hours: {} }))
+            }}
             style={{
               padding: '6px 14px',
               background: 'transparent',
@@ -702,7 +773,7 @@ export default function LocationForm({
         padding: 24,
         marginBottom: 24
       }}>
-        <SectionHeader title="Display Settings" icon="⚙️" />
+        <SectionHeader title="Display Settings" Icon={Settings} />
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <ToggleSwitch
@@ -717,25 +788,53 @@ export default function LocationForm({
             checked={form.showInFooter}
             onChange={v => setField('showInFooter', v)}
             label="Show in Footer"
-            description="Display this location in the site footer"
+            description="Display this location in the website footer"
             color={C.amber}
           />
-          
-          <ToggleSwitch
-            checked={form.alternateStyling}
-            onChange={v => setField('alternateStyling', v)}
-            label="Dark Theme Map"
-            description="Use dark Mapbox style with light markers"
-            color={C.cyan}
-          />
-          
-          <ToggleSwitch
-            checked={form.deliveryZone}
-            onChange={v => setField('deliveryZone', v)}
-            label="Offers Delivery"
-            description="This location provides delivery service"
-            color={C.acc}
-          />
+
+          {/* Services Available Multi-Select */}
+          <div style={{ marginTop: 16 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.t3,
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              marginBottom: 8, display: 'block' }}>
+              Services Available
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {['Dine-In', 'Takeout', 'Delivery'].map(service => (
+                <button
+                  key={service}
+                  type="button"
+                  onClick={() => {
+                    const current = form.servicesAvailable || []
+                    const updated = current.includes(service)
+                      ? current.filter(s => s !== service)
+                      : [...current, service]
+                    setField('servicesAvailable', updated)
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    transition: 'all 0.2s',
+                    background: (form.servicesAvailable || []).includes(service) 
+                      ? C.green + '30' : C.border,
+                    color: (form.servicesAvailable || []).includes(service) 
+                      ? C.green : C.t2,
+                    boxShadow: (form.servicesAvailable || []).includes(service)
+                      ? `0 0 0 2px ${C.green}` : 'none'
+                  }}
+                >
+                  {service}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 12, color: C.t3, marginTop: 8, marginBottom: 0 }}>
+              Select which services are available at this location
+            </p>
+          </div>
         </div>
       </div>
 
@@ -767,7 +866,7 @@ export default function LocationForm({
           </button>
         )}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           style={{
             padding: '12px 24px',
             background: 'transparent',
@@ -788,22 +887,22 @@ export default function LocationForm({
           disabled={saving}
           style={{
             padding: '12px 32px',
-            background: saving ? C.card : C.acc,
-            border: `1px solid ${saving ? C.border2 : C.acc}`,
+            background: saving ? C.card : (hasUnsavedChanges ? C.green : C.acc),
+            border: `1px solid ${saving ? C.border2 : (hasUnsavedChanges ? C.green : C.acc)}`,
             borderRadius: 8,
             color: '#fff',
             fontWeight: 700,
             fontSize: 14,
             cursor: saving ? 'not-allowed' : 'pointer',
             fontFamily: 'inherit',
-            boxShadow: saving ? 'none' : `0 4px 16px ${C.acc}40`,
+            boxShadow: saving ? 'none' : `0 4px 16px ${hasUnsavedChanges ? C.green : C.acc}40`,
             display: 'flex',
             alignItems: 'center',
             gap: 8
           }}
         >
           {saving && <LoadingSpinner size={16} color="#fff" />}
-          {saving ? 'Saving...' : (isEdit ? 'Update Location' : 'Create Location')}
+          {saving ? 'Saving...' : (isEdit ? `${hasUnsavedChanges ? '✓ ' : ''}Update Location` : 'Create Location')}
         </button>
       </div>
 

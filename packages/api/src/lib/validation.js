@@ -34,6 +34,7 @@ const settingsSchema = z.object({
   logoLight: optionalUrl,
   logoDark: optionalUrl,
   favicon: optionalUrl,
+  mapMarker: optionalUrl,
   country: z.string().optional().nullable(),
   timezone: z.string().optional().nullable(),
 }).optional().nullable()
@@ -115,6 +116,8 @@ const bookingSchema = z.object({
   bookingUrl: optionalUrl,
   bookingPhone: z.string().optional(),
   bookLabel: z.string().optional(),
+  bookingPlatform: z.string().optional(),
+  bookConfirmMsg: z.string().optional(),
   orderUrl: optionalUrl,
   orderLabel: z.string().optional(),
   uberEatsUrl: optionalUrl,
@@ -143,7 +146,9 @@ const bookingSchema = z.object({
   freeDeliveryOver: z.number().optional(),
 }).optional()
 
-const shortcodesSchema = z.record(z.string()).optional()
+const shortcodesSchema = z.object({
+  _overrides: z.record(z.string()).optional(),
+}).catchall(z.string()).optional()
 
 const analyticsSchema = z.object({
   gtmId: z.string().optional(),
@@ -179,6 +184,24 @@ const netlifySchema = z.object({
   domainLive: z.boolean().optional(),
 }).optional()
 
+const orderingSchema = z.object({
+  enabled: z.boolean().optional(),
+  taxRate: z.number().optional(),
+  taxLabel: z.string().optional(),
+  minOrderAmount: z.number().optional(),
+  deliveryFee: z.number().optional(),
+  freeDeliveryThreshold: z.number().optional(),
+  estimatedPrepTime: z.string().optional(),
+  acceptingOrders: z.boolean().optional(),
+  pauseMessage: z.string().optional(),
+  orderTypes: z.array(z.string()).optional(),
+  requirePhone: z.boolean().optional(),
+  requireEmail: z.boolean().optional(),
+  notificationEmail: z.string().optional().nullable(),
+  checkoutMessage: z.string().optional(),
+  successMessage: z.string().optional(),
+}).optional()
+
 const notesSchema = z.object({
   general: z.string().optional(),
   stock: z.string().optional(),
@@ -200,6 +223,7 @@ const siteConfigUpdateSchema = z.object({
   homepage: homepageSchema,
   netlify: netlifySchema,
   notes: notesSchema,
+  ordering: orderingSchema,
 }).partial()
 
 // Validation function

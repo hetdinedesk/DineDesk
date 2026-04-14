@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getConfig, saveConfig } from '../api/config'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { deployClient, getDeploys, createNetlifySite, getNetlifyDeploys } from '../api/deployment'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -9,27 +10,36 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
+import { Settings, Palette, Code, FileText, Layout, Share2, Star, Calendar, BarChart3, Globe, ShoppingCart, CreditCard, Bell, Store } from 'lucide-react'
 import { C } from '../theme'
+import OnlineOrderingSection from './OnlineOrderingSection'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 // Sidebar groups — Clean 3-layer structure:
 // General (Site identity) | Design (Visual layer) | Deploy (Publishing)
 const SIDEBAR = [
-  { group:'General', icon:'', items:[
-    { key:'site-settings',  label:'Site Settings'  },
-    { key:'site-branding',  label:'Branding'       },
-    { key:'shortcodes',     label:'Shortcodes'     },
-    { key:'site-notes',     label:'Notes'          },
+  { group:'General', Icon: Settings, items:[
+    { key:'site-settings',  label:'Site Settings', Icon: Settings },
+    { key:'site-branding',  label:'Branding', Icon: Palette },
+    { key:'shortcodes',     label:'Shortcodes', Icon: Code },
+    { key:'site-notes',     label:'Notes', Icon: FileText },
   ]},
-  { group:'Design', icon:'', items:[
-    { key:'themes',         label:'Theme'          },
-    { key:'header-config',  label:'Header'         },
-    { key:'social-links',   label:'Social Links'   },
-    { key:'reviews',        label:'Reviews'        },
-    { key:'booking',        label:'Booking'        },
+  { group:'Online Ordering', Icon: ShoppingCart, items:[
+    { key:'ordering-config', label:'General', Icon: Store },
+    { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
+    { key:'notifications', label:'Notifications', Icon: Bell },
   ]},
-  { group:'Deploy', icon:'', items:[
-    { key:'analytics',      label:'Analytics'      },
-    { key:'netlify',        label:'Deployment'     },
+  { group:'Design', Icon: Layout, items:[
+    { key:'themes',         label:'Theme', Icon: Palette },
+    { key:'header-config',  label:'Header', Icon: Layout },
+    { key:'social-links',   label:'Social Links', Icon: Share2 },
+    { key:'reviews',        label:'Reviews', Icon: Star },
+    { key:'booking',        label:'Booking', Icon: Calendar },
+  ]},
+  { group:'Deploy', Icon: Globe, items:[
+    { key:'analytics',      label:'Analytics', Icon: BarChart3 },
+    { key:'netlify',        label:'Deployment', Icon: Globe },
   ]},
 ]
 
@@ -62,6 +72,8 @@ function SaveBtn({ onClick, saving }) {
 }
 
 export default function ConfigSection({ clientId }) {
+  const navigate = useNavigate()
+  const location = useLocation()
   // Restore activeKey from sessionStorage on page refresh
   const getSavedActiveKey = () => {
     try {
@@ -72,140 +84,66 @@ export default function ConfigSection({ clientId }) {
     }
   }
   
-  const [activeKey, setActiveKey] = useState(getSavedActiveKey)
+  // Get subsection from URL or sessionStorage
+  const getSubsectionFromURL = () => {
+    const pathParts = location.pathname.split('/').filter(Boolean)
+    if (pathParts.length >= 4 && pathParts[0] === 'site' && pathParts[2] === 'config') {
+      return pathParts[3]
+    }
+    return getSavedActiveKey()
+  }
+  
+  const [activeKey, setActiveKey] = useState(getSubsectionFromURL)
   const [collapsed, setCollapsed] = useState({})
   const [client,    setClient]    = useState(null)
-  
-  // Centralized draft state to prevent data loss on tab switch
-  // Restore from sessionStorage to survive refreshes
-  const getInitialDrafts = () => {
-    try {
-      const saved = sessionStorage.getItem(`config_drafts_${clientId}`)
-      return saved ? JSON.parse(saved) : {}
-    } catch {
-      return {}
-    }
-  }
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState(null)
 
-  const [drafts, setDrafts] = useState(getInitialDrafts)
-
-  // Clear specific draft on successful save
-  const clearDraft = (key) => {
-    setDrafts(prev => {
-      const updated = { ...prev }
-      delete updated[key]
-      try {
-        sessionStorage.setItem(`config_drafts_${clientId}`, JSON.stringify(updated))
-      } catch (err) {
-        console.warn('[Config] Failed to clear draft from sessionStorage:', err)
-        // Don't fail silently - notify user
-        if (err.name === 'QuotaExceededError') {
-          console.warn('[Config] SessionStorage quota exceeded - clearing all drafts')
-          try {
-            sessionStorage.removeItem(`config_drafts_${clientId}`)
-          } catch {}
-        }
-      }
-      return updated
-    })
-  }
-
-  // Enhanced draft saving with error handling and recovery
-  const setDraft = (key, data) => {
-    // Sanitize data to prevent circular references and React elements
-    const sanitizedData = JSON.parse(JSON.stringify(data))
-    
-    setDrafts(prev => {
-      const updated = { ...prev, [key]: sanitizedData }
-      try {
-        sessionStorage.setItem(`config_drafts_${clientId}`, JSON.stringify(updated))
-        
-        // Create backup in localStorage for critical data
-        if (key === 'site-settings') {
-          try {
-            localStorage.setItem(`config_backup_${clientId}`, JSON.stringify({
-              timestamp: Date.now(),
-              data: sanitizedData
-            }))
-          } catch (backupErr) {
-            console.warn('[Config] Failed to create backup in localStorage:', backupErr)
-          }
-        }
-      } catch (err) {
-        console.warn('[Config] Failed to save draft to sessionStorage:', err)
-        // Handle quota exceeded by clearing other drafts
-        if (err.name === 'QuotaExceededError') {
-          console.warn('[Config] SessionStorage quota exceeded - clearing other drafts')
-          try {
-            // Keep only current draft, clear others
-            const minimalDraft = { [key]: sanitizedData }
-            sessionStorage.setItem(`config_drafts_${clientId}`, JSON.stringify(minimalDraft))
-            setDrafts(minimalDraft)
-          } catch (quotaErr) {
-            console.warn('[Config] Even minimal draft failed to save:', quotaErr)
-          }
-        }
-      }
-      return updated
-    })
-  }
-
-  // Recovery mechanism for lost drafts
-  const recoverDraft = (key) => {
-    try {
-      // Try sessionStorage first
-      const sessionDrafts = sessionStorage.getItem(`config_drafts_${clientId}`)
-      if (sessionDrafts) {
-        const drafts = JSON.parse(sessionDrafts)
-        if (drafts[key]) {
-          console.log(`[Config] Recovered draft for ${key} from sessionStorage`)
-          return drafts[key]
-        }
-      }
-      
-      // Fallback to localStorage backup for critical data
-      if (key === 'site-settings') {
-        const backup = localStorage.getItem(`config_backup_${clientId}`)
-        if (backup) {
-          const backupData = JSON.parse(backup)
-          console.log(`[Config] Recovered backup for ${key} from localStorage`)
-          return backupData.data
-        }
-      }
-    } catch (err) {
-      console.warn('[Config] Failed to recover draft:', err)
-    }
-    return null
-  }
-
-  // Save activeKey to sessionStorage whenever it changes
+  // Update URL when activeKey changes (but only if we're not already on the right URL)
   useEffect(() => {
     try {
       sessionStorage.setItem(`config_active_${clientId}`, activeKey)
+      // Only update URL if we're not already on the correct URL
+      const currentPath = window.location.pathname
+      const pathParts = currentPath.split('/').filter(Boolean)
+      if (pathParts.length >= 3 && pathParts[2] === 'config') {
+        const expectedUrl = `/site/${pathParts[1]}/config/${activeKey}`
+        if (currentPath !== expectedUrl) {
+          navigate(expectedUrl, { replace: true })
+        }
+      }
     } catch (err) {
       console.warn('[Config] Failed to save active tab to sessionStorage:', err)
     }
-  }, [activeKey, clientId])
+  }, [activeKey, clientId, navigate])
 
   useEffect(() => {                                   // ← moved inside
-    fetch(`http://localhost:3001/api/clients/${clientId}`, {
+    if (!clientId) return
+    fetch(`${API_URL}/clients/${clientId}`, {
       headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
     }).then(r => r.json()).then(setClient).catch(() => {})
   }, [clientId])
 
   const { data: config = {} } = useQuery({
     queryKey: ['config', clientId],
-    queryFn: () => getConfig(clientId)
+    queryFn: () => getConfig(clientId),
+    enabled: !!clientId
   })
+
+  const handleActiveKeyChange = (key) => {
+    if (hasUnsavedChanges) {
+      if (confirm('You have unsaved changes. Are you sure you want to leave without saving?')) {
+        setHasUnsavedChanges(false)
+        setActiveKey(key)
+      }
+    } else {
+      setActiveKey(key)
+    }
+  }
 
   const renderConfig = () => {
     try {
-      const common = { clientId, config, draft: drafts[activeKey], setDraft: (d) => setDraft(activeKey, d), clearDraft: clearDraft }
-
-      // Check for unsaved drafts and show warning
-      if (drafts[activeKey] && !config[activeKey.replace('-', '')]) {
-        console.warn(`[Config] Unsaved draft detected for ${activeKey}`)
-      }
+      const common = { clientId, config, setHasUnsavedChanges, activeKey }
 
       switch(activeKey) {
         case 'site-settings':  return <SiteSettings   {...common} client={client} />
@@ -219,7 +157,10 @@ export default function ConfigSection({ clientId }) {
         case 'reviews':        return <ReviewsConfig   {...common} />
         case 'footer':         return <FooterConfig    {...common} />
         case 'booking':        return <BookingConfig   {...common} />
-        case 'netlify':        return <NetlifyConfig   {...common} />
+        case 'netlify':        return <NetlifyConfig   {...common} client={client} />
+        case 'ordering-config': return <OnlineOrderingSection clientId={clientId} subsection='ordering-config' />
+        case 'payment-settings': return <OnlineOrderingSection clientId={clientId} subsection='payment-settings' />
+        case 'notifications': return <OnlineOrderingSection clientId={clientId} subsection='notifications' />
         default: return <div style={{color:C.t3}}>Coming soon.</div>
       }
     } catch (err) {
@@ -227,12 +168,12 @@ export default function ConfigSection({ clientId }) {
       return (
         <div style={{ padding:40, background:C.card, borderRadius:12, border:`1px solid ${C.border}` }}>
           <h3 style={{ color:C.acc, marginBottom:10 }}>Section Error</h3>
-          <p style={{ color:C.t2, fontSize:14 }}>There was an error rendering this section. Try clearing your drafts or refreshing the page.</p>
+          <p style={{ color:C.t2, fontSize:14 }}>There was an error rendering this section. Try refreshing the page.</p>
           <button 
-            onClick={() => { setDraft(activeKey, null); window.location.reload() }}
+            onClick={() => window.location.reload() }
             style={{ marginTop:20, padding:'8px 16px', background:C.acc, color:'#fff', border:'none', borderRadius:6, cursor:'pointer' }}
           >
-            Reset Section Draft
+            Refresh Page
           </button>
         </div>
       )
@@ -244,31 +185,41 @@ export default function ConfigSection({ clientId }) {
       {/* Config sidebar */}
       <div style={{ width:210, minWidth:210, background:C.panel,
         borderRight:`1px solid ${C.border}`, overflowY:'auto' }}>
-        {SIDEBAR.map(grp => (
-          <div key={grp.group}>
-            <button onClick={() => setCollapsed(p => ({...p, [grp.group]: !p[grp.group]}))}
-              style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                width:'100%', padding:'10px 14px', background:'none', border:'none',
-                borderBottom:`1px solid ${C.border}`, cursor:'pointer',
-                color:C.t3, fontSize:11, fontWeight:700, textTransform:'uppercase',
-                letterSpacing:'0.07em', fontFamily:'inherit' }}>
-              <span>{grp.icon} {grp.group}</span>
-              <span style={{ fontSize:10 }}>{collapsed[grp.group] ? '▶' : '▼'}</span>
-            </button>
-            {!collapsed[grp.group] && grp.items.map(item => (
-              <button key={item.key} onClick={() => setActiveKey(item.key)}
-                style={{ display:'flex', alignItems:'center', width:'100%',
-                  padding:'8px 14px 8px 20px', border:'none',
-                  background: activeKey===item.key ? '#1F2D4A' : 'transparent',
-                  color: activeKey===item.key ? C.t0 : C.t2,
-                  fontWeight: activeKey===item.key ? 700 : 400,
-                  fontSize:13, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
-                  borderLeft:`2px solid ${activeKey===item.key ? C.acc : 'transparent'}` }}>
-                {item.label}
+        {SIDEBAR.map(grp => {
+          const GroupIcon = grp.Icon
+          return (
+            <div key={grp.group}>
+              <button onClick={() => setCollapsed(p => ({...p, [grp.group]: !p[grp.group]}))}
+                style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  width:'100%', padding:'10px 14px', background:'none', border:'none',
+                  borderBottom:`1px solid ${C.border}`, cursor:'pointer',
+                  color:C.t3, fontSize:11, fontWeight:700, textTransform:'uppercase',
+                  letterSpacing:'0.07em', fontFamily:'inherit' }}>
+                <span style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <GroupIcon size={14} />
+                  {grp.group}
+                </span>
+                <span style={{ fontSize:10 }}>{collapsed[grp.group] ? '▶' : '▼'}</span>
               </button>
-            ))}
-          </div>
-        ))}
+              {!collapsed[grp.group] && grp.items.map(item => {
+                const ItemIcon = item.Icon
+                return (
+                  <button key={item.key} onClick={() => handleActiveKeyChange(item.key)}
+                    style={{ display:'flex', alignItems:'center', gap:10, width:'100%',
+                      padding:'8px 14px 8px 20px', border:'none',
+                      background: activeKey===item.key ? '#1F2D4A' : 'transparent',
+                      color: activeKey===item.key ? C.t0 : C.t2,
+                      fontWeight: activeKey===item.key ? 700 : 400,
+                      fontSize:13, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                      borderLeft:`2px solid ${activeKey===item.key ? C.acc : 'transparent'}` }}>
+                    <ItemIcon size={14} />
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
 
       {/* Config content */}
@@ -304,32 +255,33 @@ const SITE_TYPES = [
   { key:'finedine',    label:'Fine Dining',             desc:'Tasting menus + reservations + cellar'},
 ]
 
-function SiteSettings({ clientId, config, client, draft, setDraft, clearDraft }) {
+function SiteSettings({ clientId, config, client, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [form,   setForm]   = useState(() => {
-    if (draft) return draft
-    if (config.settings) return config.settings
-    return {}
-  })
+  const [form,   setForm]   = useState(config.settings || {})
   const [errors, setErrors] = useState({})
   const [groups, setGroups] = useState([])
   const [selectedGroupId, setSelectedGroupId] = useState(client?.groupId || '')
+  const savedFormRef = useRef(config.settings || {})
 
   useEffect(() => {
   setSelectedGroupId(client?.groupId || '')
 }, [client])
 
   useEffect(() => { 
-    if (!draft) setForm(config.settings || {}) 
-  }, [config])
+    setForm(config.settings || {})
+    savedFormRef.current = config.settings || {}
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
-  // Sync local form to parent draft
+  // Track unsaved changes
   useEffect(() => {
-    setDraft(form)
-  }, [form])
+    const saved = savedFormRef.current
+    const hasChanges = JSON.stringify(form) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [form, setHasUnsavedChanges])
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/groups', {
+    fetch(`${API_URL}/groups`, {
       headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
     }).then(r => r.json()).then(d => setGroups(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
@@ -371,7 +323,7 @@ function SiteSettings({ clientId, config, client, draft, setDraft, clearDraft })
     updates.status = form.indexing === 'allowed' ? 'live' : 'draft'
 
     if (Object.keys(updates).length > 0) {
-      await fetch(`http://localhost:3001/api/clients/${clientId}`, {
+      await fetch(`${API_URL}/clients/${clientId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -383,8 +335,8 @@ function SiteSettings({ clientId, config, client, draft, setDraft, clearDraft })
   },
   onSuccess: () => {
     qc.invalidateQueries(['config', clientId])
-    clearDraft('site-settings')
-    fetch(`http://localhost:3001/api/clients/${clientId}`, {
+    setHasUnsavedChanges(false)
+    fetch(`${API_URL}/clients/${clientId}`, {
       headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
     }).then(r => r.json()).then(d => {
       window.dispatchEvent(new CustomEvent('client-updated', {
@@ -402,10 +354,8 @@ function SiteSettings({ clientId, config, client, draft, setDraft, clearDraft })
     console.error('Save failed:', err)
     console.error('Error details:', err.response?.data)
     
-    // Don't clear draft on error - keep it for retry
-    // Show user-friendly error message
     const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
-    alert(`Save failed: ${errorMsg}\n\nYour changes are still saved as a draft. Please try again.`)
+    alert(`Save failed: ${errorMsg}\n\nPlease try again.`)
   }
 })
 
@@ -971,7 +921,7 @@ function RichEditorBlock({ label, hint, editor, onLinkClick, onImageClick }) {
 }
 
 // ── Site Notes ───────────────────────────────────────────────
-function SiteNotes({ clientId, config, draft, setDraft }) {
+function SiteNotes({ clientId, config, setHasUnsavedChanges }) {
   const qc = useQueryClient()
   const [linkModal,  setLinkModal]  = useState(null)
   const [imageModal, setImageModal] = useState(null) // { editor, dropFile? }
@@ -987,35 +937,36 @@ function SiteNotes({ clientId, config, draft, setDraft }) {
 
   const generalEditor = useEditor({
     extensions: makeExtensions('Add general notes — analytics IDs, scripts, developer contacts…'),
-    content: draft?.general || config.notes?.general || '',
+    content: config.notes?.general || '',
     editorProps: { attributes: { style:'text-align:left' } }
   })
 
   const stockEditor = useEditor({
     extensions: makeExtensions('Add operational notes…'),
-    content: draft?.stock || config.notes?.stock || '',
+    content: config.notes?.stock || '',
     editorProps: { attributes: { style:'text-align:left' } }
   })
 
   // Sync when config loads from server
   useEffect(() => {
-    if (generalEditor && config.notes?.general !== undefined && !draft)
+    if (generalEditor && config.notes?.general !== undefined)
       generalEditor.commands.setContent(config.notes.general || '', false)
   }, [config.notes?.general])
 
   useEffect(() => {
-    if (stockEditor && config.notes?.stock !== undefined && !draft)
+    if (stockEditor && config.notes?.stock !== undefined)
       stockEditor.commands.setContent(config.notes.stock || '', false)
   }, [config.notes?.stock])
 
-  // Sync to draft on change
+  // Track unsaved changes
   useEffect(() => {
     if (!generalEditor || !stockEditor) return
     const update = () => {
-      setDraft({
-        general: generalEditor.getHTML(),
-        stock:   stockEditor.getHTML(),
-      })
+      const general = generalEditor.getHTML()
+      const stock = stockEditor.getHTML()
+      const saved = config.notes || {}
+      const hasChanges = general !== (saved.general || '') || stock !== (saved.stock || '')
+      setHasUnsavedChanges(hasChanges)
     }
     generalEditor.on('update', update)
     stockEditor.on('update', update)
@@ -1023,7 +974,7 @@ function SiteNotes({ clientId, config, draft, setDraft }) {
       generalEditor.off('update', update)
       stockEditor.off('update', update)
     }
-  }, [generalEditor, stockEditor])
+  }, [config.notes, setHasUnsavedChanges])
 
   const mutation = useMutation({
     mutationFn: () => saveConfig(clientId, {
@@ -1032,9 +983,14 @@ function SiteNotes({ clientId, config, draft, setDraft }) {
         stock:   stockEditor?.getHTML()   || '',
       }
     }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries(['config', clientId])
-            clearDraft(activeKey)
+      setHasUnsavedChanges(false)
+      // Update editors with saved data
+      if (data?.notes) {
+        generalEditor?.commands.setContent(data.notes.general || '')
+        stockEditor?.commands.setContent(data.notes.stock || '')
+      }
     }
   })
 
@@ -1064,7 +1020,7 @@ function SiteNotes({ clientId, config, draft, setDraft }) {
     formData.append('file', file)
     const token = localStorage.getItem('dd_token')
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/images`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/images`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token },
         body: formData
@@ -1156,18 +1112,23 @@ function SiteNotes({ clientId, config, draft, setDraft }) {
 
 
 //-------Analytics Config ─────────────────────────────────────────────
-function AnalyticsConfig({ clientId, config, draft, setDraft }) {
+function AnalyticsConfig({ clientId, config, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [form,   setForm]   = useState(draft || config.analytics || {})
+  const [form,   setForm]   = useState(config.analytics || {})
   const [errors, setErrors] = useState({})
+  const savedFormRef = useRef(config.analytics || {})
 
   useEffect(() => { 
-    if (!draft) setForm(config.analytics || {}) 
-  }, [config])
+    setForm(config.analytics || {})
+    savedFormRef.current = config.analytics || {}
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft(form)
-  }, [form])
+    const saved = savedFormRef.current
+    const hasChanges = JSON.stringify(form) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [form, setHasUnsavedChanges])
 
   const set = (k, v) => {
     setForm(p => ({...p, [k]: v}))
@@ -1188,7 +1149,7 @@ function AnalyticsConfig({ clientId, config, draft, setDraft }) {
     mutationFn: () => saveConfig(clientId, { analytics: form }),
     onSuccess:  () => {
       qc.invalidateQueries(['config', clientId])
-            clearDraft(activeKey)
+      setHasUnsavedChanges(false)
     }
   })
 
@@ -1307,7 +1268,7 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
     
     try {
       setProgress(30)
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/images`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/images`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') },
         body: formData
@@ -1456,26 +1417,38 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
 }
 
 // ── Branding Config ──────────────────────────────────────────
-function BrandingConfig({ clientId, config, draft, setDraft }) {
+function BrandingConfig({ clientId, config, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState(draft || config.settings || {})
+  const [form, setForm] = useState(config.settings || {})
+  const savedFormRef = useRef(config.settings || {})
 
   useEffect(() => { 
-    if (!draft) setForm(config.settings || {}) 
-  }, [config])
+    setForm(config.settings || {})
+    savedFormRef.current = config.settings || {}
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft(form)
-  }, [form])
+    const saved = savedFormRef.current
+    const hasChanges = JSON.stringify(form) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [form, setHasUnsavedChanges])
 
   const set = (k, v) => setForm(p => ({...p, [k]: v}))
 
   const mutation = useMutation({
-  mutationFn: () => saveConfig(clientId, { settings: form }),
-  onSuccess: () => {
-    qc.invalidateQueries(['config', clientId])
-          clearDraft('site-branding')
-  }
+    mutationFn: () => saveConfig(clientId, { settings: form }),
+    onSuccess: () => {
+      qc.invalidateQueries(['config', clientId])
+      setHasUnsavedChanges(false)
+    },
+    onError: (err) => {
+      console.error('Branding save failed:', err)
+      console.error('Error details:', err.response?.data)
+      
+      const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
+      alert(`Save failed: ${errorMsg}\n\nPlease try again.`)
+    }
 })
 
   return (
@@ -1589,21 +1562,22 @@ function BrandingConfig({ clientId, config, draft, setDraft }) {
 }
 
 // ── Shortcodes Config ───────────────────────────────────────
-function ShortcodesConfig({ clientId, config, client, draft, setDraft, clearDraft }) {
+function ShortcodesConfig({ clientId, config, client, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [form,      setForm]      = useState(draft?.form || {})
-  const [overrides, setOverrides] = useState(draft?.overrides || {})
+  const [form,      setForm]      = useState({})
+  const [overrides, setOverrides] = useState({})
   const [groups,    setGroups]    = useState([])
   const [locations, setLocations] = useState([])
   const [autoValues, setAutoValues] = useState({})
-  const [saved,     setSaved]     = useState(false)
+  const savedOverridesRef = useRef({})
 
   useEffect(() => {
+    if (!clientId) return
     const token = localStorage.getItem('dd_token')
     const h = { Authorization: 'Bearer ' + token }
-    fetch('http://localhost:3001/api/groups', { headers: h })
+    fetch(`${API_URL}/groups`, { headers: h })
       .then(r => r.json()).then(d => setGroups(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch(`http://localhost:3001/api/clients/${clientId}/locations`, { headers: h })
+    fetch(`${API_URL}/clients/${clientId}/locations`, { headers: h })
       .then(r => r.json()).then(d => setLocations(Array.isArray(d) ? d : [])).catch(() => {})
   }, [clientId])
 
@@ -1631,17 +1605,18 @@ function ShortcodesConfig({ clientId, config, client, draft, setDraft, clearDraf
     }
 
     setAutoValues(auto)
+    setForm({ ...auto, ...savedOver })
+    setOverrides(savedOver)
+    savedOverridesRef.current = savedOver
+    setHasUnsavedChanges(false)
+  }, [config, groups, locations, client, setHasUnsavedChanges])
 
-    if (!draft) {
-      // Saved overrides win over auto
-      setForm({ ...auto, ...savedOver })
-      setOverrides(savedOver)
-    }
-  }, [config, groups, locations, client, draft])
-
+  // Track unsaved changes
   useEffect(() => {
-    setDraft({ form, overrides })
-  }, [form, overrides])
+    const saved = savedOverridesRef.current
+    const hasChanges = JSON.stringify(overrides) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [overrides, setHasUnsavedChanges])
 
   const handleChange = (key, value) => {
     setForm(p    => ({...p,    [key]: value}))
@@ -1676,10 +1651,8 @@ function ShortcodesConfig({ clientId, config, client, draft, setDraft, clearDraf
     }),
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
-      clearDraft('shortcodes')
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    }
+      setHasUnsavedChanges(false)
+          }
   })
 
   const codes = [
@@ -1793,7 +1766,7 @@ function ShortcodesConfig({ clientId, config, client, draft, setDraft, clearDraf
             boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
           {mutation.isPending ? 'Saving…' : 'Save Shortcodes'}
         </button>
-        {saved && (
+        {mutation.isSuccess && (
           <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>
         )}
       </div>
@@ -1802,8 +1775,7 @@ function ShortcodesConfig({ clientId, config, client, draft, setDraft, clearDraf
 }
 
 // ── Theme System ───────────────────────────────────────────
-// Each theme is purpose-built for a specific restaurant type
-// Theme = Layout + Style + Behavior + Priority
+// Generic theme system - themes can be added without core logic changes
 const THEMES = [
   {
     key:   'theme-d1',
@@ -1812,18 +1784,21 @@ const THEMES = [
     sellAngle: 'Clean, modern, and highly configurable',
     style: 'Modern layout with focus on imagery and clear CTAs',
     features: ['Utility belt', 'Dynamic sections', 'Reviews carousel', 'Responsive header'],
+    hasSeparateNav: false, // Combined header and navigation
     defaults: { primary:'#C8823A', secondary:'#1C2B1A', headerBg:'#ffffff',
                 headerText:'#1A1A1A', navBg:'#1C2B1A', navText:'#ffffff',
                 bodyBg:'#ffffff', bodyText:'#1A1A1A',
-                ctaBg:'#C8823A', ctaText:'#ffffff', accentBg:'#F7F2EA' }
+                ctaBg:'#C8823A', ctaText:'#ffffff', accentBg:'#F7F2EA',
+                utilityBeltBg:'#C8823A', utilityBeltText:'#ffffff' }
   },
   {
     key:   'theme-v2',
     label: 'Classic Bistro',
     target: 'Traditional venues',
     sellAngle: 'Timeless and elegant',
-    style: 'Classic layout',
-    features: [],
+    style: 'Classic layout with separate header and navigation',
+    features: ['Separate header and navigation'],
+    hasSeparateNav: true, // Separate header and navigation
     comingSoon: true,
     defaults: { primary:'#D4AF37', secondary:'#0A0A0A' }
   },
@@ -1832,14 +1807,19 @@ const THEMES = [
     label: 'Urban Minimal',
     target: 'Trendy spots',
     sellAngle: 'Sleek and modern',
-    style: 'Minimalist layout',
-    features: [],
+    style: 'Minimalist layout with separate header and navigation',
+    features: ['Separate header and navigation'],
+    hasSeparateNav: true, // Separate header and navigation
     comingSoon: true,
     defaults: { primary:'#1A1A1A', secondary:'#ffffff' }
   }
 ]
 
 const COLOUR_GROUPS = [
+  { section:'Utility Belt', fields:[
+    { key:'utilityBeltBg',    label:'Utility Belt Background' },
+    { key:'utilityBeltText',  label:'Utility Belt Text'       },
+  ]},
   { section:'Header',     fields:[
     { key:'headerBg',    label:'Header Background' },
     { key:'headerText',  label:'Header Text'       },
@@ -1854,39 +1834,51 @@ const COLOUR_GROUPS = [
   ]},
   { section:'Body',       fields:[
     { key:'bodyBg',      label:'Page Background'  },
-    { key:'bodyText',    label:'Body Text'         },
-    { key:'accentBg',    label:'Accent Background' },
+    { key:'bodyText',    label:'Body Text'        },
   ]},
-  { section:'CTAs',       fields:[
+  { section:'Buttons',    fields:[
     { key:'ctaBg',       label:'Button Background' },
     { key:'ctaText',     label:'Button Text'       },
   ]},
 ]
 
-function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
+function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [saved,    setSaved]    = useState(false)
   const [tab,      setTab]      = useState('selection')
-  const [selected, setSelected] = useState(draft?.selected || config.colours?.theme || 'theme-v1')
+  const [selected, setSelected] = useState(config.colours?.theme || 'theme-v1')
   const [colours,  setColours]  = useState(() => {
-    if (draft?.colours) return draft.colours
     const c     = config.colours || {}
     const theme = THEMES.find(t => t.key === (c.theme || 'theme-v1')) || THEMES[0]
     return { ...theme.defaults, ...c }
   })
+  const savedColoursRef = useRef(config.colours || {})
+  const savedSelectedRef = useRef(config.colours?.theme || 'theme-v1')
+
+  // Get utility belt state from header config
+  const isUtilityBeltEnabled = config.header?.utilityBelt !== false
+  
+  // Get current theme configuration to check if it has separate navigation
+  const currentTheme = THEMES.find(t => t.key === selected) || THEMES[0]
+  const hasSeparateNav = currentTheme.hasSeparateNav || false
 
   useEffect(() => {
-    if (config.colours && !draft) {
+    if (config.colours) {
       const c     = config.colours
       const theme = THEMES.find(t => t.key === (c.theme || 'theme-v1')) || THEMES[0]
       setSelected(c.theme || 'theme-v1')
       setColours({ ...theme.defaults, ...c })
+      savedColoursRef.current = c
+      savedSelectedRef.current = c.theme || 'theme-v1'
+      setHasUnsavedChanges(false)
     }
-  }, [config])
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft({ selected, colours })
-  }, [selected, colours])
+    const savedSelected = savedSelectedRef.current
+    const savedColours  = savedColoursRef.current
+    const hasChanges = selected !== savedSelected || JSON.stringify(colours) !== JSON.stringify(savedColours)
+    setHasUnsavedChanges(hasChanges)
+  }, [selected, colours, setHasUnsavedChanges])
 
   const mutation = useMutation({
     mutationFn: () => saveConfig(clientId, {
@@ -1894,10 +1886,8 @@ function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
     }),
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
-      clearDraft('themes')
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    }
+      setHasUnsavedChanges(false)
+          }
   })
 
   // Fully replace colours with theme defaults when switching theme
@@ -1925,7 +1915,7 @@ function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
           boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
         {mutation.isPending ? 'Saving…' : label}
       </button>
-      {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
     </div>
   )
 
@@ -2098,7 +2088,7 @@ function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
                 cursor:'pointer', fontFamily:'inherit' }}>
               Save & Customise Colours →
             </button>
-            {saved && (
+            {mutation.isSuccess && (
               <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>
             )}
           </div>
@@ -2120,33 +2110,99 @@ function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
                   {group.section}
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                  {group.fields.map(({ key, label }) => (
-                    <div key={key} style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <input type="color"
-                        value={colours[key] || '#000000'}
-                        onChange={e => setColour(key, e.target.value)}
-                        style={{ width:40, height:36, border:'none', borderRadius:6,
-                          cursor:'pointer', background:'none', flexShrink:0 }}/>
-                      <input
-                        value={colours[key] || ''}
-                        onChange={e => {
-                          const v = e.target.value
-                          if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColour(key, v)
-                        }}
-                        maxLength={7}
-                        style={{ width:100, padding:'7px 9px', background:C.input,
-                          border:`1px solid ${C.border}`, borderRadius:7,
-                          color:C.t0, fontSize:12, fontFamily:'monospace',
-                          outline:'none', boxSizing:'border-box', flexShrink:0 }}
-                        onFocus={e => e.target.style.borderColor = C.acc}
-                        onBlur={e  => e.target.style.borderColor = C.border}
-                      />
-                      <span style={{ fontSize:13, color:C.t1 }}>{label}</span>
-                      <div style={{ width:28, height:28, borderRadius:6, flexShrink:0,
-                        background: colours[key] || '#000',
-                        border:`1px solid ${C.border2}`, marginLeft:'auto' }}/>
-                    </div>
-                  ))}
+                  {group.fields.map(({ key, label }) => {
+                    // Check if this field should be disabled
+                    const isUtilityBeltField = group.section === 'Utility Belt'
+                    const isNavigationField = group.section === 'Navigation'
+                    const isDisabled = (isUtilityBeltField && !isUtilityBeltEnabled) || 
+                                     (isNavigationField && !hasSeparateNav)
+                    
+                    return (
+                      <div key={key} style={{ 
+                        display:'flex', 
+                        alignItems:'center', 
+                        gap:12,
+                        opacity: isDisabled ? 0.5 : 1,
+                        position: 'relative'
+                      }}>
+                        {isDisabled && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'rgba(255,255,255,0.1)',
+                            borderRadius: 6,
+                            zIndex: 1,
+                            cursor: 'not-allowed'
+                          }} />
+                        )}
+                        <input 
+                          type="color"
+                          value={colours[key] || '#000000'}
+                          onChange={e => !isDisabled && setColour(key, e.target.value)}
+                          disabled={isDisabled}
+                          style={{ 
+                            width:40, 
+                            height:36, 
+                            border:'none', 
+                            borderRadius:6,
+                            cursor: isDisabled ? 'not-allowed' : 'pointer', 
+                            background:'none', 
+                            flexShrink:0,
+                            zIndex: 2
+                          }}
+                        />
+                        <input
+                          value={colours[key] || ''}
+                          onChange={e => {
+                            if (!isDisabled) {
+                              const v = e.target.value
+                              if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColour(key, v)
+                            }
+                          }}
+                          maxLength={7}
+                          disabled={isDisabled}
+                          style={{ 
+                            width:100, 
+                            padding:'7px 9px', 
+                            background: isDisabled ? C.hover : C.input,
+                            border:`1px solid ${isDisabled ? C.border2 : C.border}`, 
+                            borderRadius:7,
+                            color: isDisabled ? C.t3 : C.t0, 
+                            fontSize:12, 
+                            fontFamily:'monospace',
+                            outline:'none', 
+                            boxSizing:'border-box', 
+                            flexShrink:0,
+                            cursor: isDisabled ? 'not-allowed' : 'text',
+                            zIndex: 2
+                          }}
+                          onFocus={e => !isDisabled && (e.target.style.borderColor = C.acc)}
+                          onBlur={e  => !isDisabled && (e.target.style.borderColor = C.border)}
+                        />
+                        <span style={{ fontSize:13, color: isDisabled ? C.t3 : C.t1 }}>
+                          {label}
+                          {isDisabled && (
+                            isUtilityBeltField ? ' (Utility Belt Disabled)' : 
+                            isNavigationField ? ' (Combined with Header)' : 
+                            ' (Disabled)'
+                          )}
+                        </span>
+                        <div style={{ 
+                          width:28, 
+                          height:28, 
+                          borderRadius:6, 
+                          flexShrink:0,
+                          background: colours[key] || '#000',
+                          border:`1px solid ${C.border2}`, 
+                          marginLeft:'auto',
+                          zIndex: 2
+                        }}/>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))}
@@ -2163,6 +2219,35 @@ function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
             <div style={{ borderRadius:12, overflow:'hidden',
               border:`1px solid ${C.border}`,
               boxShadow:'0 8px 32px rgba(0,0,0,0.4)' }}>
+
+              {/* Utility Belt Preview - On Top */}
+              {isUtilityBeltEnabled && (
+                <div style={{ 
+                  background: colours.utilityBeltBg || colours.primary || '#C8823A',
+                  padding:'4px 14px',
+                  display:'flex',
+                  alignItems:'center',
+                  justifyContent:'space-between',
+                  fontSize:'8px',
+                  fontWeight:'600',
+                  color: colours.utilityBeltText || '#ffffff',
+                  borderBottom: `1px solid rgba(0,0,0,0.1)`
+                }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span>📍 123 Main St</span>
+                    <span>📞 (555) 123-4567</span>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span>⭐ 4.8</span>
+                    <span style={{ 
+                      background: 'rgba(255,255,255,0.2)', 
+                      padding:'1px 4px', 
+                      borderRadius:'2px',
+                      fontSize:'7px'
+                    }}>Book Now</span>
+                  </div>
+                </div>
+              )}
 
               <div style={{ background: colours.headerBg || '#fff',
                 padding:'10px 14px', display:'flex', alignItems:'center',
@@ -2277,42 +2362,42 @@ function ThemesConfig({ clientId, config, draft, setDraft, clearDraft }) {
 }
 
 // ── Social Links Config ──────────────────────────────────────
-function SocialLinksConfig({ clientId, config, draft, setDraft, clearDraft }) {
+function SocialLinksConfig({ clientId, config, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [saved, setSaved] = useState(false)
-  
+    
   // Default form state
   const defaultForm = {
     facebook: '',
     instagram: '',
     twitter: '',
     showInFooter: true,
+    showInUtility: true,
   }
   
   // Merge config.social with defaults
   const [form, setForm] = useState(() => {
-    if (draft) return draft
     return {
       ...defaultForm,
       ...(config.social || {})
     }
   })
+  const savedFormRef = useRef({ ...defaultForm, ...(config.social || {}) })
 
-  // Update form when config changes (but preserve local changes during editing)
+  // Update form when config changes
   useEffect(() => {
-    if (config.social && !draft) {
-      setForm(prev => ({
-        ...defaultForm,
-        ...config.social,
-        // Preserve any local changes that haven't been saved yet
-        ...prev,
-      }))
+    if (config.social) {
+      const newForm = { ...defaultForm, ...config.social }
+      setForm(newForm)
+      savedFormRef.current = newForm
+      setHasUnsavedChanges(false)
     }
-  }, [config.social])
+  }, [config.social, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft(form)
-  }, [form])
+    const saved = savedFormRef.current
+    const hasChanges = JSON.stringify(form) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [form, setHasUnsavedChanges])
 
   const set = (k, v) => setForm(p => ({...p, [k]: v}))
 
@@ -2321,6 +2406,7 @@ function SocialLinksConfig({ clientId, config, draft, setDraft, clearDraft }) {
       // Filter out empty strings and clean up the data
       const cleanedSocial = {
         showInFooter: form.showInFooter,
+        showInUtility: form.showInUtility,
       }
       
       // Only include non-empty URLs
@@ -2336,10 +2422,8 @@ function SocialLinksConfig({ clientId, config, draft, setDraft, clearDraft }) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['config', clientId] })
-      clearDraft('social-links')
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    },
+      setHasUnsavedChanges(false)
+          },
     onError: (err) => {
       console.error('Save failed:', err)
       console.error('Error details:', err.response?.data)
@@ -2462,11 +2546,47 @@ function SocialLinksConfig({ clientId, config, draft, setDraft, clearDraft }) {
               }}/>
             </button>
           </div>
+
+          {/* Show in Utility Belt */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ display:'flex', flexDirection:'column' }}>
+              <span style={{ fontSize:13, fontWeight:600, color:C.t0 }}>Show in Utility Belt</span>
+              <span style={{ fontSize:11, color:C.t3, marginTop:2 }}>Display social icons in the header utility belt</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => set('showInUtility', !form.showInUtility)}
+              style={{ 
+                width:48, 
+                height:26, 
+                borderRadius:13, 
+                cursor:'pointer',
+                background: form.showInUtility ? C.acc : C.hover, 
+                flexShrink:0,
+                border:`1px solid ${form.showInUtility ? C.acc : C.border2}`,
+                transition:'background 0.15s',
+                padding:0,
+                position:'relative'
+              }}
+            >
+              <span style={{ 
+                width:20, 
+                height:20, 
+                borderRadius:'50%', 
+                background:'#fff',
+                position:'absolute', 
+                top:2,
+                left: form.showInUtility ? 24 : 2, 
+                transition:'left 0.15s',
+                display:'block'
+              }}/>
+            </button>
+          </div>
         </div>
       </div>
 
       <SaveBtn onClick={() => mutation.mutate()} saving={mutation.isPending || mutation.isLoading} />
-      {saved && <span style={{ marginLeft:12, color:C.acc, fontSize:13 }}>Saved!</span>}
+      {mutation.isSuccess && <span style={{ marginLeft:12, color:C.acc, fontSize:13 }}>✅ Saved</span>}
     </div>
   )
 }
@@ -2493,7 +2613,7 @@ const CTA_VARIANTS = [
 
 const UTILITY_ITEMS = [
   { key:'contact-info', label:'Contact Info', editKey:null, cmsNav:true, description:'Address, Phone, Hours' },
-  { key:'social-links', label:'Social Links', editKey:null, cmsNav:true, description:'Facebook, Instagram, etc.' },
+  { key:'social-links', label:'Social Links', editKey:'social-links', description:'Facebook, Instagram, etc.' },
   { key:'reviews',      label:'Reviews',      editKey:'reviews', description:'Star rating & review count' },
   { key:'header-ctas',  label:'Header CTAs',  editKey:null, description:'Custom call-to-action buttons' },
 ]
@@ -2655,10 +2775,12 @@ function UtilityBeltOrder({ items, utilityItems, onReorder, onToggle, onEdit }) 
   )
 }
 
-function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraft }) {
+function HeaderConfig({ clientId, config, onNavigate, setHasUnsavedChanges }) {
   const qc      = useQueryClient()
   const [saved,  setSaved]  = useState(false)
-  const [tab,    setTab]    = useState(draft?.tab || 'header')
+  const [tab,    setTab]    = useState('header')
+  const savedFormRef = useRef(null)
+  const savedCtasRef = useRef([])
   
   // Default structure for header configuration
   const defaultHeader = {
@@ -2714,22 +2836,35 @@ function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraf
   }
 
   const [form,   setForm]   = useState(() => {
-    if (draft?.form) return sanitizeHeader(draft.form)
     if (config?.header) return sanitizeHeader(config.header)
     return defaultHeader
   })
 
-  const [ctas,   setCtas]   = useState(draft?.ctas || config?.headerCtas || [])
+  const [ctas,   setCtas]   = useState(() => {
+    const initialCtas = config?.headerCtas || [];
+    return Array.isArray(initialCtas) ? initialCtas : [];
+  })
   const [ctaModal, setCtaModal] = useState(null) // null | 'new' | { ...cta }
 
   useEffect(() => {
-    if (config.header && !draft) setForm(sanitizeHeader(config.header))
-    if (config.headerCtas && !draft) setCtas(config.headerCtas)
-  }, [config])
+    if (config.header) {
+      setForm(sanitizeHeader(config.header))
+      savedFormRef.current = sanitizeHeader(config.header)
+    }
+    if (config.headerCtas) {
+      const headerCtas = Array.isArray(config.headerCtas) ? config.headerCtas : [];
+      setCtas(headerCtas)
+      savedCtasRef.current = headerCtas
+    }
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft({ tab, form, ctas })
-  }, [tab, form, ctas])
+    const savedForm = savedFormRef.current
+    const savedCtas = savedCtasRef.current
+    const hasChanges = tab !== 'header' || JSON.stringify(form) !== JSON.stringify(savedForm) || JSON.stringify(ctas) !== JSON.stringify(savedCtas)
+    setHasUnsavedChanges(hasChanges)
+  }, [tab, form, ctas, setHasUnsavedChanges])
 
   const set = (k, v) => setForm(p => ({...p, [k]: v}))
   const setUtil = (k, v) => setForm(p => ({
@@ -2747,10 +2882,8 @@ function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraf
     },
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
-      clearDraft('header-config')
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    },
+      setHasUnsavedChanges(false)
+          },
     onError: (err) => {
       console.error('Save failed:', err)
       alert('Failed to save: ' + (err.response?.data?.error || err.message))
@@ -2760,20 +2893,32 @@ function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraf
   // ── CTA helpers ──
   const saveCta = (cta) => {
     if (cta.id) {
-      setCtas(prev => prev.map(c => c.id === cta.id ? cta : c))
+      setCtas(prev => {
+        const current = Array.isArray(prev) ? prev : [];
+        return current.map(c => c.id === cta.id ? cta : c)
+      })
     } else {
-      setCtas(prev => [...prev, { ...cta, id: Date.now().toString(), active: true }])
+      setCtas(prev => {
+        const current = Array.isArray(prev) ? prev : [];
+        return [...current, { ...cta, id: Date.now().toString(), active: true }]
+      })
     }
     setCtaModal(null)
   }
 
   const deleteCta = (id) => {
     if (!window.confirm('Delete this CTA?')) return
-    setCtas(prev => prev.filter(c => c.id !== id))
+    setCtas(prev => {
+      const current = Array.isArray(prev) ? prev : [];
+      return current.filter(c => c.id !== id)
+    })
   }
 
   const toggleCta = (id) => {
-    setCtas(prev => prev.map(c => c.id === id ? {...c, active: !c.active} : c))
+    setCtas(prev => {
+      const current = Array.isArray(prev) ? prev : [];
+      return current.map(c => c.id === id ? {...c, active: !c.active} : c)
+    })
   }
 
   const tabs = [
@@ -2931,7 +3076,7 @@ function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraf
                 boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
               {mutation.isPending ? 'Saving…' : 'Save Header Config'}
             </button>
-            {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
           </div>
         </div>
       )}
@@ -2982,7 +3127,7 @@ function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraf
               <span></span>
             </div>
 
-            {ctas.length === 0 ? (
+            {(!Array.isArray(ctas) || ctas.length === 0) ? (
               <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>
                 No CTAs yet. Click + Add CTA to create one.
               </div>
@@ -2991,7 +3136,7 @@ function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraf
                 style={{ display:'grid',
                   gridTemplateColumns:'1fr 130px 180px 70px 70px 60px',
                   padding:'11px 16px', alignItems:'center',
-                  borderBottom: i < ctas.length-1 ? `1px solid ${C.border}15` : 'none' }}
+                  borderBottom: i < (Array.isArray(ctas) ? ctas.length - 1 : 0) ? `1px solid ${C.border}15` : 'none' }}
                 onMouseEnter={e => e.currentTarget.style.background=C.hover}
                 onMouseLeave={e => e.currentTarget.style.background='transparent'}>
 
@@ -3056,7 +3201,7 @@ function HeaderConfig({ clientId, config, onNavigate, draft, setDraft, clearDraf
                 boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
               {mutation.isPending ? 'Saving…' : 'Save CTAs'}
             </button>
-            {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
           </div>
         </div>
       )}
@@ -3213,20 +3358,24 @@ function CtaModal({ cta, onSave, onClose }) {
 }
 
 // ── Reviews Config ───────────────────────────────────────────
-function ReviewsConfig({ clientId, config, draft, setDraft, clearDraft }) {
+function ReviewsConfig({ clientId, config, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [tab,   setTab]   = useState(draft?.tab || 'summary')
-  const [f,     setF]     = useState(draft?.f || config.reviews || {})
-  const [saved, setSaved] = useState(false)
-  const [ctaModal, setCtaModal] = useState(null)
+  const [tab,   setTab]   = useState('summary')
+  const [f,     setF]     = useState(config.reviews || {})
+    const [ctaModal, setCtaModal] = useState(null)
+  const savedFRef = useRef(config.reviews || {})
 
   useEffect(() => { 
-    if (!draft) setF(config.reviews || {}) 
-  }, [config])
+    setF(config.reviews || {})
+    savedFRef.current = config.reviews || {}
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft({ tab, f })
-  }, [tab, f])
+    const saved = savedFRef.current
+    const hasChanges = tab !== 'summary' || JSON.stringify(f) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [tab, f, setHasUnsavedChanges])
 
   const s = (k, v) => setF(p => ({...p, [k]: v}))
 
@@ -3234,17 +3383,15 @@ function ReviewsConfig({ clientId, config, draft, setDraft, clearDraft }) {
     mutationFn: () => saveConfig(clientId, { reviews: f }),
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
-            clearDraft('reviews')
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    },
+      setHasUnsavedChanges(false)
+          },
     onError: (err) => {
       console.error('Reviews save failed:', err)
       console.error('Error details:', err.response?.data)
       
       // Show user-friendly error message
       const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
-      alert(`Reviews save failed: ${errorMsg}\n\nYour changes are still saved as a draft. Please try again.`)
+      alert(`Reviews save failed: ${errorMsg}\n\nPlease try again.`)
     }
   })
 
@@ -3302,7 +3449,7 @@ function ReviewsConfig({ clientId, config, draft, setDraft, clearDraft }) {
           boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
         {mutation.isPending ? 'Saving…' : 'Save'}
       </button>
-      {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
+      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
       {mutation.isError && (
         <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Save Failed</span>
       )}
@@ -3500,7 +3647,7 @@ function ReviewsConfig({ clientId, config, draft, setDraft, clearDraft }) {
               <span></span>
             </div>
 
-            {ctas.length === 0 ? (
+            {(!Array.isArray(ctas) || ctas.length === 0) ? (
               <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>
                 No CTAs yet. Click + Add CTA to create one.
               </div>
@@ -3509,7 +3656,7 @@ function ReviewsConfig({ clientId, config, draft, setDraft, clearDraft }) {
                 style={{ display:'grid',
                   gridTemplateColumns:'1fr 130px 180px 70px 70px 60px',
                   padding:'11px 16px', alignItems:'center',
-                  borderBottom: i < ctas.length-1 ? `1px solid ${C.border}15` : 'none' }}
+                  borderBottom: i < (Array.isArray(ctas) ? ctas.length - 1 : 0) ? `1px solid ${C.border}15` : 'none' }}
                 onMouseEnter={e => e.currentTarget.style.background=C.hover}
                 onMouseLeave={e => e.currentTarget.style.background='transparent'}>
 
@@ -3562,18 +3709,22 @@ function ReviewsConfig({ clientId, config, draft, setDraft, clearDraft }) {
 }
 
 // ── Footer Config ───────────────────────────────────────────
-function FooterConfig({ clientId, config, draft, setDraft }) {
+function FooterConfig({ clientId, config, setHasUnsavedChanges }) {
   const qc = useQueryClient()
-  const [f,     setF]     = useState(draft || config.footer || {})
-  const [saved, setSaved] = useState(false)
+  const [f,     setF]     = useState(config.footer || {})
+    const savedFRef = useRef(config.footer || {})
 
   useEffect(() => { 
-    if (!draft) setF(config.footer || {}) 
-  }, [config])
+    setF(config.footer || {})
+    savedFRef.current = config.footer || {}
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft(f)
-  }, [f])
+    const saved = savedFRef.current
+    const hasChanges = JSON.stringify(f) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [f, setHasUnsavedChanges])
 
   const s = (k, v) => setF(p => ({...p, [k]: v}))
 
@@ -3581,10 +3732,8 @@ function FooterConfig({ clientId, config, draft, setDraft }) {
     mutationFn: () => saveConfig(clientId, { footer: f }),
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
-            clearDraft(activeKey)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    }
+      setHasUnsavedChanges(false)
+          }
   })
 
   const inp = (label, key, placeholder, hint='') => (
@@ -3743,26 +3892,30 @@ function FooterConfig({ clientId, config, draft, setDraft }) {
             boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
           {mutation.isPending ? 'Saving…' : 'Save Footer'}
         </button>
-        {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+        {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
       </div>
     </div>
   )
 }
 
 // ── Booking & Ordering Config ───────────────────────────────────────────
-function BookingConfig({ clientId, config, draft, setDraft }) {
+function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
   const qc = useQueryClient()
-  const [tab,   setTab]   = useState(draft?.tab || 'booking')
-  const [f,     setF]     = useState(draft?.f || config.booking || {})
-  const [saved, setSaved] = useState(false)
+  const [tab,   setTab]   = useState('booking')
+  const [f,     setF]     = useState(config.booking || {})
+    const savedFRef = useRef(config.booking || {})
 
   useEffect(() => { 
-    if (!draft) setF(config.booking || {}) 
-  }, [config])
+    setF(config.booking || {})
+    savedFRef.current = config.booking || {}
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft({ tab, f })
-  }, [tab, f])
+    const saved = savedFRef.current
+    const hasChanges = tab !== 'booking' || JSON.stringify(f) !== JSON.stringify(saved)
+    setHasUnsavedChanges(hasChanges)
+  }, [tab, f, setHasUnsavedChanges])
 
   const s = (k, v) => setF(p => ({...p, [k]: v}))
 
@@ -3770,9 +3923,11 @@ function BookingConfig({ clientId, config, draft, setDraft }) {
     mutationFn: () => saveConfig(clientId, { booking: f }),
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
-            clearDraft(activeKey)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
+      setHasUnsavedChanges(false)
+          },
+    onError: (err) => {
+      console.error('[Booking Save Error]', err.response?.data || err.message)
+      alert('Save failed: ' + (err.response?.data?.error || err.message))
     }
   })
 
@@ -3835,7 +3990,7 @@ function BookingConfig({ clientId, config, draft, setDraft }) {
           boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
         {mutation.isPending ? 'Saving…' : 'Save'}
       </button>
-      {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
     </div>
   )
 
@@ -4076,15 +4231,16 @@ function BookingConfig({ clientId, config, draft, setDraft }) {
 }
 
 // ── Netlify Config ─────────────────────────────────────────
-function NetlifyConfig({ clientId, config, draft, setDraft }) {
+function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
   const qc = useQueryClient()
-  const [tab,      setTab]      = useState(draft?.tab || 'setup')
-  const [form,     setForm]     = useState(draft?.form || config.netlify || {})
+  const [tab,      setTab]      = useState('site')
+  const [form,     setForm]     = useState(config.netlify || {})
   const [saved,    setSaved]    = useState(false)
   const [creating, setCreating] = useState(false)
   const [createMsg,setCreateMsg]= useState('')
   const [deploys,  setDeploys]  = useState([])
   const [loadingD, setLoadingD] = useState(false)
+  const savedFormRef = useRef(config.netlify || {})
   const [domainVal,setDomainVal]= useState('')
   const [addingDomain, setAddingDomain] = useState(false)
   
@@ -4121,12 +4277,18 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
   const [rollingBack, setRollingBack] = useState(null) // deployId being rolled back
 
   useEffect(() => { 
-    if (config.netlify && !draft) setForm(config.netlify) 
-  }, [config])
+    if (config.netlify) {
+      setForm(config.netlify)
+      savedFormRef.current = config.netlify
+    }
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
-    setDraft({ tab, form })
-  }, [tab, form])
+    const savedForm = savedFormRef.current
+    const hasChanges = tab !== 'site' || JSON.stringify(form) !== JSON.stringify(savedForm)
+    setHasUnsavedChanges(hasChanges)
+  }, [tab, form, setHasUnsavedChanges])
 
   // Live build timer — ticks every second while building
   useEffect(() => {
@@ -4140,14 +4302,28 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
 
   const s = (k, v) => setForm(p => ({...p, [k]: v}))
   const token = () => localStorage.getItem('dd_token')
+  const fmtTime = (sec) => sec >= 60 ? `${Math.floor(sec/60)}m ${sec%60}s` : `${sec}s`
+
+  // Computed: expected preview URL based on clientId + restaurant name
+  const restaurantSlug = (client?.name || 'restaurant')
+    .toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim()
+    .replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+  const expectedSiteName = `${clientId}-${restaurantSlug}`
+  const expectedPreviewUrl = form.previewUrl || `https://${expectedSiteName}.netlify.app`
+  const expectedDomain = form.customDomain || `${expectedSiteName}.com.au`
+  const siteExists = !!form.siteId
+
+  // Step indicator: 0=Create, 1=Building, 2=Preview, 3=Live
+  const currentStep = !siteExists ? 0
+    : (buildStatus === 'building' || buildStatus === 'creating') ? 1
+    : (form.primaryDomain && form.domainLive) ? 3
+    : 2
 
   const mutation = useMutation({
     mutationFn: () => saveConfig(clientId, { netlify: form }),
     onSuccess: () => {
       qc.invalidateQueries(['config', clientId])
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    }
+          }
   })
 
   const createNetlifySite = async () => {
@@ -4157,7 +4333,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setBuildStartTime(Date.now())
     
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/create`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/create`, {
         method:  'POST',
         headers: { 'Content-Type':'application/json', Authorization:'Bearer '+token() },
         body: JSON.stringify({ template: form.template || 'urban-bistro' })
@@ -4204,7 +4380,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     const checkStatus = async () => {
       attempts++
       try {
-        const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/deploys`, {
+        const res = await fetch(`${API_URL}/clients/${clientId}/netlify/deploys`, {
           headers: { Authorization: 'Bearer ' + token() }
         })
         const deploys = await res.json()
@@ -4213,14 +4389,12 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
           const latestDeploy = deploys[0]
           const state = latestDeploy.state // 'building' | 'ready' | 'error' | 'enqueued' | 'processing'
 
-          const fmtSecs = (s) => s >= 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`
-
           if (state === 'ready') {
             // Use Netlify's actual reported deploy_time (seconds) if available
             const actualSecs = latestDeploy.deploy_time
               || Math.floor((Date.now() - buildStartTime) / 1000)
             setBuildStatus('ready')
-            setCreateMsg(`✅ Done! Built in ${fmtSecs(actualSecs)}`)
+            setCreateMsg(`✅ Done! Built in ${fmtTime(actualSecs)}`)
             setActualPreviewUrl(previewUrl)
             setCreating(false)
             setRebuilding(false)
@@ -4268,7 +4442,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setVerifying(true)
     setVerifyStatus(null)
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/verify`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/verify`, {
         headers: { Authorization: 'Bearer ' + token() }
       })
       const data = await res.json()
@@ -4294,7 +4468,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setBuildStatus('building')
     setBuildStartTime(Date.now())
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/rebuild`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/rebuild`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token() }
       })
@@ -4321,7 +4495,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setLoadingEnv(true)
     setEnvMsg('')
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/env`,
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/env`,
         { headers: { Authorization: 'Bearer ' + token() } })
       const data = await res.json()
       if (res.ok) {
@@ -4346,7 +4520,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setSavingEnv(true)
     setEnvMsg('')
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/env`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/env`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
         body: JSON.stringify({ vars: toSave.map(({ key, value }) => ({ key, value })) })
@@ -4374,7 +4548,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setDeletingEnvKey(key)
     try {
       const res = await fetch(
-        `http://localhost:3001/api/clients/${clientId}/netlify/env/${encodeURIComponent(key)}`,
+        `${API_URL}/clients/${clientId}/netlify/env/${encodeURIComponent(key)}`,
         { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }
       )
       if (!res.ok) {
@@ -4394,7 +4568,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setRollingBack(deployId)
     try {
       const res = await fetch(
-        `http://localhost:3001/api/clients/${clientId}/netlify/rollback/${deployId}`,
+        `${API_URL}/clients/${clientId}/netlify/rollback/${deployId}`,
         { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }
       )
       const data = await res.json()
@@ -4411,7 +4585,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
 
   const loadSetupStatus = async () => {
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/setup-status`,
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/setup-status`,
         { headers: { Authorization: 'Bearer ' + token() } })
       if (res.ok) setSetupStatus(await res.json())
     } catch { /* non-critical */ }
@@ -4421,7 +4595,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     setLinkingRepo(true)
     setLinkRepoMsg('')
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/link-repo`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/link-repo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
         body: JSON.stringify({ branch: linkRepoBranch.trim() || 'main' })
@@ -4443,7 +4617,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     if (!domainVal.trim()) return
     setAddingDomain(true)
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/domain`, {
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/domain`, {
         method:  'POST',
         headers: { 'Content-Type':'application/json', Authorization:'Bearer '+token() },
         body: JSON.stringify({ domain: domainVal.trim() })
@@ -4463,7 +4637,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
   const loadDeploys = async () => {
     setLoadingD(true)
     try {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/netlify/deploys`,
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/deploys`,
         { headers: { Authorization:'Bearer '+token() } })
       const data = await res.json()
       setDeploys(Array.isArray(data) ? data : [])
@@ -4471,50 +4645,63 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
     finally { setLoadingD(false) }
   }
 
-  useEffect(() => { if (tab === 'status') loadDeploys() }, [tab])
-
-  const TEMPLATES = [
-    { key:'urban-bistro',   label:'Urban Bistro',   desc:'Warm modern Australian'   },
-    { key:'noir-fine-dine', label:'Noir Fine Dine',  desc:'Dark luxury editorial'    },
-    { key:'garden-fresh',   label:'Garden Fresh',    desc:'Bright clean plant-forward'},
-    { key:'food-truck',     label:'Food Truck',      desc:'Fast + location-based'    },
-    { key:'cloud-kitchen',  label:'Cloud Kitchen',   desc:'Delivery only'            },
-    { key:'quick-service',  label:'Quick Service',   desc:'Fast food + combos'       },
-    { key:'catering',       label:'Catering Co',     desc:'Events + quotes'          },
-    { key:'meal-prep',      label:'Meal Prep',       desc:'Subscriptions + delivery' },
-  ]
-
-  const siteExists = !!form.siteId
-
-  const SaveRow = () => (
-    <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:20 }}>
-      <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
-        style={{ padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
-          border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
-          cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
-          boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
-      {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
-    </div>
-  )
+  useEffect(() => { if (tab === 'deploys') loadDeploys() }, [tab])
 
   return (
     <div>
       <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
         Deployment
       </h2>
-      <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
-        Manage your live website — preview builds, custom domains, and deploy status.
+      <p style={{ margin:'0 0 12px', fontSize:13, color:C.t3 }}>
+        Create, build, and manage your live website.
       </p>
 
-      {/* Tabs */}
+      {/* ── Step Indicator ── */}
+      <div style={{ display:'flex', alignItems:'center', gap:0, marginBottom:24,
+        background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:'14px 20px' }}>
+        {[
+          { label:'Create Site', step:0 },
+          { label:'Building',    step:1 },
+          { label:'Preview Ready', step:2 },
+          { label:'Live',        step:3 },
+        ].map((s, i) => {
+          const done = currentStep > s.step
+          const active = currentStep === s.step
+          const dotColor = done ? C.green : active ? '#3B82F6' : C.border
+          return (
+            <div key={s.step} style={{ display:'flex', alignItems:'center', flex:1 }}>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, flex:'0 0 auto' }}>
+                <div style={{ width:24, height:24, borderRadius:'50%',
+                  background: done ? C.green : active ? '#3B82F6' : 'transparent',
+                  border: `2px solid ${dotColor}`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontSize:11, fontWeight:700, color: (done || active) ? '#fff' : C.t3,
+                  transition:'all 0.3s' }}>
+                  {done ? '✓' : i + 1}
+                </div>
+                <span style={{ fontSize:10, fontWeight: active ? 700 : 500,
+                  color: done ? C.green : active ? '#3B82F6' : C.t3,
+                  whiteSpace:'nowrap' }}>
+                  {s.label}
+                </span>
+              </div>
+              {i < 3 && (
+                <div style={{ flex:1, height:2, margin:'0 8px',
+                  background: done ? C.green : C.border, borderRadius:1,
+                  transition:'background 0.3s', marginBottom:16 }}/>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Tabs ── */}
       <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`, marginBottom:24 }}>
         {[
-          { key:'setup',  label:'Setup'         },
-          { key:'env',    label:'Env Vars'       },
-          { key:'domain', label:'Domain'         },
-          { key:'status', label:'Deploy Status'  },
+          { key:'site',    label:'Site'           },
+          { key:'domain',  label:'Domain'         },
+          { key:'deploys', label:'Deploys'        },
+          { key:'env',     label:'Env Vars'       },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{ padding:'9px 20px', border:'none',
@@ -4527,443 +4714,287 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
         ))}
       </div>
 
-      {/* ── Setup Tab ── */}
-      {tab === 'setup' && (
+      {/* ════════════════ SITE TAB ════════════════ */}
+      {tab === 'site' && (
         <div>
-          {/* ── Repo-not-linked warning ── */}
-          {setupStatus && siteExists && !setupStatus.repoLinked && (
-            <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid #EF444460',
-              borderRadius:10, padding:'14px 16px', marginBottom:16 }}>
-              <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                <span style={{ fontSize:18, flexShrink:0 }}>⚠️</span>
+
+          {/* ── BUILDING STATE — full-attention card ── */}
+          {(buildStatus === 'creating' || buildStatus === 'building') && (
+            <div style={{ background:'rgba(59,130,246,0.06)', border:'1px solid #3B82F650',
+              borderRadius:12, padding:24, marginBottom:20 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16 }}>
+                <div style={{ width:14, height:14, borderRadius:'50%', background:'#3B82F6',
+                  flexShrink:0, animation:'pulse 1.5s infinite' }}/>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#EF4444', marginBottom:4 }}>
-                    GitHub repo not linked — this causes "Site not found"
+                  <div style={{ fontSize:16, fontWeight:700, color:'#3B82F6' }}>
+                    {buildStatus === 'creating' ? 'Creating Netlify Site...' : 'Building Your Site...'}
                   </div>
-                  <div style={{ fontSize:12, color:C.t3, lineHeight:1.7, marginBottom:10 }}>
-                    Netlify build hooks only work when a GitHub repo is connected. Without it the site
-                    has zero deployments and shows "Site not found".
-                    {!setupStatus.hasRepo ? (
-                      <span> Add <code style={{ color:C.cyan }}>SITE_TEMPLATE_REPO=owner/dinedesk</code> to
-                      your API <code style={{ color:C.cyan }}>.env</code> file, then click <strong>Link Repo</strong>.</span>
-                    ) : (
-                      <span> Repo <code style={{ color:C.cyan }}>{setupStatus.repoPath}</code> is
-                      configured — set the branch below and click <strong>Link Repo</strong>.</span>
-                    )}
+                  <div style={{ fontSize:12, color:C.t3, marginTop:3 }}>
+                    {buildStatus === 'creating'
+                      ? 'Setting up site, environment variables, and build hooks...'
+                      : 'Netlify is building and deploying — usually takes 2–5 minutes'}
                   </div>
-                  {setupStatus.hasRepo && (
-                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontSize:11, color:C.t3 }}>Branch:</span>
-                        <input
-                          value={linkRepoBranch}
-                          onChange={e => setLinkRepoBranch(e.target.value)}
-                          placeholder="main"
-                          style={{ padding:'5px 10px', background:C.card, border:`1px solid ${C.border2}`,
-                            borderRadius:6, color:C.t0, fontSize:12, fontFamily:'monospace',
-                            width:110 }}/>
-                      </div>
-                      <button onClick={linkRepo} disabled={linkingRepo}
-                        style={{ padding:'8px 18px', background:'#EF4444', border:'none',
-                          borderRadius:7, color:'#fff', fontWeight:700, fontSize:12,
-                          cursor: linkingRepo ? 'not-allowed' : 'pointer',
-                          fontFamily:'inherit', opacity: linkingRepo ? 0.7 : 1 }}>
-                        {linkingRepo ? 'Linking…' : 'Link Repo Now'}
+                </div>
+                <div style={{ fontSize:28, fontWeight:800, color:'#60A5FA',
+                  fontVariantNumeric:'tabular-nums', fontFamily:'monospace', minWidth:70, textAlign:'right' }}>
+                  {fmtTime(buildElapsed)}
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ height:6, background:'rgba(255,255,255,0.08)', borderRadius:3, overflow:'hidden', marginBottom:12 }}>
+                <div style={{ height:'100%', borderRadius:3, background:'linear-gradient(90deg, #3B82F6, #60A5FA)',
+                  width:`${Math.min(95, (buildElapsed / 300) * 100)}%`, transition:'width 1s linear' }}/>
+              </div>
+
+              {/* URL preview during build */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px',
+                background:'rgba(0,0,0,0.2)', borderRadius:8, marginBottom:10 }}>
+                <span style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase' }}>Preview URL</span>
+                <code style={{ fontSize:12, color:C.cyan, fontFamily:'monospace' }}>
+                  {form.previewUrl || expectedPreviewUrl}
+                </code>
+              </div>
+
+              <div style={{ padding:'8px 12px', background:'rgba(251,191,36,0.06)',
+                border:'1px solid #FBBF2430', borderRadius:7, fontSize:11, color:'#FBBF24', lineHeight:1.6 }}>
+                "Page not found" is normal while building. The URL goes live automatically once the build completes.
+              </div>
+
+              <button onClick={() => pollDeployStatus(form.siteId, form.previewUrl || expectedPreviewUrl)}
+                style={{ marginTop:12, padding:'6px 14px', background:'transparent',
+                  border:`1px solid ${C.border2}`, borderRadius:6,
+                  color:C.t2, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                Refresh Status
+              </button>
+            </div>
+          )}
+
+          {/* ── READY STATE — success banner after build ── */}
+          {buildStatus === 'ready' && (
+            <div style={{ background:'rgba(34,197,94,0.08)', border:'1px solid #22C55E50',
+              borderRadius:12, padding:20, marginBottom:20 }}>
+              <div style={{ fontSize:16, fontWeight:700, color:'#22C55E', marginBottom:8 }}>
+                {createMsg || 'Site is ready!'}
+              </div>
+              <a href={form.previewUrl || expectedPreviewUrl} target="_blank" rel="noopener noreferrer"
+                style={{ display:'inline-flex', alignItems:'center', gap:8,
+                  padding:'10px 20px', background:'#22C55E', borderRadius:8,
+                  color:'#fff', textDecoration:'none', fontWeight:700, fontSize:13 }}>
+                Open Preview Site →
+              </a>
+            </div>
+          )}
+
+          {/* ── ERROR STATE ── */}
+          {buildStatus === 'error' && createMsg && (
+            <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid #EF444450',
+              borderRadius:12, padding:16, marginBottom:20 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:'#EF4444' }}>{createMsg}</div>
+            </div>
+          )}
+
+          {/* ── NO SITE YET — Create section ── */}
+          {!siteExists && buildStatus !== 'creating' && buildStatus !== 'building' && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`,
+              borderRadius:12, padding:24, marginBottom:20 }}>
+              <div style={{ fontSize:15, fontWeight:700, color:C.t0, marginBottom:6 }}>
+                Create Netlify Site
+              </div>
+              <div style={{ fontSize:12, color:C.t3, marginBottom:16, lineHeight:1.7 }}>
+                This will create a Netlify site, configure environment variables, link the GitHub
+                repository, create a build hook, and trigger the first build — all automatically.
+              </div>
+
+              {/* URL Preview */}
+              <div style={{ background:'#0A0F1A', borderRadius:8, padding:14, marginBottom:18 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase',
+                  letterSpacing:'0.06em', marginBottom:8 }}>Your site will be at</div>
+                <div style={{ fontSize:14, fontWeight:600, color:C.cyan, fontFamily:'monospace',
+                  marginBottom:6 }}>
+                  {expectedPreviewUrl}
+                </div>
+                <div style={{ fontSize:11, color:C.t3 }}>
+                  Custom domain: <span style={{ color:C.t2 }}>{expectedDomain}</span>
+                  <span style={{ color:C.t3 }}> (configure in Domain tab after creation)</span>
+                </div>
+              </div>
+
+              {/* Client ID */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
+                <span style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase' }}>Client ID</span>
+                <code style={{ fontSize:12, color:C.cyan, fontFamily:'monospace',
+                  background:'#0A0F1A', padding:'5px 10px', borderRadius:5 }}>{clientId}</code>
+                <button onClick={() => navigator.clipboard.writeText(clientId)}
+                  style={{ padding:'4px 10px', background:'transparent',
+                    border:`1px solid ${C.border2}`, borderRadius:5,
+                    color:C.t3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                  Copy
+                </button>
+              </div>
+
+              <button onClick={createNetlifySite} disabled={creating}
+                style={{ padding:'12px 32px', background: creating ? C.card : C.acc,
+                  border:'none', borderRadius:8, color:'#fff', fontWeight:700,
+                  fontSize:14, cursor: creating ? 'not-allowed' : 'pointer',
+                  fontFamily:'inherit', opacity: creating ? 0.6 : 1,
+                  boxShadow: creating ? 'none' : `0 4px 16px ${C.acc}50` }}>
+                {creating ? 'Creating…' : 'Create Netlify Site'}
+              </button>
+            </div>
+          )}
+
+          {/* ── SITE EXISTS — details + Build & Deploy ── */}
+          {siteExists && buildStatus !== 'creating' && buildStatus !== 'building' && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`,
+              borderRadius:12, padding:20, marginBottom:16 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ width:8, height:8, borderRadius:'50%', background:C.green }}/>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Site Connected</div>
+                    <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
+                      Site ID: <code style={{ color:C.cyan, fontFamily:'monospace' }}>{form.siteId}</code>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={verifySiteExists} disabled={verifying}
+                    style={{ padding:'8px 14px', background:'transparent',
+                      border:`1px solid ${C.border2}`, borderRadius:6,
+                      color: verifying ? C.t3 : C.t2, fontWeight:600, fontSize:12,
+                      cursor: verifying ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                    {verifying ? 'Checking...' : 'Verify'}
+                  </button>
+                  <button onClick={triggerRebuild}
+                    disabled={rebuilding || buildStatus === 'building'}
+                    style={{ padding:'8px 18px', background:'#22C55E', border:'none',
+                      borderRadius:6, color:'#fff', fontWeight:700, fontSize:12,
+                      cursor: (rebuilding || buildStatus === 'building') ? 'not-allowed' : 'pointer',
+                      fontFamily:'inherit',
+                      boxShadow:'0 4px 16px rgba(34,197,94,0.3)',
+                      opacity: (rebuilding || buildStatus === 'building') ? 0.6 : 1 }}>
+                    {rebuilding ? 'Starting...' : 'Build & Deploy'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Verification message */}
+              {verifyMessage && (
+                <div style={{ marginBottom:14, padding:10, borderRadius:7, fontSize:12,
+                  background: verifyStatus === 'exists' ? 'rgba(34,197,94,0.08)' :
+                    verifyStatus === 'not_found' ? 'rgba(239,68,68,0.08)' : 'rgba(255,165,0,0.08)',
+                  border: `1px solid ${verifyStatus === 'exists' ? '#22C55E40' :
+                    verifyStatus === 'not_found' ? '#EF444440' : '#FFA50040'}`,
+                  color: verifyStatus === 'exists' ? C.green :
+                    verifyStatus === 'not_found' ? '#EF4444' : '#FFA500' }}>
+                  {verifyMessage}
+                  {verifyStatus === 'not_found' && (
+                    <div style={{ marginTop:6 }}>
+                      <button onClick={createNetlifySite} disabled={creating}
+                        style={{ padding:'6px 14px', background:'#EF4444', border:'none',
+                          borderRadius:5, color:'#fff', fontWeight:600, fontSize:11,
+                          cursor: creating ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                        Recreate Site
                       </button>
                     </div>
                   )}
-                  {linkRepoMsg && (
-                    <div style={{ marginTop:8, fontSize:12,
-                      color: linkRepoMsg.startsWith('✅') ? C.green : '#EF4444' }}>
-                      {linkRepoMsg}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {/* Status banner with verification */}
-          {siteExists ? (
-            <div style={{ background:'#052010', border:`1px solid ${C.green}40`,
-              borderRadius:10, padding:'12px 16px', marginBottom:20 }}>
-              
-              {/* Main status row - changes during build */}
-              {buildStatus === 'building' ? (
-                <div style={{ padding:'12px 0' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
-                    <div style={{ width:10, height:10, borderRadius:'50%',
-                      background:'#3B82F6', flexShrink:0,
-                      animation:'pulse 1.5s infinite' }}/>
-                    <div style={{ flex:1 }}>
-                      <div style={{ display:'flex', alignItems:'baseline', gap:10 }}>
-                        <span style={{ fontSize:13, fontWeight:700, color:'#3B82F6' }}>⚙️ Building…</span>
-                        <span style={{ fontSize:13, fontWeight:700, color:'#60A5FA', fontVariantNumeric:'tabular-nums' }}>
-                          {buildElapsed >= 60
-                            ? `${Math.floor(buildElapsed/60)}m ${buildElapsed%60}s`
-                            : `${buildElapsed}s`}
-                        </span>
-                      </div>
-                      <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
-                        Netlify is building your site — usually 2–5 min for Next.js
-                      </div>
-                    </div>
-                    <button onClick={() => pollDeployStatus(form.siteId, form.previewUrl)}
-                      style={{ padding:'6px 12px', background:'transparent',
-                        border:`1px solid ${C.cyan}`, borderRadius:6,
-                        color:C.cyan, fontSize:11, fontWeight:600,
-                        cursor:'pointer', fontFamily:'inherit' }}
-                      title="Force recheck build status">
-                      🔄 Refresh
-                    </button>
-                  </div>
-
-                  {/* Animated progress bar — width grows with elapsed time, caps at 95% */}
-                  <div style={{ height:4, background:'rgba(255,255,255,0.1)',
-                    borderRadius:2, overflow:'hidden' }}>
-                    <div style={{
-                      height:'100%', borderRadius:2, background:'#3B82F6',
-                      width: `${Math.min(95, (buildElapsed / 300) * 100)}%`,
-                      transition:'width 1s linear'
-                    }} />
-                  </div>
-
-                  {/* Site not found explanation */}
-                  <div style={{ marginTop:10, padding:'8px 12px',
-                    background:'rgba(251,191,36,0.08)', border:'1px solid #FBBF2440',
-                    borderRadius:7, fontSize:11, color:'#FBBF24', lineHeight:1.6 }}>
-                    ⚠️ <strong>"Site not found" is expected right now.</strong> The preview URL
-                    won't load until this build finishes. Once Netlify deploys the code,
-                    the URL becomes live automatically — no action needed.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                    <div style={{ width:8, height:8, borderRadius:'50%',
-                      background:C.green, flexShrink:0 }}/>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:700, color:C.green }}>
-                        Netlify site connected
-                      </div>
-                      <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
-                        Site ID: <code style={{ color:C.cyan, fontFamily:'monospace' }}>{form.siteId}</code>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Action buttons - hidden during build */}
-                  <div style={{ display:'flex', gap:8 }}>
-                    <button onClick={verifySiteExists} disabled={verifying}
-                      style={{ padding:'8px 14px', background: verifying ? '#1E2D4A' : '#1E2D4A',
-                        border:`1px solid ${verifying ? '#445572' : C.cyan}`,
-                        borderRadius:6, color: verifying ? '#445572' : C.cyan,
-                        fontWeight:600, fontSize:12, cursor: verifying ? 'not-allowed' : 'pointer',
-                        fontFamily:'inherit', transition:'all 0.2s' }}
-                      title="Check if site exists on Netlify">
-                      {verifying ? '⏳ Checking...' : '🔍 Verify'}
-                    </button>
-                    <button onClick={triggerRebuild}
-                      style={{ padding:'8px 14px', background: C.acc,
-                        border:'none', borderRadius:6, color:'#fff',
-                        fontWeight:600, fontSize:12, cursor: 'pointer',
-                        fontFamily:'inherit' }}
-                      title="Build and deploy your changes">
-                      🚀 Build & Deploy
-                    </button>
-                  </div>
                 </div>
               )}
-              
-              {/* Verification result message */}
-              {verifyMessage && (
-                <div style={{ marginTop:12, padding:10, borderRadius:6, fontSize:12,
-                  background: verifyStatus === 'exists' ? 'rgba(34, 197, 94, 0.1)' :
-                           verifyStatus === 'not_found' ? 'rgba(239, 68, 68, 0.1)' :
-                           'rgba(255, 165, 0, 0.1)',
-                  border: `1px solid ${
-                    verifyStatus === 'exists' ? '#22C55E' :
-                    verifyStatus === 'not_found' ? '#EF4444' :
-                    '#FFA500'}` }}>
-                  {verifyMessage}
-                  {verifyStatus === 'not_found' && (
-                    <div style={{ marginTop:6, fontWeight:600 }}>
-                      💡 Tip: Use the "Create Netlify Site" button below to recreate it
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Preview link */}
-              {form.previewUrl && (
-                <a href={form.previewUrl} target="_blank" rel="noreferrer"
-                  style={{ marginLeft:'auto', padding:'6px 14px', background:'transparent',
-                    border:`1px solid ${C.border2}`, borderRadius:6,
-                    color:C.t2, fontSize:12, textDecoration:'none' }}>
-                  Open Preview ↗
-                </a>
-              )}
-            </div>
-          ) : (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`,
-              borderRadius:10, padding:'12px 16px', marginBottom:20,
-              display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:8, height:8, borderRadius:'50%',
-                background:C.amber, flexShrink:0 }}/>
-              <span style={{ fontSize:13, color:C.amber, fontWeight:600 }}>
-                No Netlify site yet — select a template and click Create Site below
-              </span>
-            </div>
-          )}
 
-          {/* Theme info — reads from Design > Theme */}
-          <div style={{ background:C.card, border:`1px solid ${C.border}`,
-            borderRadius:12, padding:20, marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-              Active Theme
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ 
-                padding:'10px 16px', 
-                borderRadius:8,
-                border:`1px solid ${C.acc}`,
-                background: C.accBg 
-              }}>
-                <div style={{ fontSize:13, fontWeight:700, color:C.acc }}>
-                  {THEMES.find(t => t.key === (config.colours?.theme || 'none'))?.label || 'Custom'}
-                </div>
-              </div>
-              <span style={{ fontSize:12, color:C.t3 }}>
-                Set in <strong>Design → Theme</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* Create/Recreate site button - shows ONLY when site doesn't exist OR verification shows deleted */}
-          {(!siteExists || verifyStatus === 'not_found') && (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`,
-              borderRadius:12, padding:20, marginBottom:16 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-                textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
-                {verifyStatus === 'not_found' ? '🔄 Recreate Netlify Site' : '✨ Create Netlify Site'}
-              </div>
-              <div style={{ fontSize:12, color:C.t3, marginBottom:16, lineHeight:1.7 }}>
-                {verifyStatus === 'not_found' 
-                  ? 'Site was deleted from Netlify. Click to create a fresh site with new build.'
-                  : 'This will create a new site under your Netlify account, set the correct env vars (SITE_ID, SITE_TEMPLATE, CMS_API_URL), create a build hook, and trigger the first build automatically.'}
-              </div>
-              
-              <button onClick={createNetlifySite} disabled={creating || buildStatus === 'building'}
-                style={{ padding:'11px 28px', 
-                  background: (creating || buildStatus === 'building') ? C.card : C.acc,
-                  border:'none', borderRadius:8, color:'#fff', fontWeight:700,
-                  fontSize:14, cursor: (creating || buildStatus === 'building') ? 'not-allowed' : 'pointer',
-                  fontFamily:'inherit', opacity: (creating || buildStatus === 'building') ? 0.6 : 1 }}>
-                {buildStatus === 'creating' ? '⏳ Creating...' : 
-                 buildStatus === 'building' ? '⚙️ Building...' : 
-                 creating ? 'Creating…' : (verifyStatus === 'not_found' ? '🔄 Recreate Site' : '✨ Create Netlify Site')}
-              </button>
-              
-              {/* Build status display */}
-              {(buildStatus || createMsg) && (
-                <div style={{ marginTop:16, padding:14,
-                  background: buildStatus === 'ready'    ? 'rgba(34,197,94,0.1)'   :
-                              buildStatus === 'error'    ? 'rgba(239,68,68,0.1)'   :
-                              buildStatus === 'building' ? 'rgba(59,130,246,0.08)' :
-                                                          'rgba(59,130,246,0.1)',
-                  borderRadius:8, border: `1px solid ${
-                    buildStatus === 'ready' ? '#22C55E' :
-                    buildStatus === 'error' ? '#EF4444' : '#3B82F6'}` }}>
-
-                  {/* Building state — live counter + progress bar */}
-                  {buildStatus === 'building' && (
-                    <>
-                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                        <div style={{ width:8, height:8, borderRadius:'50%', background:'#3B82F6',
-                          flexShrink:0, animation:'pulse 1.5s infinite' }}/>
-                        <span style={{ fontSize:13, fontWeight:600, color:'#3B82F6' }}>
-                          ⚙️ Building…&nbsp;
-                          <span style={{ fontVariantNumeric:'tabular-nums' }}>
-                            {buildElapsed >= 60
-                              ? `${Math.floor(buildElapsed/60)}m ${buildElapsed%60}s`
-                              : `${buildElapsed}s`}
-                          </span>
-                        </span>
-                      </div>
-                      <div style={{ height:4, background:'rgba(255,255,255,0.1)',
-                        borderRadius:2, overflow:'hidden' }}>
-                        <div style={{
-                          height:'100%', borderRadius:2, background:'#3B82F6',
-                          width:`${Math.min(95,(buildElapsed/300)*100)}%`,
-                          transition:'width 1s linear'
-                        }}/>
-                      </div>
-                      <div style={{ marginTop:6, fontSize:11, color:C.t3 }}>
-                        Usually 2–5 min · "Site not found" is normal until the build finishes
-                      </div>
-                    </>
-                  )}
-
-                  {/* Done state */}
-                  {buildStatus === 'ready' && (
-                    <>
-                      <div style={{ fontSize:15, fontWeight:700, color:'#22C55E', marginBottom:10 }}>
-                        {createMsg}
-                      </div>
-                      {actualPreviewUrl && (
-                        <a href={actualPreviewUrl} target="_blank" rel="noopener noreferrer"
-                          style={{ display:'inline-flex', alignItems:'center', gap:8,
-                            padding:'10px 18px', background:'#22C55E', borderRadius:8,
-                            color:'#fff', textDecoration:'none', fontWeight:600, fontSize:13 }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" strokeWidth="2.5">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                          </svg>
-                          Open Preview Site →
-                        </a>
-                      )}
-                    </>
-                  )}
-
-                  {/* Error / other states */}
-                  {buildStatus !== 'building' && buildStatus !== 'ready' && createMsg && (
-                    <div style={{ fontSize:13, fontWeight:600,
-                      color: buildStatus === 'error' ? '#EF4444' : '#3B82F6' }}>
-                      {createMsg}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* If site exists — show details + Build & Deploy button */}
-          {siteExists && (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`,
-              borderRadius:12, padding:20, marginBottom:16 }}>
-              
-              {/* Site already exists message */}
-              {verifyStatus === 'exists' && (
-                <div style={{ marginBottom:14, padding:10, background:'rgba(34, 197, 94, 0.1)',
-                  border:'1px solid #22C55E', borderRadius:6 }}>
-                  <div style={{ fontSize:12, fontWeight:600, color:'#22C55E' }}>
-                    ✅ Site already created on Netlify
-                  </div>
-                  <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>
-                    Your preview site is live. Use "Build & Deploy" to push CMS changes to your live site.
-                  </div>
-                </div>
-              )}
-              
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-                  textTransform:'uppercase', letterSpacing:'0.08em' }}>
-                  Site Details
-                </div>
-                
-                {/* Build & Deploy button - disabled while building */}
-                <button onClick={triggerRebuild} 
-                  disabled={rebuilding || buildStatus === 'building'}
-                  style={{ padding:'9px 18px', 
-                    background: (rebuilding || buildStatus === 'building') ? '#1E2D4A' : '#22C55E',
-                    border:'none', borderRadius:6, 
-                    color: (rebuilding || buildStatus === 'building') ? '#445572' : '#fff',
-                    fontWeight:700, fontSize:12, 
-                    cursor: (rebuilding || buildStatus === 'building') ? 'not-allowed' : 'pointer',
-                    fontFamily:'inherit', 
-                    opacity: (rebuilding || buildStatus === 'building') ? 0.6 : 1,
-                    boxShadow: (rebuilding || buildStatus === 'building') ? 'none' : '0 4px 16px rgba(34, 197, 94, 0.4)' }}>
-                  {buildStatus === 'building' ? '⚙️ Building in Progress...' : 
-                   rebuilding ? '⏳ Starting Build...' : '🚀 Build & Deploy'}
-                </button>
-              </div>
+              {/* Site URLs */}
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                {[
-                  ['Preview URL', form.previewUrl, true],
-                  ['Build Hook',  form.buildHook,  true],
-                ].map(([label, val, mono]) => val ? (
-                  <div key={label}>
+                <div>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>
+                    Preview URL
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <code style={{ fontSize:12, color:C.cyan, fontFamily:'monospace',
+                      background:'#0A0F1A', padding:'7px 12px', borderRadius:6,
+                      flex:1, wordBreak:'break-all' }}>
+                      {form.previewUrl}
+                    </code>
+                    <a href={form.previewUrl} target="_blank" rel="noreferrer"
+                      style={{ padding:'7px 14px', background:'transparent',
+                        border:`1px solid ${C.border2}`, borderRadius:6,
+                        color:C.t2, fontSize:12, textDecoration:'none',
+                        whiteSpace:'nowrap' }}>
+                      Open ↗
+                    </a>
+                  </div>
+                </div>
+                {form.primaryDomain && (
+                  <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.t3,
                       textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>
-                      {label}
+                      Live Domain
                     </div>
-                    <div style={{ fontSize:12, color:C.cyan,
-                      fontFamily: mono ? 'monospace' : 'inherit',
-                      background:'#0A0F1A', padding:'7px 12px',
-                      borderRadius:6, wordBreak:'break-all' }}>
-                      {val}
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ width:6, height:6, borderRadius:'50%',
+                        background: form.domainLive ? C.green : C.amber }}/>
+                      <code style={{ fontSize:12, color: form.domainLive ? C.green : C.amber,
+                        fontFamily:'monospace' }}>
+                        {form.primaryDomain}
+                      </code>
+                      <span style={{ fontSize:10, color:C.t3 }}>
+                        {form.domainLive ? 'Live' : 'Pending DNS'}
+                      </span>
                     </div>
                   </div>
-                ) : null)}
+                )}
+              </div>
+
+              {/* Client ID */}
+              <div style={{ marginTop:14, paddingTop:14, borderTop:`1px solid ${C.border}` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase' }}>Client ID</span>
+                  <code style={{ fontSize:12, color:C.cyan, fontFamily:'monospace',
+                    background:'#0A0F1A', padding:'5px 10px', borderRadius:5 }}>{clientId}</code>
+                  <button onClick={() => navigator.clipboard.writeText(clientId)}
+                    style={{ padding:'4px 10px', background:'transparent',
+                      border:`1px solid ${C.border2}`, borderRadius:5,
+                      color:C.t3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                    Copy
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* GitHub Repo — manual connection guide */}
-          {siteExists && (() => {
-            const siteName = form.previewUrl
-              ? form.previewUrl.replace('https://','').replace('.netlify.app','')
-              : null
-            const netlifySettingsUrl = siteName
-              ? `https://app.netlify.com/sites/${siteName}/settings/deploys#repository`
-              : 'https://app.netlify.com'
-            return (
-              <div style={{ background:C.card, border:`1px solid ${C.border}`,
-                borderRadius:12, padding:16, marginBottom:16 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:C.t3,
-                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>
-                  GitHub Repo Connection
-                </div>
-                <div style={{ fontSize:12, color:'#FBBF24', background:'rgba(251,191,36,0.07)',
-                  border:'1px solid #FBBF2440', borderRadius:7, padding:'8px 12px', marginBottom:12, lineHeight:1.7 }}>
-                  ⚠️ GitHub access must be set up through <strong>Netlify's UI</strong> — the API cannot store OAuth tokens.
-                  Once connected via UI, all future builds will work automatically.
-                </div>
-                <div style={{ fontSize:12, color:C.t2, lineHeight:2, marginBottom:12 }}>
-                  <div>1. Click <strong style={{ color:C.cyan }}>Open Netlify Settings ↗</strong> below</div>
-                  <div>2. Click <strong>Link repository</strong> → choose <strong>GitHub</strong></div>
-                  <div>3. Select repo: <code style={{ color:C.cyan }}>{setupStatus?.repoPath || 'hetdinedesk/DineDesk'}</code></div>
-                  <div>4. Branch: <code style={{ color:C.cyan }}>master</code></div>
-                  <div>5. Base directory: <code style={{ color:C.cyan }}>packages/site-template</code></div>
-                  <div>6. Build command: <code style={{ color:C.cyan }}>npm install &amp;&amp; npm run build</code></div>
-                  <div>7. Publish directory: <code style={{ color:C.cyan }}>.next</code></div>
-                  <div>8. Save → then click <strong>🚀 Build &amp; Deploy</strong> here</div>
-                </div>
-                <a href={netlifySettingsUrl} target="_blank" rel="noreferrer"
-                  style={{ display:'inline-flex', alignItems:'center', gap:8,
-                    padding:'8px 16px', background:C.acc, borderRadius:7,
-                    color:'#fff', textDecoration:'none', fontWeight:600, fontSize:12 }}>
-                  Open Netlify Settings ↗
-                </a>
+          {/* Repo warning — only if site exists but repo not linked */}
+          {setupStatus && siteExists && !setupStatus.repoLinked && (
+            <div style={{ background:'rgba(239,68,68,0.06)', border:'1px solid #EF444440',
+              borderRadius:10, padding:14, marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                <span style={{ fontSize:13, fontWeight:700, color:'#EF4444' }}>
+                  GitHub repo not linked
+                </span>
               </div>
-            )
-          })()}
-
-          {/* Client ID reference */}
-          <div style={{ background:C.card, border:`1px solid ${C.border}`,
-            borderRadius:12, padding:16, marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:C.t3,
-              textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>
-              Client ID (SITE_ID)
+              <div style={{ fontSize:12, color:C.t3, lineHeight:1.7, marginBottom:10 }}>
+                Builds require a linked GitHub repo. 
+                {setupStatus.hasRepo
+                  ? <span> Click below to link <code style={{ color:C.cyan }}>{setupStatus.repoPath}</code>.</span>
+                  : <span> Add <code style={{ color:C.cyan }}>SITE_TEMPLATE_REPO</code> to your API .env file.</span>}
+              </div>
+              {setupStatus.hasRepo && (
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <input value={linkRepoBranch} onChange={e => setLinkRepoBranch(e.target.value)}
+                    placeholder="main"
+                    style={{ padding:'5px 10px', background:C.input, border:`1px solid ${C.border}`,
+                      borderRadius:6, color:C.t0, fontSize:12, fontFamily:'monospace', width:100 }}/>
+                  <button onClick={linkRepo} disabled={linkingRepo}
+                    style={{ padding:'7px 16px', background:'#EF4444', border:'none',
+                      borderRadius:6, color:'#fff', fontWeight:700, fontSize:12,
+                      cursor: linkingRepo ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                    {linkingRepo ? 'Linking…' : 'Link Repo'}
+                  </button>
+                  {linkRepoMsg && <span style={{ fontSize:12,
+                    color: linkRepoMsg.startsWith('✅') ? C.green : '#EF4444' }}>{linkRepoMsg}</span>}
+                </div>
+              )}
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <code style={{ fontSize:12, color:C.cyan, fontFamily:'monospace',
-                background:'#0A0F1A', padding:'7px 12px', borderRadius:6, flex:1 }}>
-                {clientId}
-              </code>
-              <button onClick={() => { navigator.clipboard.writeText(clientId) }}
-                style={{ padding:'7px 14px', background:'transparent',
-                  border:`1px solid ${C.border2}`, borderRadius:6,
-                  color:C.t2, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
-                Copy
-              </button>
-            </div>
-          </div>
-
-          <SaveRow/>
+          )}
         </div>
       )}
 
@@ -4973,7 +5004,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
           {!siteExists && (
             <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13,
               background:C.card, border:`1px solid ${C.border}`, borderRadius:12 }}>
-              Create a Netlify site in the Setup tab first.
+              Create a Netlify site in the Site tab first.
             </div>
           )}
 
@@ -5056,7 +5087,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
           {!siteExists && (
             <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13,
               background:C.card, border:`1px solid ${C.border}`, borderRadius:12 }}>
-              Create a Netlify site in the Setup tab first.
+              Create a Netlify site in the Site tab first.
             </div>
           )}
 
@@ -5204,8 +5235,8 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
         </div>
       )}
 
-      {/* ── Deploy Status Tab ── */}
-      {tab === 'status' && (
+      {/* ── Deploys Tab ── */}
+      {tab === 'deploys' && (
         <div>
           <div style={{ display:'flex', justifyContent:'space-between',
             alignItems:'center', marginBottom:16 }}>
@@ -5243,7 +5274,7 @@ function NetlifyConfig({ clientId, config, draft, setDraft }) {
               </div>
               {deploys.length === 0 ? (
                 <div style={{ padding:32, textAlign:'center', color:C.t3, fontSize:13 }}>
-                  No deploys yet — click Build &amp; Deploy in the Setup tab.
+                  No deploys yet — click Build &amp; Deploy in the Site tab.
                 </div>
               ) : deploys.map((d, i) => {
                 const col = { ready:C.green, building:C.amber,

@@ -1,28 +1,36 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { LayoutDashboard, BarChart3, MousePointerClick, FileText, ArrowLeftRight, FileBarChart, Trash2, Copy } from 'lucide-react'
 import { getAnalytics } from '../api/analytics'
 import { getMenuItems } from '../api/menuItems'
 import { getPages } from '../api/pages'
 import { getSpecials } from '../api/specials'
 import { C } from '../theme'
+import { API } from '../api/utils'
 import { useMediaQuery } from '../Components/Layout'
 
 const DASH_NAV = [
-  { key: 'overview', label: 'Overview', icon: '📊' },
-  { key: 'analytics', label: 'Analytics', icon: '📈' },
-  { key: 'engagements', label: 'Engagements', icon: '👆' },
-  { key: 'content', label: 'Content', icon: '📝' },
-  { key: 'traffic', label: 'Traffic', icon: '🔄' },
-  { key: 'report', label: 'Report', icon: '📋' },
+  { key: 'overview', label: 'Overview', Icon: LayoutDashboard },
+  { key: 'analytics', label: 'Analytics', Icon: BarChart3 },
+  { key: 'engagements', label: 'Engagements', Icon: MousePointerClick },
+  { key: 'content', label: 'Content', Icon: FileText },
+  { key: 'traffic', label: 'Traffic', Icon: ArrowLeftRight },
+  { key: 'report', label: 'Report', Icon: FileBarChart },
 ]
 
-export default function DashboardSection({ clientId }) {
-  const [subNav, setSubNav] = useState('analytics')
+export default function DashboardSection({ clientId, onDeleteSite, subNav, setSubNav }) {
+  const navigate = useNavigate()
   const [period, setPeriod] = useState('M')
   const isMobile = useMediaQuery('(max-width: 768px)')
 
+  const handleNavChange = (key) => {
+    setSubNav(key)
+    navigate(`/site/${clientId}/dashboard/${key}`)
+  }
+
   return (
-    <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
+    <div style={{ display:'flex', flex: 1, minHeight: 0, overflow:'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
 
       {/* Sidebar nav */}
       <div style={{
@@ -36,33 +44,37 @@ export default function DashboardSection({ clientId }) {
         overflowX: isMobile ? 'auto' : 'visible',
         flexShrink: 0
       }}>
-        {DASH_NAV.map(item => (
-          <button key={item.key} onClick={() => setSubNav(item.key)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              width: isMobile ? 'auto' : '100%',
-              padding: isMobile ? '12px 16px' : '9px 14px',
-              border: 'none',
-              background: subNav === item.key ? C.active : 'transparent',
-              color: subNav === item.key ? C.t0 : C.t2,
-              fontWeight: subNav === item.key ? 700 : 400, fontSize: 13,
-              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-              borderLeft: isMobile ? 'none' : `2px solid ${subNav === item.key ? C.acc : 'transparent'}`,
-              borderBottom: isMobile ? `2px solid ${subNav === item.key ? C.acc : 'transparent'}` : 'none',
-              whiteSpace: 'nowrap'
-            }}>
-            <span style={{ fontSize: 14 }}>{item.icon}</span>{!isMobile && item.label}
-          </button>
-        ))}
+        {DASH_NAV.map(item => {
+          const Icon = item.Icon
+          return (
+            <button key={item.key} onClick={() => handleNavChange(item.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: isMobile ? 'auto' : '100%',
+                padding: isMobile ? '12px 16px' : '9px 14px',
+                border: 'none',
+                background: subNav === item.key ? C.active : 'transparent',
+                color: subNav === item.key ? C.t0 : C.t2,
+                fontWeight: subNav === item.key ? 700 : 400, fontSize: 13,
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                borderLeft: isMobile ? 'none' : `2px solid ${subNav === item.key ? C.acc : 'transparent'}`,
+                borderBottom: isMobile ? `2px solid ${subNav === item.key ? C.acc : 'transparent'}` : 'none',
+                whiteSpace: 'nowrap'
+              }}>
+              <Icon size={14} />
+              {!isMobile && item.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Main content area */}
-      <div style={{ flex: 1, padding: isMobile ? '16px' : '28px 32px', overflowY: 'auto', background: C.page }}>
+      <div key={subNav} style={{ flex: 1, padding: isMobile ? '16px' : '28px 32px', overflowY: 'auto', background: C.page }}>
         {subNav === 'analytics' && (
           <AnalyticsTab clientId={clientId} period={period} setPeriod={setPeriod}/>
         )}
         {subNav === 'overview' && (
-          <OverviewTab clientId={clientId} period={period}/>
+          <OverviewTab clientId={clientId} period={period} onDeleteSite={onDeleteSite}/>
         )}
         {!['analytics','overview'].includes(subNav) && (
           <PlaceholderTab label={DASH_NAV.find(d => d.key===subNav)?.label}/>
@@ -121,7 +133,7 @@ function AnalyticsTab({ clientId, period, setPeriod }) {
         <div style={{ background:'#1A0A00', border:`1px solid ${C.amber}40`,
           borderRadius:10, padding:'20px 24px', marginBottom:20,
           fontSize:14, color:C.amber }}>
-          ⚠️ {data.error}
+          ● {data.error}
         </div>
       )}
 
@@ -197,7 +209,21 @@ function MiniChart({ data, color, height }) {
 }
 
 // ── Overview Tab ─────────────────────────────────────────────
-function OverviewTab({ clientId, period }) {
+function OverviewTab({ clientId, period, onDeleteSite }) {
+  const [deleting, setDeleting] = useState(false)
+  const queryClient = useQueryClient()
+  const token = () => localStorage.getItem('dd_token')
+
+  const { data: client } = useQuery({
+    queryKey: ['client', clientId],
+    queryFn: async () => {
+      const res = await fetch(`${API}/clients/${clientId}`, {
+        headers: { Authorization: 'Bearer ' + token() }
+      })
+      return res.json()
+    }
+  })
+
   const { data: analytics } = useQuery({
     queryKey: ['analytics', clientId, period],
     queryFn:  () => getAnalytics(clientId, period),
@@ -207,18 +233,52 @@ function OverviewTab({ clientId, period }) {
   const { data: pages    = [] } = useQuery({ queryKey:['pages',clientId],       queryFn:() => getPages(clientId)      })
   const { data: specials = [] } = useQuery({ queryKey:['specials',clientId],    queryFn:() => getSpecials(clientId)   })
 
+  const handleCloneClient = async () => {
+    if (!confirm(`Clone "${client?.name}"? This will create a duplicate with all settings and content.`)) return
+    
+    try {
+      const res = await fetch(`${API}/clients/${clientId}/clone`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token() }
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to clone client')
+      }
+      const clonedClient = await res.json()
+      alert(`Successfully cloned "${client?.name}" as "${clonedClient.name}"`)
+    } catch (err) { alert(err.message) }
+  }
+
   const metrics = [
-    { label:'Menu Items',            value: items.length,                  icon:'🍽️' },
-    { label:'Pages',                  value: pages.length,                  icon:'📄' },
-    { label:'Specials',               value: specials.length,               icon:'⭐', color: C.acc },
-    { label:'Unique Visitors',        value: analytics?.uniqueVisitors || '—', icon:'👥' },
-    { label:'Pageviews',              value: analytics?.pageviews || '—',      icon:'📊' },
-    { label:'Bounce Rate',            value: analytics?.bounceRate || '—',    icon:'↩️', color: C.amber },
+    { label:'Menu Items',            value: items.length,                  icon:'' },
+    { label:'Pages',                  value: pages.length,                  icon:'' },
+    { label:'Specials',               value: specials.length,               icon:'', color: C.acc },
+    { label:'Unique Visitors',        value: analytics?.uniqueVisitors || '—', icon:'' },
+    { label:'Pageviews',              value: analytics?.pageviews || '—',      icon:'' },
+    { label:'Bounce Rate',            value: analytics?.bounceRate || '—',    icon:'', color: C.amber },
   ]
 
   return (
     <div>
       <h2 style={{ margin:'0 0 20px', fontSize:17, fontWeight:700, color:C.t0 }}>Overview</h2>
+      
+      {/* Clone Section */}
+      <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10, padding:'16px 20px', marginBottom:24 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span style={{ fontSize:13, color:C.t0 }}>Clone this site</span>
+          <button 
+            onClick={handleCloneClient}
+            style={{ padding:'8px 14px', background:C.acc, border:'none', borderRadius:7, color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:6 }}
+          >
+            <Copy size={14} /> Clone Site
+          </button>
+        </div>
+        <div style={{ fontSize:11, color:C.t3, marginTop:8 }}>
+          Create a duplicate of this site with all settings and content preserved.
+        </div>
+      </div>
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:24 }}>
         {metrics.map(m => (
           <div key={m.label} style={{ background:C.panel, border:`1px solid ${C.border}`,
@@ -280,6 +340,41 @@ function OverviewTab({ clientId, period }) {
           </div>
         </div>
       </div>
+
+      {/* Danger Zone — Delete Client */}
+      {onDeleteSite && (
+        <div style={{ marginTop:32, background:'#1A0505', border:'1px solid #EF444440',
+          borderRadius:10, padding:'20px 24px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:C.red, marginBottom:4 }}>Danger Zone</div>
+              <div style={{ fontSize:12, color:C.t3 }}>Permanently delete this client and all its data. This action cannot be undone.</div>
+            </div>
+            {!deleting ? (
+              <button onClick={() => setDeleting(true)}
+                style={{ padding:'8px 16px', background:'transparent', border:`1px solid ${C.red}`,
+                  borderRadius:7, color:C.red, fontWeight:700, fontSize:12, cursor:'pointer',
+                  fontFamily:'inherit', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                <Trash2 size={13}/> Delete Client
+              </button>
+            ) : (
+              <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                <button onClick={() => setDeleting(false)}
+                  style={{ padding:'8px 14px', background:'transparent', border:`1px solid ${C.border}`,
+                    borderRadius:7, color:C.t2, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                  Cancel
+                </button>
+                <button onClick={() => onDeleteSite(clientId)}
+                  style={{ padding:'8px 16px', background:C.red, border:'none',
+                    borderRadius:7, color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer',
+                    fontFamily:'inherit' }}>
+                  Yes, Delete Permanently
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -294,7 +389,7 @@ function PlaceholderTab({ label }) {
         This section shows {label} data from your connected analytics integrations.
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-        {[['Coming Soon','—','🔄'],['Connect Analytics','→','⚙️'],['GA4 Required','Setup','📊']].map(([lbl,val,icon]) => (
+        {[['Coming Soon','—',''],['Connect Analytics','→',''],['GA4 Required','Setup','']].map(([lbl,val,icon]) => (
           <div key={lbl} style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10, padding:'16px 20px' }}>
             <div style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>{lbl}</div>
             <div style={{ fontSize:28, fontWeight:800, color:C.t0 }}>{val} <span style={{fontSize:18}}>{icon}</span></div>

@@ -3,20 +3,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Sparkles, Image, Flame, Users, MapPin, Star, Images, Layout, Plus } from 'lucide-react'
 import LoadingSpinner from '../Components/LoadingSpinner'
 import { getHomeSections, saveHomeSections } from '../api/homepage.js'
+import { getFeaturedConfig, updateFeaturedConfig } from '../api/featuredConfig.js'
 import { C } from '../theme'
 
 // Sidebar tabs for Homepage
 const HOMEPAGE_SIDEBAR = [
-  { key: 'hero', label: 'Hero Section', icon: '✨' },
-  { key: 'promo-tile', label: 'Promo Tiles', icon: '🏷️' },
-  { key: 'specials', label: 'Specials Section', icon: '🔥' },
-  { key: 'about', label: 'Meet Our Team', icon: '👥' },
-  { key: 'locations', label: 'Locations Section', icon: '📍' },
-  { key: 'reviews', label: 'Reviews Section', icon: '⭐' },
-  { key: 'homepage-banners', label: 'Homepage Banners', icon: '🖼️' },
-  { key: 'content', label: 'Content Sections', icon: '📝' }
+  { key: 'hero', label: 'Hero Section', Icon: Sparkles },
+  { key: 'promo-tile', label: 'Promo Tiles', Icon: Image },
+  { key: 'featured', label: 'Featured Items', Icon: Flame },
+  { key: 'specials', label: 'Specials Section', Icon: Flame },
+  { key: 'about', label: 'Meet Our Team', Icon: Users },
+  { key: 'locations', label: 'Locations Section', Icon: MapPin },
+  { key: 'reviews', label: 'Reviews Section', Icon: Star },
+  { key: 'homepage-banners', label: 'Homepage Banners', Icon: Images },
+  { key: 'content', label: 'Content Sections', Icon: Layout }
 ]
 
 // Reusable Components (from NavbarSection pattern)
@@ -61,24 +64,16 @@ const ToggleSwitch = memo(({ checked, onChange, size = 'small', label }) => (
   </div>
 ))
 
-const SectionHeader = memo(({ title, icon, onAdd, addLabel = 'Add' }) => (
+const SectionHeader = memo(({ title, Icon, onAdd, addLabel = 'Add' }) => (
   <div style={{
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottom: `1px solid ${C.border}`
+    marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${C.border}`
   }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 16 }}>{icon}</span>
-      <span style={{
-        fontSize: 13,
-        fontWeight: 700,
-        color: C.t2,
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em'
-      }}>{title}</span>
+      {Icon && <Icon size={16} style={{ color: C.t2 }} />}
+      <span style={{ fontSize: 13, fontWeight: 700, color: C.t2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{title}</span>
     </div>
     {onAdd && (
       <button
@@ -145,6 +140,8 @@ export default function HomePageSection({ clientId, activeKey = 'promo-tiles' })
         return <HeroTab sections={currentSections} onSave={saveHomepage.mutate} clientId={clientId} />
       case 'promo-tile':
         return <PromoTilesTab sections={currentSections} onSave={saveHomepage.mutate} clientId={clientId} />
+      case 'featured':
+        return <FeaturedTab clientId={clientId} />
       case 'specials':
         return <SpecialsTab sections={currentSections} onSave={saveHomepage.mutate} clientId={clientId} />
       case 'about':
@@ -168,18 +165,22 @@ export default function HomePageSection({ clientId, activeKey = 'promo-tiles' })
     <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden' }}>
       {/* Sidebar */}
       <div style={{ width:220, minWidth:220, background:C.panel, borderRight:`1px solid ${C.border}`, overflowY:'auto' }}>
-        {HOMEPAGE_SIDEBAR.map(item => (
-          <button key={item.key} onClick={() => setLocalActiveKey(item.key)}
-            style={{ display:'flex', alignItems:'center', gap:10, width:'100%',
-              padding:'11px 14px', border:'none',
-              background: localActiveKey===item.key ? '#1F2D4A' : 'transparent',
-              color: localActiveKey===item.key ? C.t0 : C.t2,
-              fontWeight: localActiveKey===item.key ? 700 : 400,
-              fontSize:13, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
-              borderLeft:`2px solid ${localActiveKey===item.key ? C.acc : 'transparent'}` }}>
-            <span style={{fontSize:16}}>{item.icon}</span>{item.label}
-          </button>
-        ))}
+        {HOMEPAGE_SIDEBAR.map(item => {
+          const Icon = item.Icon
+          return (
+            <button key={item.key} onClick={() => setLocalActiveKey(item.key)}
+              style={{ display:'flex', alignItems:'center', gap:10, width:'100%',
+                padding:'11px 14px', border:'none',
+                background: localActiveKey===item.key ? '#1F2D4A' : 'transparent',
+                color: localActiveKey===item.key ? C.t0 : C.t2,
+                fontWeight: localActiveKey===item.key ? 700 : 400,
+                fontSize:13, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                borderLeft:`2px solid ${localActiveKey===item.key ? C.acc : 'transparent'}` }}>
+              <Icon size={16} />
+              {item.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Content */}
@@ -194,7 +195,7 @@ export default function HomePageSection({ clientId, activeKey = 'promo-tiles' })
 function HeroTab({ sections, onSave, clientId }) {
   return <GenericSectionTab 
     title="Hero Section" 
-    icon="✨" 
+    icon="" 
     sections={sections} 
     sectionType="hero"
     onSave={onSave} 
@@ -219,11 +220,8 @@ function PromoTilesTab({ sections, onSave, clientId }) {
   const content = useMemo(() => {
     try {
       const parsed = typeof section.content === 'string' ? JSON.parse(section.content) : (section.content || {})
-      console.log('[ReviewsTab] Raw section.content:', section.content);
-      console.log('[ReviewsTab] Parsed content:', parsed);
       return parsed
     } catch {
-      console.log('[ReviewsTab] Error parsing content, returning {}');
       return {}
     }
   }, [section.content])
@@ -237,21 +235,46 @@ function PromoTilesTab({ sections, onSave, clientId }) {
 
   const [itemModal, setItemModal] = useState(null)
 
+  // Ensure items have sortOrder
+  const items = useMemo(() => {
+    return (content.items || []).map((item, idx) => ({
+      ...item,
+      sortOrder: item.sortOrder ?? idx
+    })).sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [content.items])
+
   const saveItem = (item) => {
-    const items = [...(content.items || [])]
+    const currentItems = [...items]
     if (item.id) {
-      const idx = items.findIndex(i => i.id === item.id)
-      items[idx] = item
+      const idx = currentItems.findIndex(i => i.id === item.id)
+      currentItems[idx] = { ...item, sortOrder: currentItems[idx].sortOrder }
     } else {
-      items.push({ ...item, id: Date.now().toString() })
+      const maxOrder = currentItems.length > 0 
+        ? Math.max(...currentItems.map(i => i.sortOrder ?? 0))
+        : -1
+      currentItems.push({ ...item, id: Date.now().toString(), sortOrder: maxOrder + 1 })
     }
-    updateContent({ items })
+    updateContent({ items: currentItems })
     setItemModal(null)
+  }
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    
+    const oldIndex = items.findIndex(i => i.id === active.id)
+    const newIndex = items.findIndex(i => i.id === over.id)
+    
+    if (oldIndex < 0 || newIndex < 0) return
+    
+    const reordered = arrayMove(items, oldIndex, newIndex)
+    const withUpdatedOrder = reordered.map((item, idx) => ({ ...item, sortOrder: idx }))
+    updateContent({ items: withUpdatedOrder })
   }
 
   return (
     <div style={{ maxWidth: 800 }}>
-      <SectionHeader title="Promo Tiles" icon="🏷️" />
+      <SectionHeader title="Promo Tiles" Icon={Image} />
       
       {/* 1. Page Header */}
       <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20, marginBottom:20 }}>
@@ -273,20 +296,23 @@ function PromoTilesTab({ sections, onSave, clientId }) {
           <button onClick={() => setItemModal({})} style={{ padding:'4px 12px', background:C.acc, border:'none', borderRadius:6, color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>+ Add Item</button>
         </div>
         
-        <div style={{ display:'grid', gap:10 }}>
-          {(content.items || []).map(item => (
-            <div key={item.id} style={{ display:'flex', alignItems:'center', gap:12, background:C.panel, border:`1px solid ${C.border}`, borderRadius:8, padding:10 }}>
-              <img src={item.image} style={{ width:40, height:40, borderRadius:6, objectFit:'cover', background:C.card }} />
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>{item.title}</div>
-                <div style={{ fontSize:11, color:C.t2 }}>{item.description}</div>
-              </div>
-              <button onClick={() => setItemModal(item)} style={{ padding:'4px 8px', background:'transparent', border:`1px solid ${C.border2}`, borderRadius:4, color:C.t2, fontSize:11, cursor:'pointer' }}>Edit</button>
-              <button onClick={() => updateContent({ items: content.items.filter(i => i.id !== item.id) })} style={{ padding:'4px 8px', background:'transparent', border:`1px solid ${C.red}40`, borderRadius:4, color:C.red, fontSize:11, cursor:'pointer' }}>Delete</button>
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+            <div style={{ display:'grid', gap:10 }}>
+              {items.length === 0 && (
+                <div style={{ textAlign:'center', padding:20, color:C.t3, fontSize:12 }}>No items added yet. Click "+ Add Item" to create a promo tile.</div>
+              )}
+              {items.map(item => (
+                <SortablePromoItem 
+                  key={item.id} 
+                  item={item} 
+                  onEdit={() => setItemModal(item)}
+                  onDelete={() => updateContent({ items: items.filter(i => i.id !== item.id) })}
+                />
+              ))}
             </div>
-          ))}
-          {(content.items || []).length === 0 && <div style={{ textAlign:'center', padding:20, color:C.t3, fontSize:12 }}>No items added yet.</div>}
-        </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
       {/* 3. CTA Section */}
@@ -314,54 +340,190 @@ function PromoTilesTab({ sections, onSave, clientId }) {
           item={itemModal}
           onSave={saveItem}
           onClose={() => setItemModal(null)}
+          clientId={clientId}
         />
       )}
     </div>
   )
 }
 
-function PromoItemModal({ item, onSave, onClose }) {
+// Sortable Promo Item Component
+function SortablePromoItem({ item, onEdit, onDelete }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1
+  }
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={{ ...style, display:'flex', alignItems:'center', gap:12, background:C.panel, border:`1px solid ${C.border}`, borderRadius:8, padding:10 }}
+    >
+      {/* Drag Handle */}
+      <div {...attributes} {...listeners} style={{ cursor: 'grab', color: C.t3, fontSize: 18 }}>⋮⋮</div>
+      
+      <img src={item.image} style={{ width:40, height:40, borderRadius:6, objectFit:'cover', background:C.card }} />
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>{item.heading || item.title}</div>
+        <div style={{ fontSize:11, color:C.t2 }}>{item.subheading || item.description}</div>
+      </div>
+      {item.alternateStyle && (
+        <span style={{ fontSize:10, color:C.acc, background:C.acc+'20', padding:'2px 6px', borderRadius:4 }}>Alt Style</span>
+      )}
+      <button onClick={onEdit} style={{ padding:'4px 8px', background:'transparent', border:`1px solid ${C.border2}`, borderRadius:4, color:C.t2, fontSize:11, cursor:'pointer' }}>Edit</button>
+      <button onClick={onDelete} style={{ padding:'4px 8px', background:'transparent', border:`1px solid ${C.red}40`, borderRadius:4, color:C.red, fontSize:11, cursor:'pointer' }}>Delete</button>
+    </div>
+  )
+}
+
+function PromoItemModal({ item, onSave, onClose, clientId }) {
   const [form, setForm] = useState({
-    title: '',
-    description: '',
+    heading: '',
+    subheading: '',
     image: '',
-    ctaLabel: 'Order Now',
-    ctaLink: '/menu',
+    alternateStyle: false,
+    linkType: 'internal',
+    linkUrl: '',
     ...item
   })
+
+  const handleSave = () => {
+    if (!form.heading?.trim()) return
+    onSave({
+      ...form,
+      // Maintain backward compatibility
+      title: form.heading,
+      description: form.subheading,
+      ctaLink: form.linkUrl,
+      ctaLabel: 'Learn More'
+    })
+  }
+
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-      <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, width:'100%', maxWidth:480 }}>
+      <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, width:'100%', maxWidth:520, maxHeight:'90vh', overflow:'auto' }}>
         <div style={{ padding:24, borderBottom:`1px solid ${C.border}` }}>
-          <h3 style={{ margin:0, color:C.t0, fontSize:18 }}>{item.id ? 'Edit' : 'Add'} Promo Item</h3>
+          <h3 style={{ margin:0, color:C.t0, fontSize:18 }}>{item.id ? 'Edit' : 'Add'} Promo Tile</h3>
         </div>
         <div style={{ padding:24 }}>
+          {/* Heading */}
           <div style={{ marginBottom:16 }}>
-            <label style={labelStyle}>Title *</label>
-            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={inputStyle} />
+            <label style={labelStyle}>Heading *</label>
+            <input 
+              value={form.heading} 
+              onChange={e => setForm({ ...form, heading: e.target.value })} 
+              style={inputStyle} 
+              placeholder="e.g. Summer Specials"
+            />
           </div>
+
+          {/* Subheading */}
           <div style={{ marginBottom:16 }}>
-            <label style={labelStyle}>Description</label>
-            <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={inputStyle} rows={2} />
+            <label style={labelStyle}>Subheading</label>
+            <input 
+              value={form.subheading} 
+              onChange={e => setForm({ ...form, subheading: e.target.value })} 
+              style={inputStyle} 
+              placeholder="e.g. Refreshing drinks for hot days"
+            />
           </div>
-          <div style={{ marginBottom:16 }}>
-            <label style={labelStyle}>Image URL</label>
-            <input value={form.image} onChange={e => setForm({ ...form, image: e.target.value })} style={inputStyle} />
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <div>
-              <label style={labelStyle}>CTA Label</label>
-              <input value={form.ctaLabel} onChange={e => setForm({ ...form, ctaLabel: e.target.value })} style={inputStyle} />
+
+          {/* Image Upload Box */}
+          <div style={{ marginBottom:20 }}>
+            <label style={labelStyle}>Promo Image</label>
+            <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+              <div style={{ 
+                width: 100, height: 100, borderRadius: 8, 
+                background: form.image ? 'transparent' : C.card,
+                border: `2px dashed ${form.image ? C.green : C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden'
+              }}>
+                {form.image ? (
+                  <img src={form.image} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                ) : (
+                  <span style={{ color:C.t3, fontSize:12 }}>No image</span>
+                )}
+              </div>
+              <div style={{ flex:1 }}>
+                <input 
+                  value={form.image} 
+                  onChange={e => setForm({ ...form, image: e.target.value })} 
+                  style={{ ...inputStyle, marginBottom:8 }} 
+                  placeholder="Image URL"
+                />
+                <p style={{ margin:0, fontSize:11, color:C.t3 }}>Enter image URL or upload via media library</p>
+              </div>
             </div>
-            <div>
-              <label style={labelStyle}>CTA Link</label>
-              <input value={form.ctaLink} onChange={e => setForm({ ...form, ctaLink: e.target.value })} style={inputStyle} />
+          </div>
+
+          {/* Alternate Style Toggle */}
+          <div style={{ marginBottom:20, padding:16, background:C.card, borderRadius:8, border:`1px solid ${C.border}` }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer' }} onClick={() => setForm({ ...form, alternateStyle: !form.alternateStyle })}>
+              <div style={{
+                width: 44, height: 24, borderRadius: 12,
+                background: form.alternateStyle ? C.acc : C.border,
+                position: 'relative', transition: 'background 0.2s'
+              }}>
+                <div style={{
+                  width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                  position: 'absolute', top: 2, left: form.alternateStyle ? 22 : 2,
+                  transition: 'left 0.2s'
+                }} />
+              </div>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:C.t1 }}>Use Alternate Style</div>
+                <div style={{ fontSize:11, color:C.t3 }}>Display with different layout/colors</div>
+              </div>
             </div>
+          </div>
+
+          {/* Link Section */}
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>Link Type</label>
+            <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+              <button 
+                onClick={() => setForm({ ...form, linkType: 'internal' })}
+                style={{ 
+                  flex:1, padding:'8px 12px', borderRadius:6, border:`1px solid ${form.linkType === 'internal' ? C.acc : C.border}`,
+                  background: form.linkType === 'internal' ? C.acc+'20' : 'transparent',
+                  color: form.linkType === 'internal' ? C.acc : C.t2, fontSize:12, cursor:'pointer'
+                }}
+              >
+                Internal Page
+              </button>
+              <button 
+                onClick={() => setForm({ ...form, linkType: 'external' })}
+                style={{ 
+                  flex:1, padding:'8px 12px', borderRadius:6, border:`1px solid ${form.linkType === 'external' ? C.acc : C.border}`,
+                  background: form.linkType === 'external' ? C.acc+'20' : 'transparent',
+                  color: form.linkType === 'external' ? C.acc : C.t2, fontSize:12, cursor:'pointer'
+                }}
+              >
+                External URL
+              </button>
+            </div>
+            <input 
+              value={form.linkUrl} 
+              onChange={e => setForm({ ...form, linkUrl: e.target.value })} 
+              style={inputStyle} 
+              placeholder={form.linkType === 'internal' ? "/menu or /specials" : "https://example.com"}
+            />
           </div>
         </div>
         <div style={{ padding:24, borderTop:`1px solid ${C.border}`, display:'flex', gap:12, justifyContent:'flex-end' }}>
           <button onClick={onClose} style={btnCancel}>Cancel</button>
-          <button onClick={() => onSave(form)} style={btnSave}>Save Item</button>
+          <button onClick={handleSave} style={btnSave}>Save Tile</button>
         </div>
       </div>
     </div>
@@ -384,11 +546,8 @@ function SpecialsTab({ sections, onSave, clientId }) {
   const content = useMemo(() => {
     try {
       const parsed = typeof section.content === 'string' ? JSON.parse(section.content) : (section.content || {})
-      console.log('[ReviewsTab] Raw section.content:', section.content);
-      console.log('[ReviewsTab] Parsed content:', parsed);
       return parsed
     } catch {
-      console.log('[ReviewsTab] Error parsing content, returning {}');
       return {}
     }
   }, [section.content])
@@ -416,7 +575,7 @@ function SpecialsTab({ sections, onSave, clientId }) {
 
   return (
     <div style={{ maxWidth: 800 }}>
-      <SectionHeader title="Specials Section" icon="🔥" />
+      <SectionHeader title="Specials Section" Icon={Flame} />
       
       <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20, marginBottom:20 }}>
         <div style={{ fontSize:12, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:14 }}>Section Header</div>
@@ -534,7 +693,7 @@ const btnSave = { padding: '10px 24px', background: C.green, border: 'none', bor
 function AboutTab({ sections, onSave, clientId }) {
   return <GenericSectionTab 
     title="Meet Our Team" 
-    icon="👥" 
+    icon="" 
     sections={sections} 
     sectionType="about"
     onSave={onSave} 
@@ -546,7 +705,7 @@ function AboutTab({ sections, onSave, clientId }) {
 function LocationsTab({ sections, onSave, clientId }) {
   return <GenericSectionTab 
     title="Locations Section" 
-    icon="📍" 
+    icon="" 
     sections={sections} 
     sectionType="locations"
     onSave={onSave} 
@@ -578,11 +737,8 @@ function ReviewsTab({ sections, onSave, clientId }) {
   const content = useMemo(() => {
     try {
       const parsed = typeof section.content === 'string' ? JSON.parse(section.content) : (section.content || {})
-      console.log('[ReviewsTab] Raw section.content:', section.content);
-      console.log('[ReviewsTab] Parsed content:', parsed);
       return parsed
     } catch {
-      console.log('[ReviewsTab] Error parsing content, returning {}');
       return {}
     }
   }, [section.content])
@@ -597,7 +753,7 @@ function ReviewsTab({ sections, onSave, clientId }) {
 
   return (
     <div style={{ maxWidth: 800 }}>
-      <SectionHeader title="Reviews Section" icon="⭐" />
+      <SectionHeader title="Reviews Section" Icon={Star} />
       
       {/* Section Header */}
       <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20, marginBottom:20 }}>
@@ -733,7 +889,7 @@ function ReviewsTab({ sections, onSave, clientId }) {
 function HomepageBannersTab({ sections, onSave, clientId }) {
   return <GenericSectionTab 
     title="Homepage Banners" 
-    icon="🖼️" 
+    icon="" 
     sections={sections} 
     sectionType="banner"
     onSave={onSave} 
@@ -745,7 +901,7 @@ function HomepageBannersTab({ sections, onSave, clientId }) {
 function ContentTab({ sections, onSave, clientId }) {
   return <GenericSectionTab 
     title="Content Sections" 
-    icon="📝" 
+    icon="" 
     sections={sections} 
     sectionType="content"
     onSave={onSave} 
@@ -819,7 +975,7 @@ function GenericSectionTab({ title, icon, sections, sectionType, onSave, clientI
 
   return (
     <div>
-      <SectionHeader title={title} icon={icon} onAdd={handleAdd} addLabel="Add Section" />
+      <SectionHeader title={title} Icon={Plus} onAdd={handleAdd} addLabel="Add Section" />
       
       {localSections.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48, color: C.t3 }}>
@@ -1183,6 +1339,137 @@ function EditSectionModal({ section, onSave, onClose }) {
             Save Section
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Featured Tab ─────────────────────────────────────────────
+function FeaturedTab({ clientId }) {
+  const qc = useQueryClient()
+  const [config, setConfig] = useState({
+    heading: "Chef's Recommendations",
+    subheading: "Handpicked selections from our menu",
+    isActive: true
+  })
+
+  const { data: configData, isLoading } = useQuery({
+    queryKey: ['featured-config', clientId],
+    queryFn: () => getFeaturedConfig(clientId),
+    onSuccess: (data) => {
+      if (data) {
+        setConfig({
+          heading: data.heading || "Chef's Recommendations",
+          subheading: data.subheading || "Handpicked selections from our menu",
+          isActive: data.isActive !== false
+        })
+      }
+    }
+  })
+
+  const mUpdateConfig = useMutation({
+    mutationFn: (body) => updateFeaturedConfig(clientId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['featured-config', clientId] })
+      alert('Featured items configuration saved successfully!')
+    }
+  })
+
+  const handleSave = () => {
+    mUpdateConfig.mutate(config)
+  }
+
+  if (isLoading) {
+    return <LoadingSpinner />
+  }
+
+  const inputStyle = {
+    width: '100%',
+    padding: '10px 12px',
+    background: C.input,
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    color: C.t0,
+    fontSize: 13,
+    outline: 'none',
+    fontFamily: 'inherit'
+  }
+
+  const labelStyle = {
+    display: 'block',
+    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: 600,
+    color: C.t2,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px'
+  }
+
+  return (
+    <div style={{ maxWidth: 600 }}>
+      <h2 style={{ fontSize: 20, fontWeight: 700, color: C.t0, marginBottom: 8 }}>
+        Featured Items Configuration
+      </h2>
+      <p style={{ fontSize: 13, color: C.t2, marginBottom: 24 }}>
+        Configure the "Chef's Recommendations" section that displays featured menu items on the homepage.
+      </p>
+
+      <div style={{ background: C.card, borderRadius: 12, padding: 24, border: `1px solid ${C.border}` }}>
+        <div style={{ marginBottom: 20 }}>
+          <label style={labelStyle}>Section Heading</label>
+          <input
+            value={config.heading}
+            onChange={(e) => setConfig({ ...config, heading: e.target.value })}
+            style={inputStyle}
+            placeholder="e.g. Chef's Recommendations"
+          />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={labelStyle}>Section Subheading</label>
+          <input
+            value={config.subheading}
+            onChange={(e) => setConfig({ ...config, subheading: e.target.value })}
+            style={inputStyle}
+            placeholder="e.g. Handpicked selections from our menu"
+          />
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <ToggleSwitch
+            checked={config.isActive}
+            onChange={(checked) => setConfig({ ...config, isActive: checked })}
+            label="Show this section on homepage"
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+          <button
+            onClick={handleSave}
+            disabled={mUpdateConfig.isLoading}
+            style={{
+              padding: '10px 24px',
+              background: C.green,
+              border: 'none',
+              borderRadius: 8,
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              opacity: mUpdateConfig.isLoading ? 0.6 : 1
+            }}
+          >
+            {mUpdateConfig.isLoading ? 'Saving...' : 'Save Configuration'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20, padding: 16, background: C.card, borderRadius: 8, border: `1px solid ${C.border}` }}>
+        <p style={{ fontSize: 12, color: C.t2, margin: 0 }}>
+          <strong>Note:</strong> This section displays menu items marked as "Featured" in the Items section.
+          To feature items, go to Items → Menu Items and toggle the "Featured" option for desired items.
+        </p>
       </div>
     </div>
   )

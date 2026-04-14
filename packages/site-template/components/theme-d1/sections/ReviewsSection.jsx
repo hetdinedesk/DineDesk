@@ -9,38 +9,36 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
   const { reviews, siteConfig, shortcodes } = useCMS();
 
   // CMS configuration - check if reviews carousel should be shown
-  const showReviewsCarousel = content?.showReviewsCarousel !== false; // Default to true
+  // The CMS uses 'showGoogleReviews' in the section content
+  const hasValidPlaceId = siteConfig?.reviews?.placeId && siteConfig?.reviews?.placeId.trim() !== '';
+  // Reviews are in siteConfig.reviews.googleReviews or siteConfig.reviews.reviews
+  const googleReviews = siteConfig?.reviews?.googleReviews || [];
+  const hasReviews = reviews.length > 0 || googleReviews.length > 0;
+  // Check both the section content flag AND the siteConfig reviews setting
+  const showReviewsCarousel = (content?.showGoogleReviews !== false) && hasValidPlaceId && hasReviews;
   // Use site config CTA first, then fallback to section content CTA
   const ctaConfig = siteConfig?.reviews?.ctas?.[0] || content?.cta || null;
   
-  // Debug CTA config
-  console.log('[ReviewsSection] CTA Config:', ctaConfig);
-  console.log('[ReviewsSection] CTA URL (value):', ctaConfig?.value);
-  console.log('[ReviewsSection] CTA URL (url):', ctaConfig?.url);
-  console.log('[ReviewsSection] Full SiteConfig object:', siteConfig);
-  console.log('[ReviewsSection] SiteConfig reviews:', siteConfig?.reviews);
-  console.log('[ReviewsSection] SiteConfig reviews keys:', siteConfig?.reviews ? Object.keys(siteConfig.reviews) : 'no reviews');
-  console.log('[ReviewsSection] SiteConfig CTAs array:', siteConfig?.reviews?.ctas);
-  console.log('[ReviewsSection] First CTA in array:', siteConfig?.reviews?.ctas?.[0]);
   
   // For reviews section, prioritize site config over section title to match CMS behavior  
-  const displayTitle = siteConfig?.reviews?.carouselHeading || title || content?.heading || content?.carouselHeading || 'What Our Guests Say';
+  const displayTitle = siteConfig?.reviews?.carouselHeading || title || content?.heading || content?.carouselHeading;
   
   // Process site config subtitle through shortcodes
   const siteConfigSubtitle = siteConfig?.reviews?.carouselSubHeading || '';
   const processedSiteConfigSubtitle = replaceShortcodes(siteConfigSubtitle, shortcodes);
   
-  const displaySubtitle = processedSiteConfigSubtitle || subtitle || content?.subheading || content?.carouselSubHeading || content?.subtitle || 'reviews';
+  const displaySubtitle = processedSiteConfigSubtitle || subtitle || content?.subheading || content?.carouselSubHeading || content?.subtitle;
   
   // If no title and no subtitle provided, don't show the header section
   const showHeader = displayTitle || displaySubtitle;
 
-  // If reviews carousel is not enabled, don't show anything
+  // If reviews carousel is not enabled, no valid place ID, or no reviews, don't show anything
   if (!showReviewsCarousel) return null;
 
   // Get all reviews - both CMS reviews and Google reviews for carousel
   const cmsReviews = reviews.filter((review) => review.isActive);
-  const googleReviewsData = siteConfig?.googleReviews?.reviews || [];
+  // Google reviews are in siteConfig.reviews.googleReviews or siteConfig.reviews.reviews
+  const googleReviewsData = siteConfig?.reviews?.googleReviews || siteConfig?.reviews?.reviews || [];
   
   // Combine both types of reviews
   const allReviews = [
@@ -82,28 +80,13 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
 
   // Generate review URL
   const getReviewUrl = () => {
-    console.log('[getReviewUrl] CTA Config:', ctaConfig);
-    console.log('[getReviewUrl] Checking ctaConfig?.url:', ctaConfig?.url);
-    console.log('[getReviewUrl] Checking ctaConfig?.value:', ctaConfig?.value);
-    
     // First try the CTA URL from content (supports both url and value fields)
-    if (ctaConfig?.url) {
-      console.log('[getReviewUrl] Using ctaConfig.url:', ctaConfig.url);
-      return ctaConfig.url;
-    }
-    if (ctaConfig?.value) {
-      console.log('[getReviewUrl] Using ctaConfig.value:', ctaConfig.value);
-      return ctaConfig.value;
-    }
-    // Fallback to Google reviews place ID
+    if (ctaConfig?.url) return ctaConfig.url;
+    if (ctaConfig?.value) return ctaConfig.value;
     const googleReviews = siteConfig?.googleReviews;
     if (googleReviews?.placeId) {
-      const fallbackUrl = `https://search.google.com/local/writereview?placeid=${googleReviews.placeId}`;
-      console.log('[getReviewUrl] Using Google place ID fallback:', fallbackUrl);
-      return fallbackUrl;
+      return `https://search.google.com/local/writereview?placeid=${googleReviews.placeId}`;
     }
-    // Final fallback
-    console.log('[getReviewUrl] Using final fallback #');
     return '#';
   };
 
@@ -222,7 +205,7 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
         </div>
 
         {/* CTA Section */}
-        {ctaConfig && (ctaConfig.active !== false) && (
+        {ctaConfig && (ctaConfig.active !== false) && ctaConfig?.label && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -236,7 +219,7 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
               rel="noopener noreferrer"
               className={getCtaStyles(ctaConfig?.variant || ctaConfig?.variantType || 'primary')}
             >
-              {ctaConfig?.label || ctaConfig?.workingTitle || 'Leave a Review'}
+              {ctaConfig.label}
             </a>
           </motion.div>
         )}

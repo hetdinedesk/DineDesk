@@ -2,11 +2,16 @@ export default function ReviewsSection({ data={} }) {
   const reviews    = data.reviews || {}
   const colours    = data.colours || {}
 
+  // Check if reviews should be shown - require valid place ID and enabled carousel
+  const hasValidPlaceId = reviews.placeId && reviews.placeId.trim() !== '';
+  // showReviewsCarousel is exported from API based on showGoogleReviews setting
+  const isCarouselEnabled = reviews.showReviewsCarousel === true || reviews.showGoogleReviews !== false;
+  
   // Use live Google reviews if available, otherwise nothing
   const reviewCards = reviews.googleReviews || []
 
-  // Don't render if no data at all
-  if (!reviews.overallScore && reviewCards.length === 0) return null
+  // Don't render if reviews are not enabled, no valid place ID, or no data at all
+  if (!isCarouselEnabled || !hasValidPlaceId || (!reviews.overallScore && reviewCards.length === 0)) return null
 
   const bg      = 'var(--color-secondary, #1C2B1A)'
   const gold    = '#F5A623'

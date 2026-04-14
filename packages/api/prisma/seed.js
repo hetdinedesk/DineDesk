@@ -275,17 +275,6 @@ async function main() {
     }
   })
 
-  // Navigation Items
-  await prisma.navigationItem.createMany({
-    data: [
-      { clientId: client.id, label: 'Home', url: '/', sortOrder: 0, isActive: true },
-      { clientId: client.id, label: 'Menu', url: '/menu', sortOrder: 1, isActive: true },
-      { clientId: client.id, label: 'Specials', url: '/specials', sortOrder: 2, isActive: true },
-      { clientId: client.id, label: 'Locations', url: '/locations', sortOrder: 3, isActive: true },
-      { clientId: client.id, label: 'Book', url: '/book', sortOrder: 4, isActive: true },
-    ]
-  })
-
   // Menu Categories
   const categories = await prisma.$transaction([
     prisma.menuCategory.create({
@@ -513,7 +502,7 @@ async function main() {
     ]
   })
 
-  console.log('✅ Seeded comprehensive demo data!')
+  console.log('✅ Seeded demo data!')
   console.log('   - Admin user: admin@dinedesk.com / password')
   console.log('   - Client: Demo Restaurant (demo.dinedesk.com.au)')
   console.log('   - 2 Locations with hours & gallery')
@@ -523,7 +512,8 @@ async function main() {
   console.log('   - 5 Home Sections')
   console.log('   - Theme colors & settings')
   console.log('   - Reviews & booking config')
-  console.log('   - Navigation, legal docs, and more!')
+  console.log('   - Legal docs and more!')
+  console.log('   - Navigation: EMPTY (add via CMS)')
 }
 
 main()

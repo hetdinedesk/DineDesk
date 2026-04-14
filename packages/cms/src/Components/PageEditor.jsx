@@ -7,24 +7,11 @@ import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import { useState } from 'react'
 import ImageUpload from './ImageUpload'
-import LoadingSpinner from './LoadingSpinner'
+import { API } from '../api/utils'
 
-const C = {
-  page:'#080C14', panel:'#0E1420', card:'#141C2E', hover:'#1A2540',
-  border:'#1E2D4A', input:'#111827', editorBg:'#0A0F1A',
-  t0:'#F1F5FF', t1:'#B8C5E0', t2:'#7A8BAD', t3:'#445572',
-  acc:'#FF6B2B', cyan:'#00D4FF'
-}
-
+// Same editor CSS as used in ConfigSection (Site Notes)
 const editorCSS = `
-  .editor-container { position: relative; }
-  .ProseMirror { 
-    outline: none; 
-    min-height: 200px; 
-    padding: 16px; 
-    line-height: 1.7; 
-    font-size: 15px;
-  }
+  .ProseMirror { outline: none; text-align: left; }
   .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     float: left;
@@ -32,24 +19,32 @@ const editorCSS = `
     pointer-events: none;
     height: 0;
   }
-  .ProseMirror h2 { font-size: 20px; font-weight: 700; margin: 20px 0 10px; color: #F1F5FF; }
-  .ProseMirror h3 { font-size: 17px; font-weight: 700; margin: 16px 0 8px; color: #B8C5E0; }
-  .ProseMirror ul, .ProseMirror ol { padding-left: 24px; margin: 12px 0; }
-  .ProseMirror li { margin: 4px 0; }
+  .ProseMirror h2 { font-size: 16px; font-weight: 700; margin: 14px 0 8px; color: #F1F5FF; }
+  .ProseMirror h3 { font-size: 14px; font-weight: 700; margin: 12px 0 6px; color: #B8C5E0; }
+  .ProseMirror ul, .ProseMirror ol { padding-left: 18px; margin: 8px 0; }
+  .ProseMirror li { margin: 3px 0; }
   .ProseMirror a { color: #00D4FF; text-decoration: underline; }
-  .ProseMirror img { max-width: 100%; border-radius: 8px; margin: 12px 0; }
+  .ProseMirror img { max-width: 100%; border-radius: 6px; margin: 8px 0; display: block; }
+  .source-textarea { 
+    width: 100%; min-height: 300px; padding: 14px 16px; 
+    background: #0A0F1A; border: none; border-radius: 0 0 12px 12px; 
+    color: #00D4FF; font-family: 'Fira Code', monospace; font-size: 13px; 
+    line-height: 1.7; outline: none; resize: vertical; box-sizing: border-box;
+  }
+  .page-drop-active { border-color: #FF6B2B !important; background: #2A1200 !important; }
 `
 
 export default function PageEditor({ 
   content = '', 
   onUpdate, 
-  placeholder = 'Start writing page content... Supports shortcodes like {{restaurantName}}',
+  placeholder = 'Start writing page content...',
   clientId,
   readOnly = false 
 }) {
   const [sourceMode, setSourceMode] = useState(false)
+  const [sourceValue, setSourceValue] = useState('')
   const [linkModal, setLinkModal] = useState(null)
-  const [imageModal, setImageModal] = useState(false)
+  const [imageModal, setImageModal] = useState(null)
 
   const editor = useEditor({
     extensions: [
@@ -57,21 +52,12 @@ export default function PageEditor({
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Link.configure({ openOnClick: false }),
-      Image.configure({
-        HTMLAttributes: { class: 'page-image' }
-      }),
-      Placeholder.configure({
-        placeholder
-      })
+      Image,
+      Placeholder.configure({ placeholder })
     ],
     content,
     editable: !readOnly,
-    editorProps: {
-      attributes: {
-        class: 'ProseMirror',
-        'data-placeholder': placeholder
-      }
-    },
+    editorProps: { attributes: { style: 'text-align: left' } },
     onUpdate: ({ editor }) => {
       if (!sourceMode && !readOnly) {
         onUpdate?.(editor.getHTML())
@@ -80,174 +66,169 @@ export default function PageEditor({
   })
 
   const enterSource = () => {
+    setSourceValue(editor?.getHTML() || '')
     setSourceMode(true)
   }
 
   const exitSource = () => {
-    if (editor) {
-      editor.commands.setContent(sourceValue, false)
-    }
+    editor?.commands.setContent(sourceValue, false)
     setSourceMode(false)
   }
 
-  const [sourceValue, setSourceValue] = useState('')
-  
-  const insertLink = (href) => {
-    editor.chain().focus().extendMarkRange('link').setLink({ href }).run()
-    setLinkModal(null)
+  const handleSourceChange = (e) => {
+    setSourceValue(e.target.value)
   }
 
-  const insertImage = (url) => {
-    editor.chain().focus().setImage({ src: url }).run()
-    setImageModal(false)
+  const handleLinkClick = () => {
+    setLinkModal({ initial: editor?.getAttributes('link').href || '' })
+  }
+
+  const handleImageClick = (dropFile = null) => {
+    setImageModal({ dropFile })
   }
 
   return (
-    <div className="editor-container" style={{ background: C.card, borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ background: '#141C2E', border: '1px solid #1E2D4A', borderRadius: 12, overflow: 'hidden' }}>
       <style>{editorCSS}</style>
 
-      {/* Toolbar */}
-      <Toolbar 
+      <PageToolbar
         editor={editor}
+        onLinkClick={handleLinkClick}
+        onImageClick={handleImageClick}
         sourceMode={sourceMode}
-        onSourceToggle={sourceMode ? exitSource : enterSource}
-        onLinkClick={() => setLinkModal({ editor })}
-        onImageClick={() => setImageModal(true)}
-        onEnterSource={enterSource}
+        onToggleSource={sourceMode ? exitSource : enterSource}
       />
 
       {sourceMode ? (
-        <textarea 
-          value={editor ? editor.getHTML() : ''}
-          onChange={e => setSourceValue(e.target.value)}
-          style={{
-            width: '100%', minHeight: '300px', resize: 'vertical',
-            background: C.editorBg, border: 'none', borderRadius: '0 0 12px 12px',
-            color: C.cyan, fontFamily: "'Fira Code', monospace", fontSize: 14,
-            padding: '20px', outline: 'none', lineHeight: 1.6
-          }}
-          placeholder={placeholder}
+        <textarea
+          className="source-textarea"
+          value={sourceValue}
+          onChange={handleSourceChange}
+          spellCheck={false}
         />
       ) : (
-        <div style={{
-          minHeight: '300px',
-          background: C.editorBg,
-          borderRadius: '0 0 12px 12px',
-          position: 'relative',
-          cursor: readOnly ? 'default' : 'text'
-        }}>
+        <div
+          style={{
+            minHeight: 300, padding: '14px 16px', background: '#111827',
+            borderTop: '1px solid #1E2D4A', borderRadius: '0 0 12px 12px',
+            color: '#F1F5FF', fontSize: 13, lineHeight: 1.7,
+            outline: 'none', cursor: 'text', transition: 'border-color 0.15s'
+          }}
+          onClick={() => editor?.commands.focus()}
+          onDrop={e => {
+            e.preventDefault()
+            e.currentTarget.classList.remove('page-drop-active')
+            const file = e.dataTransfer.files[0]
+            if (file?.type.startsWith('image/')) handleImageClick(file)
+          }}
+          onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('page-drop-active') }}
+          onDragLeave={e => e.currentTarget.classList.remove('page-drop-active')}
+        >
           <EditorContent editor={editor} />
         </div>
       )}
 
-      {/* Link Modal */}
       {linkModal && (
-        <LinkModal 
-          editor={linkModal.editor}
-          onConfirm={insertLink}
+        <LinkModal
+          initial={linkModal.initial}
+          onConfirm={(url) => {
+            if (!url) editor?.chain().focus().unsetLink().run()
+            else editor?.chain().focus().setLink({ href: url }).run()
+            setLinkModal(null)
+          }}
           onClose={() => setLinkModal(null)}
         />
       )}
 
-      {/* Image Modal */}
       {imageModal && (
         <ImageModal
           clientId={clientId}
-          onInsert={insertImage}
-          onClose={() => setImageModal(false)}
+          editor={editor}
+          dropFile={imageModal.dropFile}
+          onInsertUrl={(url) => {
+            editor?.chain().focus().setImage({ src: url }).run()
+            setImageModal(null)
+          }}
+          onClose={() => setImageModal(null)}
         />
       )}
     </div>
   )
 }
 
-function Toolbar({ editor, sourceMode, onSourceToggle, onLinkClick, onImageClick }) {
+// Same toolbar pattern as NoteToolbar in ConfigSection
+function PageToolbar({ editor, onLinkClick, onImageClick, sourceMode, onToggleSource }) {
   if (!editor && !sourceMode) return null
 
-  const isActive = (command) => editor?.isActive(command) || false
+  const btn = (active, onClick, label, title = '') => (
+    <button
+      onMouseDown={e => { e.preventDefault(); onClick() }}
+      title={title || label}
+      style={{
+        padding: '4px 8px', borderRadius: 5, border: 'none',
+        background: active ? '#1F2D4A' : 'transparent',
+        color: active ? '#FF6B2B' : '#7A8BAD',
+        cursor: 'pointer', fontSize: 13, fontWeight: 600
+      }}
+    >
+      {label}
+    </button>
+  )
 
-  const buttons = [
-    { label: 'B', command: () => editor.chain().focus().toggleBold().run(), active: isActive('bold') },
-    { label: 'I', command: () => editor.chain().focus().toggleItalic().run(), active: isActive('italic') },
-    { label: 'U', command: () => editor.chain().focus().toggleUnderline().run(), active: isActive('underline') },
-    { label: 'S', command: () => editor.chain().focus().toggleStrike().run(), active: isActive('strike') },
-    null, // separator
-    { label: 'H2', command: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), active: isActive('heading', { level: 2 }) },
-    { label: 'H3', command: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), active: isActive('heading', { level: 3 }) },
-    null,
-    { label: '• List', command: () => editor.chain().focus().toggleBulletList().run(), active: isActive('bulletList') },
-    { label: '1. List', command: () => editor.chain().focus().toggleOrderedList().run(), active: isActive('orderedList') },
-    null,
-    { label: '🔗 Link', command: onLinkClick, active: isActive('link') },
-    { label: '🖼️ Image', command: onImageClick },
-  ]
+  const sep = <div style={{ width: 1, height: 18, background: '#1E2D4A', margin: '0 4px', flexShrink: 0 }} />
+
+  // Source mode — show minimal toolbar
+  if (sourceMode) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 2,
+        padding: '6px 10px', background: '#141C2E',
+        borderBottom: '1px solid #1E2D4A', borderRadius: '12px 12px 0 0'
+      }}>
+        <span style={{ fontSize: 11, color: '#445572', marginRight: 8 }}>Source Code</span>
+        <div style={{ marginLeft: 'auto' }}>
+          {btn(true, onToggleSource, '</>', 'Toggle source code')}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 2,
-      padding: '8px 12px', background: C.panel,
-      borderBottom: `1px solid ${C.border}`,
-      borderRadius: '12px 12px 0 0',
-      overflow: 'auto'
+      display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2,
+      padding: '6px 10px', background: '#141C2E',
+      borderBottom: '1px solid #1E2D4A', borderRadius: '12px 12px 0 0'
     }}>
-      {buttons.map((btn, i) => btn ? (
-        <button key={i} 
-          onMouseDown={e => { e.preventDefault(); btn.command() }}
-          style={{
-            padding: '6px 10px', 
-            borderRadius: 6, 
-            border: 'none',
-            background: btn.active ? C.hover : 'transparent',
-            color: btn.active ? C.acc : C.t2,
-            fontSize: 13, fontWeight: btn.active ? 600 : 400,
-            cursor: 'pointer', whiteSpace: 'nowrap',
-            minWidth: btn.label.length > 3 ? 70 : 34
-          }}
-          title={btn.label}
-        >
-          {btn.label}
-        </button>
-      ) : (
-        <div key={i} style={{ width: 1, height: 20, background: C.border2 }} />
-      ))}
-      
+      {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), 'B')}
+      {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), 'I')}
+      {btn(editor.isActive('underline'), () => editor.chain().focus().toggleUnderline().run(), 'U')}
+      {btn(editor.isActive('strike'), () => editor.chain().focus().toggleStrike().run(), 'S')}
+      {sep}
+      {btn(editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), 'H2')}
+      {btn(editor.isActive('heading', { level: 3 }), () => editor.chain().focus().toggleHeading({ level: 3 }).run(), 'H3')}
+      {sep}
+      {btn(editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run(), '• List')}
+      {btn(editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run(), '1. List')}
+      {sep}
+      {btn(editor.isActive({ textAlign: 'left' }), () => editor.chain().focus().setTextAlign('left').run(), '⬅')}
+      {btn(editor.isActive({ textAlign: 'center' }), () => editor.chain().focus().setTextAlign('center').run(), '⬛')}
+      {btn(editor.isActive({ textAlign: 'right' }), () => editor.chain().focus().setTextAlign('right').run(), '➡')}
+      {sep}
+      {btn(editor.isActive('link'), onLinkClick, '🔗 Link')}
+      {btn(false, () => onImageClick(), '🖼 Image')}
+      {sep}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
-        {editor && (
-          <>
-            <button onClick={() => editor.chain().focus().undo().run()}
-              style={btnStyle(false)} title="Undo">
-              ↶
-            </button>
-            <button onClick={() => editor.chain().focus().redo().run()}
-              style={btnStyle(false)} title="Redo">
-              ↷
-            </button>
-          </>
-        )}
-        <button onClick={onSourceToggle}
-          style={btnStyle(sourceMode)} title="Source code">
-          {"</>"}
-        </button>
+        {btn(false, () => editor.chain().focus().undo().run(), '↩', 'Undo')}
+        {btn(false, () => editor.chain().focus().redo().run(), '↪', 'Redo')}
+        {sep}
+        {btn(false, onToggleSource, '</>', 'Toggle source code')}
       </div>
     </div>
   )
 }
 
-function btnStyle(active) {
-  return {
-    padding: '6px 10px', borderRadius: 6, border: 'none',
-    background: active ? C.hover : 'transparent',
-    color: active ? C.acc : C.t2,
-    fontSize: 13, cursor: 'pointer'
-  }
-}
-
-function LinkModal({ editor, onConfirm, onClose }) {
-  const [url, setUrl] = useState('')
-  
-  useEffect(() => {
-    setUrl(editor?.getAttributes('link').href || '')
-  }, [editor])
+function LinkModal({ initial, onConfirm, onClose }) {
+  const [url, setUrl] = useState(initial || '')
 
   return (
     <div style={{
@@ -256,19 +237,19 @@ function LinkModal({ editor, onConfirm, onClose }) {
       alignItems: 'center', justifyContent: 'center', padding: 24
     }}>
       <div style={{
-        background: C.panel, border: `1px solid ${C.border}`,
+        background: '#141C2E', border: '1px solid #1E2D4A',
         borderRadius: 12, padding: 24, width: '100%', maxWidth: 420
       }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: C.t0, marginBottom: 16 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#F1F5FF', marginBottom: 16 }}>
           Link Editor
         </div>
-        <input 
+        <input
           value={url}
           onChange={e => setUrl(e.target.value)}
           placeholder="https://example.com"
           style={{
-            width: '100%', padding: '12px 14px', background: C.input,
-            border: `1px solid ${C.border}`, borderRadius: 8, color: C.t0,
+            width: '100%', padding: '12px 14px', background: '#111827',
+            border: '1px solid #1E2D4A', borderRadius: 8, color: '#F1F5FF',
             fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 16
           }}
           onKeyDown={e => {
@@ -281,8 +262,8 @@ function LinkModal({ editor, onConfirm, onClose }) {
             <button onClick={() => onConfirm('')}
               style={{
                 padding: '8px 16px', background: 'transparent',
-                border: `1px solid ${C.red}40`, borderRadius: 6,
-                color: C.red, fontSize: 13, cursor: 'pointer'
+                border: '1px solid #FF6B2B40', borderRadius: 6,
+                color: '#FF6B2B', fontSize: 13, cursor: 'pointer'
               }}>
               Remove
             </button>
@@ -290,15 +271,15 @@ function LinkModal({ editor, onConfirm, onClose }) {
           <button onClick={onClose}
             style={{
               padding: '8px 16px', background: 'transparent',
-              border: `1px solid ${C.border}`, borderRadius: 6,
-              color: C.t2, fontSize: 13, cursor: 'pointer'
+              border: '1px solid #1E2D4A', borderRadius: 6,
+              color: '#7A8BAD', fontSize: 13, cursor: 'pointer'
             }}>
             Cancel
           </button>
           <button onClick={() => onConfirm(url || '')}
             disabled={!url}
             style={{
-              padding: '8px 20px', background: url ? C.acc : C.card,
+              padding: '8px 20px', background: url ? '#FF6B2B' : '#141C2E',
               border: 'none', borderRadius: 6, color: '#fff',
               fontSize: 13, fontWeight: 600, cursor: url ? 'pointer' : 'not-allowed'
             }}>
@@ -310,20 +291,84 @@ function LinkModal({ editor, onConfirm, onClose }) {
   )
 }
 
-function ImageModal({ clientId, onInsert, onClose }) {
+function ImageModal({ clientId, editor, dropFile, onInsertUrl, onClose }) {
+  const [uploading, setUploading] = useState(false)
+
+  const handleFileUpload = async (file) => {
+    if (!file) return
+    setUploading(true)
+    
+    const localUrl = URL.createObjectURL(file)
+    editor?.chain().focus().setImage({ src: localUrl }).run()
+    onClose()
+
+    const formData = new FormData()
+    formData.append('file', file)
+    const token = localStorage.getItem('dd_token')
+    
+    try {
+      const res = await fetch(`${API}/clients/${clientId}/images`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: formData
+      })
+      const data = await res.json()
+      if (data.url) {
+        const current = editor?.getHTML() || ''
+        const updated = current.replace(localUrl, data.url)
+        editor?.commands.setContent(updated, false)
+      }
+    } catch (err) {
+      console.error('Image upload failed:', err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 10000,
       background: 'rgba(0,0,0,0.75)', display: 'flex',
       alignItems: 'center', justifyContent: 'center', padding: 24
     }}>
-      <ImageUpload 
-        clientId={clientId}
-        label="Insert Image"
-        hint="Upload or paste URL - PNG/JPG/WEBP"
-        onChange={onInsert}
-        onClose={onClose}
-      />
+      {dropFile ? (
+        <div style={{
+          background: '#141C2E', border: '1px solid #1E2D4A',
+          borderRadius: 12, padding: 24, width: '100%', maxWidth: 420
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#F1F5FF', marginBottom: 16 }}>
+            Upload Image
+          </div>
+          <p style={{ color: '#B8C5E0', marginBottom: 16 }}>{dropFile.name}</p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <button onClick={onClose}
+              style={{
+                padding: '8px 16px', background: 'transparent',
+                border: '1px solid #1E2D4A', borderRadius: 6,
+                color: '#7A8BAD', fontSize: 13, cursor: 'pointer'
+              }}>
+              Cancel
+            </button>
+            <button onClick={() => handleFileUpload(dropFile)}
+              disabled={uploading}
+              style={{
+                padding: '8px 20px', background: '#FF6B2B',
+                border: 'none', borderRadius: 6, color: '#fff',
+                fontSize: 13, fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer'
+              }}>
+              {uploading ? 'Uploading...' : 'Upload'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <ImageUpload
+          clientId={clientId}
+          label="Insert Image"
+          hint="Upload or paste URL - PNG/JPG/WEBP"
+          onChange={onInsertUrl}
+          onClose={onClose}
+        />
+      )}
     </div>
   )
 }

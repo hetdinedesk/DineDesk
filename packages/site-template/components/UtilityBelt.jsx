@@ -54,7 +54,7 @@ export default function UtilityBelt() {
         )}
       </div>
     ),
-    'social-links': (utilityItems['social-links'] !== false && social?.showInUtility) && (
+    'social-links': (utilityItems['social-links'] !== false && social?.showInUtility !== false) && (
       <div key="social-links" className="hidden sm:flex items-center gap-3 ml-2 pl-4 border-l border-white/10">
         {socialPlatforms.map(platform => {
           const url = social[platform.key]

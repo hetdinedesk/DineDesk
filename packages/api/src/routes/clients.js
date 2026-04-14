@@ -5,10 +5,15 @@ const { authenticateToken, requireRole } = require('../middleware/auth')
 const { validateSiteConfig } = require('../lib/validation')
 const { geocodeAddress, hasAddressChanged } = require('../lib/geocoding')
 const multer = require('multer')
-const sharp  = require('sharp')
+const sharp = require('sharp')
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const fs = require('fs')
 const path = require('path')
+
+// Generate short random ID (8 characters)
+const generateShortId = () => {
+  return Math.random().toString(36).substring(2, 10)
+}
 
 const upload = multer({ storage: multer.memoryStorage() })
 
@@ -63,7 +68,7 @@ const router = express.Router()
 // Cache key: clientId, value: { data, timestamp }
 // ═══════════════════════════════════════════════════════════════
 const exportCache = new Map()
-const CACHE_TTL_MS = 5000 // 5 seconds
+const CACHE_TTL_MS = 60000 // 60 seconds
 
 function getCachedExport(clientId) {
   const cached = exportCache.get(clientId)
@@ -94,31 +99,140 @@ router.get('/:id/export', async (req, res) => {
     if (cached) {
       return res.json(cached)
     }
-    const [client, menuCategories, menuItems, specials, pages, banners, footerSections, cfg, navigationItems, homeSections] = await Promise.all([
-      prisma.client.findUnique({ where: { id }, include: { locations: true } }),
+
+    const [client, menuCategories, menuItems, specials, pages, banners, footerSections, unassignedFooterLinks, cfg, navigationItems, homeSections, promoTiles, promoConfig, featuredConfig, welcomeContent, teamDepartments, specialsConfig, homepageLayout, customTextBlocks, paymentGateway, legalDocs] = await Promise.all([
+      prisma.client.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          domain: true,
+          status: true,
+          locations: {
+            select: {
+              id: true,
+              name: true,
+              isPrimary: true,
+              isActive: true,
+              showInFooter: true,
+              address: true,
+              phone: true,
+              formEmail: true
+            }
+          }
+        }
+      }),
       prisma.menuCategory.findMany({
         where: { clientId: id },
-        orderBy: { sortOrder: 'asc' }
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          sortOrder: true
+        }
       }),
       prisma.menuItem.findMany({
         where: { clientId: id },
-        orderBy: { sortOrder: 'asc' }
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          categoryId: true,
+          name: true,
+          description: true,
+          price: true,
+          imageUrl: true,
+          isAvailable: true,
+          isFeatured: true,
+          sortOrder: true
+        }
       }),
-      prisma.special.findMany({ where: { clientId: id, isActive: true } }),
-      prisma.page.findMany({ where: { clientId: id, status: 'published' } }),
-      prisma.banner.findMany({ where: { clientId: id, isActive: true } }),
+      prisma.special.findMany({
+        where: { clientId: id, isActive: true },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          price: true,
+          imageUrl: true,
+          bannerImage: true,
+          isActive: true,
+          startDate: true,
+          endDate: true,
+          showInNav: true
+        }
+      }),
+      prisma.page.findMany({
+        where: { clientId: id, status: 'published' },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          subtitle: true,
+          content: true,
+          metaTitle: true,
+          metaDesc: true,
+          ogImage: true,
+          pageType: true,
+          status: true,
+          bannerId: true,
+          showEnquiryForm: true,
+          showLocationMap: true,
+          banner: { select: { id: true, imageUrl: true, title: true } }
+        }
+      }),
+      prisma.banner.findMany({
+        where: { clientId: id, isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          subtitle: true,
+          text: true,
+          imageUrl: true,
+          buttonText: true,
+          buttonUrl: true,
+          isExternal: true,
+          isActive: true,
+          location: true,
+          sortOrder: true,
+          widthPx: true,
+          heightPx: true
+        }
+      }),
       prisma.footerSection.findMany({
         where: { clientId: id },
         orderBy: { sortOrder: 'asc' },
         include: {
-          links: { orderBy: { sortOrder: 'asc' }, include: { page: true } }
+          links: { orderBy: { sortOrder: 'asc' }, include: { page: { select: { id: true, slug: true, pageType: true } } } }
+        }
+      }),
+      prisma.footerLink.findMany({
+        where: { clientId: id, footerSectionId: null },
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          label: true,
+          externalUrl: true,
+          pageId: true,
+          sortOrder: true,
+          isActive: true,
+          page: { select: { id: true, slug: true, pageType: true } }
         }
       }),
       prisma.siteConfig.findUnique({ where: { clientId: id } }),
       prisma.navigationItem.findMany({
         where: { clientId: id, isActive: true },
         orderBy: { sortOrder: 'asc' },
-        include: { page: true }
+        select: {
+          id: true,
+          label: true,
+          url: true,
+          parentId: true,
+          sortOrder: true,
+          isActive: true,
+          pageId: true,
+          page: { select: { id: true, slug: true, pageType: true } }
+        }
       }).then(items => {
         // Build hierarchical tree
         const itemMap = new Map()
@@ -131,8 +245,7 @@ router.get('/:id/export', async (req, res) => {
         items.forEach(item => {
           const node = itemMap.get(item.id)
           if (item.parentId && itemMap.has(item.parentId)) {
-            const parent = itemMap.get(item.parentId)
-            parent.children.push(node)
+            itemMap.get(item.parentId).children.push(node)
           } else {
             roots.push(node)
           }
@@ -142,14 +255,86 @@ router.get('/:id/export', async (req, res) => {
       }),
       prisma.homeSection.findMany({
         where: { clientId: id },
-        orderBy: { sortOrder: 'asc' }
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          type: true,
+          content: true,
+          isActive: true,
+          sortOrder: true,
+          departmentId: true
+        }
+      }),
+      prisma.promoTile.findMany({
+        where: { clientId: id, isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          heading: true,
+          subheading: true,
+          imageUrl: true,
+          linkUrl: true,
+          linkLabel: true,
+          isExternal: true,
+          isActive: true,
+          sortOrder: true
+        }
+      }),
+      prisma.promoConfig.findUnique({
+        where: { clientId: id }
+      }),
+      prisma.featuredConfig.findUnique({
+        where: { clientId: id }
+      }),
+      prisma.welcomeContent.findUnique({
+        where: { clientId: id }
+      }),
+      prisma.teamDepartment.findMany({
+        where: { clientId: id, isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+          sortOrder: true
+        }
+      }),
+      prisma.specialsConfig.findUnique({
+        where: { clientId: id }
+      }),
+      prisma.homepageLayout.findUnique({
+        where: { clientId: id }
+      }),
+      prisma.customTextBlock.findMany({
+        where: { clientId: id, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          isActive: true,
+          createdAt: true
+        }
+      }),
+      prisma.paymentGateway.findUnique({
+        where: { clientId: id },
+        select: {
+          id: true,
+          provider: true,
+          isActive: true,
+          currency: true,
+          cashEnabled: true,
+          cashLabel: true,
+          testMode: true,
+          config: true
+        }
+      }),
+      prisma.legalDoc.findMany({
+        where: { clientId: id, isActive: true },
+        orderBy: { id: 'asc' }
       })
     ])
     
-    // Debug: Check what's in cfg.reviews
-    console.log('[API Export] cfg?.reviews:', JSON.stringify(cfg?.reviews, null, 2));
-    console.log('[API Export] cfg?.reviews?.ctas:', cfg?.reviews?.ctas);
-
     if (!client) return res.status(404).json({ error: 'Client not found' })
 
     // Fetch Google reviews if Place ID is set
@@ -158,31 +343,48 @@ let finalReviews = []
 let googlePlaceData = null
 const placeId = cfg?.reviews?.googlePlaceId
 
-if (placeId && process.env.GOOGLE_PLACES_API_KEY) {
-  console.log('[GOOGLE API] Fetching reviews for Place ID:', placeId)
-  console.log('[GOOGLE API] API Key exists:', !!process.env.GOOGLE_PLACES_API_KEY)
+// Check if reviews section is active and enabled in CMS
+  const reviewsSection = homeSections.find(section => section.type === 'reviews' && section.isActive)
+  let reviewsContent = {}
+  if (reviewsSection) {
+    try {
+      reviewsContent = typeof reviewsSection.content === 'string' ? JSON.parse(reviewsSection.content) : reviewsSection.content || {}
+    } catch (e) {
+      reviewsContent = {}
+    }
+  }
+  
+  // Validate place ID format (Google Place IDs should start with "ChI" and be 27+ characters long)
+  const isValidPlaceId = (placeId) => {
+    if (!placeId || typeof placeId !== 'string') return false;
+    // Google Place IDs typically start with "ChI" and are at least 27 characters
+    return placeId.startsWith('ChI') && placeId.length >= 27;
+  }
+  
+  // Only fetch Google reviews if:
+  // 1. Reviews section is active and enabled
+  // 2. Place ID is configured and valid
+  // 3. Google Reviews are enabled in the section
+  const shouldFetchGoogleReviews = reviewsSection && 
+                                reviewsContent.showGoogleReviews !== false && 
+                                placeId && 
+                                isValidPlaceId(placeId) &&
+                                process.env.GOOGLE_PLACES_API_KEY
+
+  if (shouldFetchGoogleReviews) {
   try {
     const gRes = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,reviews&key=${process.env.GOOGLE_PLACES_API_KEY}`
     )
     const gData = await gRes.json()
-    console.log('[GOOGLE API] Response status:', gRes.status)
-    console.log('[GOOGLE API] Response data:', gData)
     if (gData.result) {
       googlePlaceData = {
         rating:       gData.result.rating,
         totalReviews: gData.result.user_ratings_total,
       }
-      console.log('[GOOGLE API] Total reviews available according to Google:', gData.result.user_ratings_total);
-      console.log('[GOOGLE API] Reviews returned by API:', gData.result.reviews?.length || 0);
-      console.log('[GOOGLE API] Raw reviews count:', gData.result.reviews?.length || 0)
-      console.log('[GOOGLE API] Raw reviews:', gData.result.reviews?.slice(0, 5))
       const minStars = cfg?.reviews?.minStars || 3
-      console.log('[GOOGLE API] Minimum star rating:', minStars)
       const rawReviews = gData.result.reviews || []
       const filteredReviews = rawReviews.filter(r => r.rating >= minStars)
-      console.log('[GOOGLE API] Reviews after filtering:', filteredReviews.length)
-      console.log('[GOOGLE API] Filtered reviews sample:', filteredReviews.slice(0, 5))
       googleReviews = (gData.result.reviews || [])
         .filter(r => r.rating >= minStars)
         .map(r => ({
@@ -196,7 +398,6 @@ if (placeId && process.env.GOOGLE_PLACES_API_KEY) {
       // If we have very few reviews after filtering, supplement with sample reviews to ensure variety
       finalReviews = googleReviews;
       if (finalReviews.length < 5 && cfg?.reviews?.showSampleReviews !== false) {
-        console.log('[GOOGLE API] Supplementing with sample reviews for better display');
         const sampleReviews = [
           {
             name: 'Sarah Mitchell',
@@ -243,26 +444,35 @@ if (placeId && process.env.GOOGLE_PLACES_API_KEY) {
         // Add sample reviews to reach at least 5 total reviews
         const neededReviews = 5 - finalReviews.length;
         finalReviews = [...finalReviews, ...sampleReviews.slice(0, neededReviews)];
-        console.log('[GOOGLE API] Final reviews count after supplementation:', finalReviews.length);
       }
     }
   } catch (err) {
     console.error('[GOOGLE API] Error fetching Google reviews:', err)
   }
-} else {
-  console.log('[GOOGLE API] Not fetching - Place ID:', !!placeId, 'API Key:', !!process.env.GOOGLE_PLACES_API_KEY)
+} else if (placeId && !isValidPlaceId(placeId)) {
+  console.log('[GOOGLE API] Invalid Place ID format:', placeId);
 }
 
 const exportData = {
   client,
+  locations: client.locations || [], // Extract locations from client
   menuCategories,
   menuItems,
   specials,
   pages,
   banners,
   footerSections,
+  unassignedFooterLinks: unassignedFooterLinks || [],
   navigationItems,
   homeSections,
+  promoTiles: promoTiles || [],
+  promoConfig: promoConfig || { heading: null, subheading: null, isActive: true },
+  featuredConfig: featuredConfig || { heading: null, subheading: null, isActive: true },
+  welcomeContent: welcomeContent || { subtitle: null, heading: null, text: null, imageUrl: null, ctaText: null, ctaUrl: null, isExternal: false, isActive: true },
+  teamDepartments: teamDepartments || [],
+  specialsConfig: specialsConfig || { heading: null, subheading: null, showOnHomepage: false, maxItems: 2 },
+  homepageLayout: homepageLayout || { components: [] },
+  customTextBlocks: customTextBlocks || [],
   settings:   cfg?.settings   || {},
   shortcodes: cfg?.shortcodes || {},
   colours:    cfg?.colours    || {},
@@ -273,6 +483,19 @@ const exportData = {
   headerCtas: cfg?.headerCtas || [],
   footer:     cfg?.footer     || {},
   social:     cfg?.social     || {},
+  ordering:   cfg?.ordering   || { enabled: false },
+  paymentGateway: paymentGateway ? {
+    id: paymentGateway.id,
+    provider: paymentGateway.provider,
+    isActive: paymentGateway.isActive,
+    currency: paymentGateway.currency,
+    cashEnabled: paymentGateway.cashEnabled,
+    cashLabel: paymentGateway.cashLabel,
+    testMode: paymentGateway.testMode,
+    testPublishableKey: paymentGateway.config?.testPublishableKey || '',
+    livePublishableKey: paymentGateway.config?.livePublishableKey || ''
+  } : {},
+  legalDocs: legalDocs || [],
   siteType:   cfg?.settings?.siteType || 'restaurant',
   // Reviews — merge Google live data with CMS config
   reviews: {
@@ -281,61 +504,17 @@ const exportData = {
     overallScore:   googlePlaceData?.rating || cfg?.reviews?.overallScore || 4.5,
     googleCount:    googlePlaceData?.totalReviews || cfg?.reviews?.googleCount || 25,
     googleScore:    googlePlaceData?.rating || cfg?.reviews?.googleScore || 4.5,
-    // Live reviews from Google (filtered by min stars) + sample reviews if needed
-    googleReviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || [
-      {
-        name: 'James Wilson',
-        stars: 5,
-        text: 'The best steak I have had in years. The atmosphere is perfect for a date night.',
-        date: '2024-03-15',
-        source: 'Google'
-      },
-      {
-        name: 'Sarah Chen', 
-        stars: 5,
-        text: 'Absolutely incredible service and the wine list is extensive. Highly recommend the seafood platter.',
-        date: '2024-03-10',
-        source: 'Google'
-      },
-      {
-        name: 'Michael Ross',
-        stars: 4,
-        text: 'Great food and lovely staff. The dessert was the highlight of the evening.',
-        date: '2024-03-05',
-        source: 'Google'
-      }
-    ]),
+    // Only provide reviews if they were fetched from Google or manually configured
+    googleReviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || []),
     // Google reviews configuration for frontend
     placeId: cfg?.reviews?.googlePlaceId || null,
     averageRating: googlePlaceData?.rating || cfg?.reviews?.averageRating || 4.5,
     totalReviews: googlePlaceData?.totalReviews || cfg?.reviews?.totalReviews || 25,
     showFloatingWidget: cfg?.reviews?.enableFloating !== false,
     showReviewCta: cfg?.reviews?.showReviewCta !== false,
-    reviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || [
-      {
-        name: 'James Wilson',
-        stars: 5,
-        text: 'The best steak I have had in years. The atmosphere is perfect for a date night.',
-        date: '2024-03-15',
-        source: 'Google'
-      },
-      {
-        name: 'Sarah Chen', 
-        stars: 5,
-        text: 'Absolutely incredible service and the wine list is extensive. Highly recommend the seafood platter.',
-        date: '2024-03-10',
-        source: 'Google'
-      },
-      {
-        name: 'Michael Ross',
-        stars: 4,
-        text: 'Great food and lovely staff. The dessert was the highlight of the evening.',
-        date: '2024-03-05',
-        source: 'Google'
-      }
-    ]),
-    // Carousel content options
-    showReviewsCarousel: cfg?.reviews?.showReviewsCarousel === true,
+    reviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || []),
+    // Carousel content options - only show if reviews section is active and enabled
+    showReviewsCarousel: reviewsSection && reviewsContent.showGoogleReviews !== false,
     alternateStyles: cfg?.reviews?.alternateStyles === true
   }
 }
@@ -349,6 +528,12 @@ const exportData = {
     res.status(500).json({ error: err.message })
   }
 })
+
+// ═══════════════════════════════════════════════════════════════
+// PUBLIC SUB-ROUTERS — customer-facing (no auth required)
+// ═══════════════════════════════════════════════════════════════
+router.use('/:id/orders',     require('./orders'))
+router.use('/:id/payments',   require('./payments'))
 
 // ═══════════════════════════════════════════════════════════════
 // PROTECTED ROUTES
@@ -380,8 +565,302 @@ router.get('/', async (req, res) => {
 
 router.post('/', clientAdminOnly, async (req, res) => {
   try {
-    const client = await prisma.client.create({ data: req.body })
+    const { name } = req.body
+
+    // Check if client with same name already exists
+    const existingClient = await prisma.client.findFirst({
+      where: { name: name?.trim() }
+    })
+
+    if (existingClient) {
+      return res.status(400).json({ error: 'A client with this name already exists' })
+    }
+
+    // Generate unique short ID with retry logic
+    let shortId
+    let attempts = 0
+    const maxAttempts = 10
+
+    while (attempts < maxAttempts) {
+      attempts++
+      shortId = generateShortId()
+      const idExists = await prisma.client.findUnique({ where: { id: shortId } })
+      if (!idExists) break
+    }
+
+    if (!shortId || attempts >= maxAttempts) {
+      return res.status(500).json({ error: 'Could not generate unique ID' })
+    }
+
+    const client = await prisma.client.create({ data: { ...req.body, id: shortId } })
     await prisma.siteConfig.create({ data: { clientId: client.id } })
+
+    // Auto-create Home page (unassigned - user decides whether to show in nav)
+    await prisma.page.create({
+      data: {
+        clientId: client.id,
+        slug: '',
+        title: 'Home',
+        subtitle: 'Welcome to ' + (client.name || 'our restaurant'),
+        status: 'published',
+        inNavigation: false,
+        pageType: 'home',
+        content: JSON.stringify({
+          blocks: [
+            { type: 'hero', title: 'Welcome', subtitle: 'Experience the finest dining' }
+          ]
+        })
+      }
+    })
+
+    // Auto-create legal documents
+    const privacyContent = `# Privacy Policy
+
+## What Data We Collect
+
+We collect the following types of data from our customers:
+
+- **Personal Information**: Name, email address, phone number provided during checkout
+- **Order Information**: Order details, items ordered, delivery/pickup preferences
+- **Location Data**: Selected restaurant location for order fulfillment
+- **Payment Information**: Payment method used (processed securely through Stripe)
+
+## How We Use Your Data
+
+We use your data to:
+
+- Process and fulfill your orders
+- Send order confirmations and receipts
+- Communicate about your order status
+- Improve our services and customer experience
+- Respond to your inquiries and support requests
+
+## How We Store and Protect Your Data
+
+- All data is stored securely in encrypted databases
+- Payment information is processed through Stripe and never stored on our servers
+- We use industry-standard security measures to protect your data
+- Access to your data is restricted to authorized personnel only
+
+## Third-Party Services
+
+We use the following third-party services:
+
+- **Stripe**: For secure payment processing
+- **Email Service**: For sending order confirmations and notifications
+- **Cloudflare R2**: For secure file storage
+
+## Cookie Policy
+
+We use cookies to:
+- Remember your preferences
+- Maintain your shopping cart session
+- Improve website performance
+- Analyze website usage
+
+## Data Retention
+
+We retain your data for:
+- Order records: 7 years (as required by law)
+- Customer accounts: Until you request deletion
+- Marketing communications: Until you opt out
+
+## Your Rights
+
+You have the right to:
+- Access your personal data
+- Request deletion of your data
+- Opt out of marketing communications
+- Update your information
+- Lodge a complaint with relevant authorities
+
+To exercise these rights, contact us at support@${client.name.toLowerCase().replace(/\s+/g, '')}.com`
+
+    const termsContent = `# Terms & Conditions
+
+## Order Acceptance & Cancellation Policies
+
+- All orders are subject to availability
+- We reserve the right to cancel orders if items are unavailable
+- Customers may cancel orders within 30 minutes of placement
+- Cancellations after 30 minutes may incur a fee
+- We reserve the right to refuse service to anyone
+
+## Payment Terms & Conditions
+
+- Payment is required at time of ordering
+- We accept credit/debit cards (via Stripe) and cash
+- All prices are in ${client.currency || 'AUD'}
+- Prices are subject to change without notice
+- Refunds will be processed to the original payment method
+
+## Refund Policies
+
+- Full refunds for cancelled orders before preparation begins
+- Partial refunds for orders cancelled during preparation
+- No refunds for completed orders
+- Refunds processed within 5-7 business days
+
+## Service Availability & Disclaimers
+
+- Online ordering is available during restaurant operating hours
+- We do not guarantee preparation or delivery times
+- We are not liable for delays due to weather, traffic, or other circumstances
+- Images are for illustration purposes only
+
+## User Accounts & Responsibilities
+
+- Users must provide accurate and complete information
+- Users are responsible for maintaining account security
+- Users must be at least 18 years old to place orders
+- One account per person is permitted
+
+## Intellectual Property Rights
+
+- All website content is owned by ${client.name}
+- Menu items, recipes, and branding are proprietary
+- Unauthorized reproduction is prohibited
+
+## Limitation of Liability
+
+- We are not liable for indirect or consequential damages
+- Our liability is limited to the order value
+- We are not responsible for third-party service interruptions
+
+## Governing Law & Jurisdiction
+
+- These terms are governed by the laws of Australia
+- Any disputes will be resolved in Australian courts
+- By using our service, you agree to these terms`
+
+    const restaurantTermsContent = `# Terms of Service for Restaurants
+
+## Restaurant Responsibilities
+
+- Accurately maintain menu items, prices, and descriptions
+- Fulfill orders within estimated preparation times
+- Ensure food safety and quality standards
+- Maintain accurate operating hours
+- Provide excellent customer service
+
+## Commission/Fee Structure
+
+- Commission rates are as agreed in the restaurant agreement
+- Fees are deducted from order totals before payout
+- Detailed commission statements provided monthly
+- Payment to restaurants within 7 days of order completion
+
+## Payment Processing Terms
+
+- All payments processed through the platform
+- Stripe processes payments securely
+- Restaurant agrees to payment terms and conditions
+- Disputes handled according to Stripe's policies
+
+## Order Fulfillment Obligations
+
+- Accept all orders unless capacity is reached
+- Notify platform immediately of capacity issues
+- Cancel orders only in exceptional circumstances
+- Maintain inventory accuracy
+
+## Menu Accuracy Requirements
+
+- Keep menu items, prices, and descriptions current
+- Remove unavailable items promptly
+- Update seasonal items regularly
+- Ensure allergen information is accurate
+
+## Cancellation Policies
+
+- Restaurant may cancel orders with valid reason
+- Customers may cancel within specified timeframes
+- Platform reserves right to mediate disputes
+- Repeated cancellations may affect restaurant rating
+
+## Performance Standards
+
+- Maintain average order completion time under 30 minutes
+- Maintain customer satisfaction rating above 4.0/5.0
+- Respond to customer inquiries within 24 hours
+- Keep cancellation rate below 5%
+
+## Termination
+
+- Either party may terminate with 30 days notice
+- Immediate termination for material breach
+- Platform may suspend for policy violations
+- Outstanding fees due at termination`
+
+    await prisma.legalDoc.createMany({
+      data: [
+        {
+          clientId: client.id,
+          type: 'privacy',
+          title: 'Privacy Policy',
+          content: privacyContent,
+          urlSlug: 'privacy',
+          isActive: true
+        },
+        {
+          clientId: client.id,
+          type: 'terms',
+          title: 'Terms & Conditions',
+          content: termsContent,
+          urlSlug: 'terms',
+          isActive: true
+        },
+        {
+          clientId: client.id,
+          type: 'restaurant-terms',
+          title: 'Restaurant Terms of Service',
+          content: restaurantTermsContent,
+          urlSlug: 'restaurant-terms',
+          isActive: true
+        }
+      ]
+    })
+
+    // Auto-create footer section for legal links
+    const legalFooterSection = await prisma.footerSection.create({
+      data: {
+        clientId: client.id,
+        title: 'Legal',
+        sortOrder: 999,
+        isActive: true
+      }
+    })
+
+    // Auto-create footer links for legal documents
+    await prisma.footerLink.createMany({
+      data: [
+        {
+          clientId: client.id,
+          footerSectionId: legalFooterSection.id,
+          label: 'Privacy Policy',
+          externalUrl: '/privacy',
+          sortOrder: 1,
+          isActive: true
+        },
+        {
+          clientId: client.id,
+          footerSectionId: legalFooterSection.id,
+          label: 'Terms & Conditions',
+          externalUrl: '/terms',
+          sortOrder: 2,
+          isActive: true
+        },
+        {
+          clientId: client.id,
+          footerSectionId: legalFooterSection.id,
+          label: 'Restaurant Terms',
+          externalUrl: '/restaurant-terms',
+          sortOrder: 3,
+          isActive: true
+        }
+      ]
+    })
+
     log({
       action: 'CLIENT_CREATED', entity: 'Client', entityName: client.name,
       userId: req.user.id, userName: req.user.name,
@@ -389,6 +868,369 @@ router.post('/', clientAdminOnly, async (req, res) => {
     })
     res.json(client)
   } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Clone a client
+router.post('/:id/clone', clientAdminOnly, async (req, res) => {
+  try {
+    const sourceClient = await prisma.client.findUnique({
+      where: { id: req.params.id },
+      include: {
+        siteConfig: true,
+        menuCategories: { include: { items: true } },
+        pages: true,
+        navigationItems: true,
+        footerSections: { include: { links: true } },
+        banners: true,
+        specials: true,
+        promoTiles: true,
+        promoConfig: true,
+        specialsConfig: true,
+        featuredConfig: true,
+        welcomeContent: true,
+        teamDepartments: true,
+        homeSections: true,
+        homepageLayout: true,
+        customTextBlocks: true,
+        legalDocs: true
+      }
+    })
+
+    if (!sourceClient) {
+      return res.status(404).json({ error: 'Client not found' })
+    }
+
+    // Generate unique short ID for cloned client
+    let shortId
+    let attempts = 0
+    const maxAttempts = 10
+
+    while (attempts < maxAttempts) {
+      attempts++
+      shortId = generateShortId()
+      const idExists = await prisma.client.findUnique({ where: { id: shortId } })
+      if (!idExists) break
+    }
+
+    if (!shortId || attempts >= maxAttempts) {
+      return res.status(500).json({ error: 'Could not generate unique ID' })
+    }
+
+    // Create cloned client
+    const clonedClient = await prisma.client.create({
+      data: {
+        id: shortId,
+        name: sourceClient.name + ' (duplicate)',
+        domain: null,
+        status: 'draft',
+        clonable: false
+      }
+    })
+
+    // Clone site config
+    if (sourceClient.siteConfig) {
+      await prisma.siteConfig.create({
+        data: {
+          clientId: clonedClient.id,
+          version: 1,
+          settings: sourceClient.siteConfig.settings,
+          netlify: sourceClient.siteConfig.netlify,
+          colours: sourceClient.siteConfig.colours,
+          analytics: sourceClient.siteConfig.analytics,
+          shortcodes: sourceClient.siteConfig.shortcodes,
+          homepage: sourceClient.siteConfig.homepage,
+          reviews: sourceClient.siteConfig.reviews,
+          booking: sourceClient.siteConfig.booking,
+          notes: sourceClient.siteConfig.notes,
+          header: sourceClient.siteConfig.header,
+          footer: sourceClient.siteConfig.footer,
+          headerCtas: sourceClient.siteConfig.headerCtas,
+          social: sourceClient.siteConfig.social
+        }
+      })
+    } else {
+      await prisma.siteConfig.create({ data: { clientId: clonedClient.id } })
+    }
+
+    // Clone menu categories and items
+    for (const category of sourceClient.menuCategories) {
+      const clonedCategory = await prisma.menuCategory.create({
+        data: {
+          clientId: clonedClient.id,
+          name: category.name,
+          sortOrder: category.sortOrder
+        }
+      })
+
+      for (const item of category.items) {
+        await prisma.menuItem.create({
+          data: {
+            clientId: clonedClient.id,
+            categoryId: clonedCategory.id,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            imageUrl: item.imageUrl,
+            sortOrder: item.sortOrder,
+            isAvailable: item.isAvailable,
+            isFeatured: item.isFeatured
+          }
+        })
+      }
+    }
+
+    // Clone pages
+    for (const page of sourceClient.pages) {
+      await prisma.page.create({
+        data: {
+          clientId: clonedClient.id,
+          slug: page.slug,
+          title: page.title,
+          subtitle: page.subtitle,
+          metaTitle: page.metaTitle,
+          metaDesc: page.metaDesc,
+          content: page.content,
+          status: page.status,
+          inNavigation: page.inNavigation,
+          pageType: page.pageType,
+          bannerId: null,
+          parentId: null,
+          navOrder: page.navOrder
+        }
+      })
+    }
+
+    // Clone navigation items
+    for (const navItem of sourceClient.navigationItems) {
+      await prisma.navigationItem.create({
+        data: {
+          clientId: clonedClient.id,
+          label: navItem.label,
+          pageId: null,
+          url: navItem.url,
+          parentId: null,
+          sortOrder: navItem.sortOrder,
+          isActive: navItem.isActive
+        }
+      })
+    }
+
+    // Clone footer sections
+    for (const footerSection of sourceClient.footerSections) {
+      const clonedFooterSection = await prisma.footerSection.create({
+        data: {
+          clientId: clonedClient.id,
+          title: footerSection.title,
+          sortOrder: footerSection.sortOrder
+        }
+      })
+
+      for (const link of footerSection.links) {
+        await prisma.footerLink.create({
+          data: {
+            clientId: clonedClient.id,
+            footerSectionId: clonedFooterSection.id,
+            pageId: null,
+            label: link.label,
+            externalUrl: link.externalUrl,
+            sortOrder: link.sortOrder
+          }
+        })
+      }
+    }
+
+    // Clone legal docs
+    for (const legalDoc of sourceClient.legalDocs || []) {
+      await prisma.legalDoc.create({
+        data: {
+          clientId: clonedClient.id,
+          type: legalDoc.type,
+          title: legalDoc.title,
+          content: legalDoc.content,
+          urlSlug: legalDoc.urlSlug,
+          isActive: legalDoc.isActive
+        }
+      })
+    }
+
+    // Clone banners
+    for (const banner of sourceClient.banners) {
+      await prisma.banner.create({
+        data: {
+          clientId: clonedClient.id,
+          imageUrl: banner.imageUrl,
+          title: banner.title,
+          subtitle: banner.subtitle,
+          isActive: banner.isActive,
+          sortOrder: banner.sortOrder
+        }
+      })
+    }
+
+    // Clone specials
+    for (const special of sourceClient.specials) {
+      await prisma.special.create({
+        data: {
+          clientId: clonedClient.id,
+          title: special.title,
+          description: special.description,
+          price: special.price,
+          imageUrl: special.imageUrl,
+          bannerImage: special.bannerImage,
+          startDate: special.startDate,
+          endDate: special.endDate,
+          isActive: special.isActive,
+          showInNav: special.showInNav
+        }
+      })
+    }
+
+    // Clone promo tiles
+    for (const promoTile of sourceClient.promoTiles) {
+      await prisma.promoTile.create({
+        data: {
+          clientId: clonedClient.id,
+          heading: promoTile.heading,
+          subheading: promoTile.subheading,
+          imageUrl: promoTile.imageUrl,
+          linkUrl: promoTile.linkUrl,
+          linkLabel: promoTile.linkLabel,
+          isExternal: promoTile.isExternal,
+          sortOrder: promoTile.sortOrder,
+          isActive: promoTile.isActive
+        }
+      })
+    }
+
+    // Clone promo config
+    if (sourceClient.promoConfig) {
+      await prisma.promoConfig.create({
+        data: {
+          clientId: clonedClient.id,
+          heading: sourceClient.promoConfig.heading,
+          subheading: sourceClient.promoConfig.subheading,
+          isActive: sourceClient.promoConfig.isActive
+        }
+      })
+    }
+
+    // Clone specials config
+    if (sourceClient.specialsConfig) {
+      await prisma.specialsConfig.create({
+        data: {
+          clientId: clonedClient.id,
+          heading: sourceClient.specialsConfig.heading,
+          subheading: sourceClient.specialsConfig.subheading,
+          showOnHomepage: sourceClient.specialsConfig.showOnHomepage,
+          maxItems: sourceClient.specialsConfig.maxItems
+        }
+      })
+    }
+
+    // Clone featured config
+    if (sourceClient.featuredConfig) {
+      await prisma.featuredConfig.create({
+        data: {
+          clientId: clonedClient.id,
+          heading: sourceClient.featuredConfig.heading,
+          subheading: sourceClient.featuredConfig.subheading,
+          isActive: sourceClient.featuredConfig.isActive
+        }
+      })
+    }
+
+    // Clone welcome content
+    if (sourceClient.welcomeContent) {
+      await prisma.welcomeContent.create({
+        data: {
+          clientId: clonedClient.id,
+          subtitle: sourceClient.welcomeContent.subtitle,
+          heading: sourceClient.welcomeContent.heading,
+          text: sourceClient.welcomeContent.text,
+          imageUrl: sourceClient.welcomeContent.imageUrl,
+          ctaText: sourceClient.welcomeContent.ctaText,
+          ctaUrl: sourceClient.welcomeContent.ctaUrl,
+          isExternal: sourceClient.welcomeContent.isExternal,
+          isActive: sourceClient.welcomeContent.isActive
+        }
+      })
+    }
+
+    // Clone team departments
+    for (const dept of sourceClient.teamDepartments) {
+      await prisma.teamDepartment.create({
+        data: {
+          clientId: clonedClient.id,
+          name: dept.name,
+          sortOrder: dept.sortOrder,
+          isActive: dept.isActive
+        }
+      })
+    }
+
+    // Clone home sections
+    for (const section of sourceClient.homeSections) {
+      const createdSection = await prisma.homeSection.create({
+        data: {
+          clientId: clonedClient.id,
+          type: section.type,
+          title: section.title,
+          content: section.content,
+          imageUrl: section.imageUrl,
+          buttonText: section.buttonText,
+          buttonUrl: section.buttonUrl,
+          sortOrder: section.sortOrder,
+          isActive: section.isActive
+        }
+      })
+
+      // Clone member department relationships
+      if (section.memberDepartments && section.memberDepartments.length > 0) {
+        for (const md of section.memberDepartments) {
+          await prisma.memberDepartment.create({
+            data: {
+              homeSectionId: createdSection.id,
+              departmentId: md.departmentId
+            }
+          })
+        }
+      }
+    }
+
+    // Clone homepage layout
+    if (sourceClient.homepageLayout) {
+      await prisma.homepageLayout.create({
+        data: {
+          clientId: clonedClient.id,
+          components: sourceClient.homepageLayout.components
+        }
+      })
+    }
+
+    // Clone custom text blocks
+    for (const block of sourceClient.customTextBlocks) {
+      await prisma.customTextBlock.create({
+        data: {
+          clientId: clonedClient.id,
+          title: block.title,
+          content: block.content,
+          isActive: block.isActive
+        }
+      })
+    }
+
+    log({
+      action: 'CLIENT_CLONED', entity: 'Client', entityName: clonedClient.name,
+      userId: req.user.id, userName: req.user.name,
+      clientId: clonedClient.id, clientName: clonedClient.name,
+      sourceClientId: sourceClient.id, sourceClientName: sourceClient.name
+    })
+
+    res.json(clonedClient)
+  } catch (err) {
+    console.error('Clone client error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -412,9 +1254,16 @@ router.put('/:id', clientAdminOnly, async (req, res) => {
     const client = await prisma.client.findUnique({ where: { id: clientId } })
     if (!client) return res.status(404).json({ error: 'Client not found' })
 
+    // Whitelist allowed fields to prevent mass assignment
+    const allowed = ['name', 'domain', 'status', 'groupId', 'clonable']
+    const data = {}
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) data[key] = req.body[key]
+    }
+
     const updated = await prisma.client.update({
       where: { id: clientId },
-      data: req.body
+      data
     })
     res.json(updated)
   } catch (err) {
@@ -424,9 +1273,44 @@ router.put('/:id', clientAdminOnly, async (req, res) => {
 
 router.delete('/:id', clientAdminOnly, async (req, res) => {
   try {
-    await prisma.client.delete({ where: { id: req.params.id } })
+    const id = req.params.id
+    await prisma.$transaction(async (tx) => {
+      // Delete in dependency order (children before parents)
+      await tx.order.deleteMany({ where: { clientId: id } })
+      await tx.formSubmission.deleteMany({ where: { clientId: id } })
+      await tx.deployment.deleteMany({ where: { clientId: id } })
+      await tx.activityLog.deleteMany({ where: { clientId: id } })
+      await tx.legalDoc.deleteMany({ where: { clientId: id } })
+      await tx.paymentGateway.deleteMany({ where: { clientId: id } })
+      await tx.alertPopup.deleteMany({ where: { clientId: id } })
+      await tx.homeSection.deleteMany({ where: { clientId: id } })
+      // Footer links → footer sections (cascade handles links, but be safe)
+      await tx.footerLink.deleteMany({ where: { footerSection: { clientId: id } } })
+      await tx.footerSection.deleteMany({ where: { clientId: id } })
+      // Navigation items reference pages, delete nav first
+      await tx.navigationItem.deleteMany({ where: { clientId: id } })
+      // Pages have self-ref (parentId) and banner ref — clear both before deleting
+      await tx.page.updateMany({ where: { clientId: id }, data: { bannerId: null, parentId: null } })
+      await tx.banner.deleteMany({ where: { clientId: id } })
+      await tx.page.deleteMany({ where: { clientId: id } })
+      await tx.menuItem.deleteMany({ where: { clientId: id } })
+      await tx.menuCategory.deleteMany({ where: { clientId: id } })
+      await tx.special.deleteMany({ where: { clientId: id } })
+      await tx.location.deleteMany({ where: { clientId: id } })
+      await tx.siteConfig.deleteMany({ where: { clientId: id } })
+      await tx.client.delete({ where: { id } })
+    })
+
+    log({
+      action: 'CLIENT_DELETED', entity: 'Client',
+      entityName: req.params.id,
+      userId: req.user.id, userName: req.user.name,
+      clientId: id
+    })
+
     res.json({ success: true })
   } catch (err) {
+    console.error('Delete client error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -443,7 +1327,7 @@ router.get('/:id/locations', async (req, res) => {
 
 router.post('/:id/locations', async (req, res) => {
   try {
-    const { isPrimary, ...data } = req.body
+    const { isPrimary, id, clientId: cid, createdAt, updatedAt, page, exteriorImage, ...data } = req.body
     const clientId = req.params.id
     
     // Auto-geocode address if lat/lng not provided
@@ -476,6 +1360,10 @@ router.post('/:id/locations', async (req, res) => {
     const loc = await prisma.location.create({
       data: { ...data, lat, lng, isPrimary, clientId }
     })
+    
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+    
     res.json(loc)
   } catch (err) {
     console.error('Create location error:', err.message)
@@ -498,6 +1386,27 @@ const updateLocationHandler = async (req, res) => {
     
     // Filter out fields that shouldn't be updated
     const { id, clientId: cid, createdAt, updatedAt, page, ...data } = rawData
+    
+    // Normalize hours format - convert full day names to abbreviated and remove duplicates
+    if (data.hours) {
+      const dayNameMap = {
+        'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed', 'Thursday': 'Thu',
+        'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
+      }
+      const normalizedHours = {}
+      
+      Object.entries(data.hours).forEach(([key, value]) => {
+        // Skip full day names - they'll be replaced by abbreviated versions
+        if (dayNameMap[key]) {
+          // This is a full name, skip it (abbreviated version should be in data too)
+          return
+        }
+        // Keep abbreviated names as-is
+        normalizedHours[key] = value
+      })
+      
+      data.hours = normalizedHours
+    }
     
     // Auto-geocode if address changed and lat/lng not manually provided
     let lat = data.lat
@@ -538,10 +1447,14 @@ const updateLocationHandler = async (req, res) => {
       where: { id: locId },
       data: { ...data, lat, lng, isPrimary }
     })
+    
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+    
     res.json(loc)
   } catch (err) {
     console.error('[Location Update] Error:', err.message, err.stack)
-    res.status(500).json({ error: err.message, stack: err.stack })
+    res.status(500).json({ error: err.message })
   }
 }
 
@@ -550,7 +1463,12 @@ router.patch('/:id/locations/:locId', updateLocationHandler)
 
 router.delete('/:id/locations/:locId', async (req, res) => {
   try {
+    const clientId = req.params.id
     await prisma.location.delete({ where: { id: req.params.locId } })
+    
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+    
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -612,8 +1530,9 @@ router.get('/:id/pages', async (req, res) => {
 })
 
 const PAGE_WRITABLE_FIELDS = [
-  'title', 'slug', 'content', 'status', 'bannerId', 'metaTitle', 'metaDesc', 'ogImage',
-  'inNavigation', 'navOrder', 'parentId'
+  'title', 'subtitle', 'slug', 'content', 'metaTitle', 'metaDesc', 'ogImage',
+  'status', 'inNavigation', 'navOrder', 'parentId', 'pageType', 'bannerId',
+  'showEnquiryForm', 'showLocationMap'
 ]
 
 function pickPageData (body) {
@@ -663,13 +1582,48 @@ router.post('/:id/pages', async (req, res) => {
             isActive: true
           }
         })
+        // Automatically create a footer link for the new page
+        const maxFooterLink = await tx.footerLink.aggregate({
+          where: { footerSection: null },
+          _max: { sortOrder: true }
+        })
+        await tx.footerLink.create({
+          data: {
+            clientId,
+            footerSectionId: null, // Unassigned footer link
+            pageId: created.id,
+            label: created.title,
+            url: slug ? `/${slug}` : '/',
+            sortOrder: (maxFooterLink._max.sortOrder ?? -1) + 1,
+            isActive: true
+          }
+        })
         return created
       })
       return res.json(page)
     }
 
-    const page = await prisma.page.create({
-      data: { ...data, clientId }
+    const page = await prisma.$transaction(async (tx) => {
+      const created = await tx.page.create({
+        data: { ...data, clientId }
+      })
+      // Automatically create a footer link for the new page
+      const maxFooterLink = await tx.footerLink.aggregate({
+        where: { footerSection: null },
+        _max: { sortOrder: true }
+      })
+      await tx.footerLink.create({
+        data: {
+          clientId,
+          footerSectionId: null, // Unassigned footer link
+          pageId: created.id,
+          label: created.title,
+          url: String(created.slug || '').replace(/^\//, '') ? `/${String(created.slug || '').replace(/^\//, '')}` : '/',
+          sortOrder: (maxFooterLink._max.sortOrder ?? -1) + 1,
+          isActive: true
+        }
+      })
+      return created
     })
     res.json(page)
   } catch (err) {
@@ -745,6 +1699,288 @@ router.delete('/:id/banners/:bannerId', async (req, res) => {
   }
 })
 
+// ── Promo Tiles ───────────────────────────────────────────────
+router.get('/:id/promo-tiles', async (req, res) => {
+  try {
+    const tiles = await prisma.promoTile.findMany({ 
+      where: { clientId: req.params.id },
+      orderBy: { sortOrder: 'asc' }
+    })
+    res.json(tiles)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/:id/promo-tiles', async (req, res) => {
+  try {
+    const tile = await prisma.promoTile.create({
+      data: { ...req.body, clientId: req.params.id }
+    })
+    res.json(tile)
+  } catch (err) {
+    console.error('Create promo tile error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/promo-tiles/:tileId', async (req, res) => {
+  try {
+    const tile = await prisma.promoTile.update({
+      where: { id: req.params.tileId },
+      data: req.body
+    })
+    res.json(tile)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/:id/promo-tiles/:tileId', async (req, res) => {
+  try {
+    await prisma.promoTile.delete({ where: { id: req.params.tileId } })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Promo Config ─────────────────────────────────────────────
+router.get('/:id/promo-config', async (req, res) => {
+  try {
+    const config = await prisma.promoConfig.findUnique({
+      where: { clientId: req.params.id }
+    })
+    res.json(config || { heading: null, subheading: null, isActive: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/promo-config', async (req, res) => {
+  try {
+    const config = await prisma.promoConfig.upsert({
+      where: { clientId: req.params.id },
+      create: { ...req.body, clientId: req.params.id },
+      update: req.body
+    })
+    res.json(config)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Featured Config ───────────────────────────────────────────
+router.get('/:id/featured-config', async (req, res) => {
+  try {
+    const config = await prisma.featuredConfig.findUnique({
+      where: { clientId: req.params.id }
+    })
+    res.json(config || { heading: null, subheading: null, isActive: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/featured-config', async (req, res) => {
+  try {
+    const config = await prisma.featuredConfig.upsert({
+      where: { clientId: req.params.id },
+      create: { ...req.body, clientId: req.params.id },
+      update: req.body
+    })
+    res.json(config)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Welcome Content ───────────────────────────────────────────
+router.get('/:id/welcome-content', async (req, res) => {
+  try {
+    const content = await prisma.welcomeContent.findUnique({
+      where: { clientId: req.params.id }
+    })
+    res.json(content || { subtitle: null, heading: null, text: null, imageUrl: null, ctaText: null, ctaUrl: null, isExternal: false, isActive: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/welcome-content', async (req, res) => {
+  try {
+    const content = await prisma.welcomeContent.upsert({
+      where: { clientId: req.params.id },
+      create: { ...req.body, clientId: req.params.id },
+      update: req.body
+    })
+    res.json(content)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Homepage Layout ─────────────────────────────────────────────
+router.get('/:id/homepage-layout', async (req, res) => {
+  try {
+    const layout = await prisma.homepageLayout.findUnique({
+      where: { clientId: req.params.id }
+    })
+    // Return default layout if none exists
+    const defaultComponents = [
+      { id: 'welcome', type: 'welcome', visible: true, order: 0 },
+      { id: 'promos', type: 'promos', visible: true, order: 1 },
+      { id: 'specials', type: 'specials', visible: true, order: 2 },
+      { id: 'reviews', type: 'reviews', visible: true, order: 3 }
+    ]
+    res.json(layout || { components: defaultComponents })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/homepage-layout', async (req, res) => {
+  try {
+    const layout = await prisma.homepageLayout.upsert({
+      where: { clientId: req.params.id },
+      create: { ...req.body, clientId: req.params.id },
+      update: req.body
+    })
+    res.json(layout)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Custom Text Blocks ───────────────────────────────────────────
+router.get('/:id/custom-text-blocks', async (req, res) => {
+  try {
+    const blocks = await prisma.customTextBlock.findMany({
+      where: { clientId: req.params.id },
+      orderBy: { createdAt: 'asc' }
+    })
+    res.json(blocks)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/:id/custom-text-blocks', async (req, res) => {
+  try {
+    const block = await prisma.customTextBlock.create({
+      data: { ...req.body, clientId: req.params.id }
+    })
+    res.json(block)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/custom-text-blocks/:blockId', async (req, res) => {
+  try {
+    const block = await prisma.customTextBlock.update({
+      where: { id: req.params.blockId },
+      data: req.body
+    })
+    res.json(block)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/:id/custom-text-blocks/:blockId', async (req, res) => {
+  try {
+    await prisma.customTextBlock.delete({
+      where: { id: req.params.blockId }
+    })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Team Departments ─────────────────────────────────────────────
+router.get('/:id/departments', async (req, res) => {
+  try {
+    const departments = await prisma.teamDepartment.findMany({
+      where: { clientId: req.params.id },
+      orderBy: { sortOrder: 'asc' }
+    })
+    res.json(departments)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/:id/departments', async (req, res) => {
+  try {
+    const department = await prisma.teamDepartment.create({
+      data: { ...req.body, clientId: req.params.id }
+    })
+    exportCache.delete(req.params.id)
+    res.json(department)
+  } catch (err) {
+    console.error('Create department error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/departments/:deptId', async (req, res) => {
+  try {
+    const department = await prisma.teamDepartment.update({
+      where: { id: req.params.deptId },
+      data: req.body
+    })
+    exportCache.delete(req.params.id)
+    res.json(department)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/:id/departments/:deptId', async (req, res) => {
+  try {
+    // Remove department reference from home sections
+    await prisma.homeSection.updateMany({
+      where: { departmentId: req.params.deptId },
+      data: { departmentId: null }
+    })
+    await prisma.teamDepartment.delete({ where: { id: req.params.deptId } })
+    exportCache.delete(req.params.id)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Specials Config ────────────────────────────────────────────
+router.get('/:id/specials-config', async (req, res) => {
+  try {
+    const config = await prisma.specialsConfig.findUnique({
+      where: { clientId: req.params.id }
+    })
+    res.json(config || { heading: null, subheading: null, showOnHomepage: false, maxItems: 2, isActive: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/specials-config', async (req, res) => {
+  try {
+    console.log('[SPECIALS CONFIG SAVE] Request body:', req.body)
+    const config = await prisma.specialsConfig.upsert({
+      where: { clientId: req.params.id },
+      create: { ...req.body, clientId: req.params.id },
+      update: req.body
+    })
+    console.log('[SPECIALS CONFIG SAVE] Successfully saved:', config)
+    res.json(config)
+  } catch (err) {
+    console.error('[SPECIALS CONFIG SAVE] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── SiteConfig ────────────────────────────────────────────────
 router.get('/:id/config', async (req, res) => {
   try {
@@ -806,7 +2042,7 @@ router.put('/:id/config', async (req, res) => {
   } catch (err) {
     console.error('[CONFIG SAVE] Error:', err)
     console.error('[CONFIG SAVE] Error stack:', err.stack)
-    res.status(500).json({ error: err.message, stack: err.stack })
+    res.status(500).json({ error: err.message })
   }
 })
 
@@ -939,56 +2175,37 @@ router.post('/:id/netlify/create', async (req, res) => {
     }
 
     // Generate site name and custom domain for Netlify
-    // Site name format: urban-eats-dinedesk-xxxxx (random suffix for uniqueness)
-    // Custom domain format: urban-eats-dinedesk.com.au (based on client name/domain)
+    // Site name format: {clientId}-{restaurant-name}  (clientId is already unique)
+    // Preview URL:      https://{clientId}-{restaurant-name}.netlify.app
+    // Custom domain:    {clientId}-{restaurant-name}.com.au (or user-provided domain)
     const generateSiteDetails = (client) => {
-      // Priority: Use explicit domain field, otherwise generate from client name
-      let baseName = client.domain || client.name || 'site'
-      
-      // If domain is provided and looks like a full domain (contains .com, .au, etc)
-      if (client.domain && client.domain.includes('.')) {
-        // Extract just the restaurant name part from domain
-        // e.g., "urban-eats-dinedesk.com.au" -> "urban-eats-dinedesk"
-        baseName = client.domain
-          .replace(/^https?:\/\/(www\.)?/, '')  // Remove protocol
-          .replace(/\.(com|co|au|uk|ca|in|io|org|net|biz|local|test|localhost|internal|dev)(\..*)?$/, '') // Remove TLD
-      }
-      
-      // Sanitize for Netlify site name (alphanumeric + hyphens only)
-      let sanitizedName = baseName
-        .replace(/\./g, '-')                    // Replace dots with hyphens
-        .replace(/[^a-z0-9-]/g, '-')           // Replace non-alphanumeric with hyphens
+      // Sanitize restaurant name for Netlify subdomain (alphanumeric + hyphens)
+      let restaurantSlug = (client.name || 'restaurant')
         .toLowerCase()
-        .replace(/-+/g, '-')                   // Collapse multiple hyphens
-        .replace(/^-|-$/g, '')                 // Remove leading/trailing hyphens
-      
-      // Ensure "-dinedesk" branding is included
-      if (!sanitizedName.includes('dinedesk')) {
-        sanitizedName = sanitizedName + '-dinedesk'
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+
+      // Keep slug reasonable — clientId is 8 chars + hyphen = 9, Netlify max is 63
+      if (restaurantSlug.length > 50) {
+        restaurantSlug = restaurantSlug.slice(0, 50).replace(/-$/, '')
       }
-      
-      // Keep under Netlify's 63 character limit
-      // Reserve space for random suffix
-      const maxLen = 57  // 63 - 6 for suffix and hyphens
-      if (sanitizedName.length > maxLen) {
-        sanitizedName = sanitizedName.slice(0, maxLen)
-      }
-      
-      // Add random suffix to ensure global uniqueness on Netlify
-      const randomSuffix = Math.random().toString(36).substring(2, 7) // 5 random chars
-      const netlifySiteName = `${sanitizedName}-${randomSuffix}`
-      
-      // Generate custom domain if not explicitly provided
+
+      // Format: {clientId}-{restaurant-name}  — clientId guarantees uniqueness
+      const netlifySiteName = `${client.id}-${restaurantSlug}`
+
+      // Custom domain: use explicit domain from client record, or auto-generate
       let customDomain = client.domain
       if (!customDomain || !customDomain.includes('.')) {
-        // Auto-generate domain in format: restaurant-name-dinedesk.com.au
-        customDomain = `${sanitizedName}.com.au`
+        customDomain = `${client.id}-${restaurantSlug}.com.au`
       }
-      
+
       return {
         siteName: netlifySiteName,
         customDomain: customDomain,
-        baseName: sanitizedName
+        baseName: restaurantSlug
       }
     }
     
@@ -1000,15 +2217,52 @@ router.post('/:id/netlify/create', async (req, res) => {
     console.log('🔗 API URL:', apiUrl)
     console.log('👤 Client:', client.name, '| ID:', client.id)
 
-    // 1 — Create the Netlify site
+    // 1 — Create the Netlify site (retry with random suffix if name is taken)
     console.log('⏳ Step 1/7: Creating Netlify site...')
-    const netlifyData = await netlifyService.createSite(siteName, null)
-    console.log('✅ Site created:', netlifyData.id)
+    let netlifyData = null
+    let finalSiteName = siteName
+    const maxNameRetries = 5
+    for (let attempt = 0; attempt < maxNameRetries; attempt++) {
+      const suffix = Math.random().toString(36).substring(2, 10) // 8 random chars
+      const tryName = attempt === 0 ? siteName : `${siteName}-${suffix}`
+      console.log(`   🔄 Attempt ${attempt + 1}/${maxNameRetries}: Creating site "${tryName}"...`)
+      try {
+        netlifyData = await netlifyService.createSite(tryName, null)
+        finalSiteName = tryName
+        console.log(`   ✅ Success on attempt ${attempt + 1}`)
+        break
+      } catch (nameErr) {
+        const msg = (nameErr.message || '').toLowerCase()
+        console.error(`   ❌ Attempt ${attempt + 1} failed: ${nameErr.message}`)
 
-    // 1.5 — Repo linking via API breaks Netlify's GitHub OAuth connection.
-    // Users must connect the repo manually via Netlify UI (Site settings → Build & deploy → Link repository).
-    const repoLinked = false
-    console.log('ℹ️  Skipping API repo link — connect via Netlify UI to preserve OAuth token.')
+        // Account limit — do NOT retry, bubble up immediately
+        if (msg.includes('usage limit') || msg.includes('exceeded') || msg.includes('cannot create more')) {
+          throw new Error('Netlify account site limit reached. Delete unused sites at https://app.netlify.com before creating a new one.')
+        }
+
+        // Name taken — retry with a different suffix
+        const isTaken = msg.includes('not available') || msg.includes('already taken')
+        if (isTaken && attempt < maxNameRetries - 1) {
+          console.warn(`   ⏳ Name "${tryName}" is taken, waiting 1s before retry...`)
+          await new Promise(r => setTimeout(r, 1000))
+          continue
+        }
+        throw nameErr // last attempt or non-name error — bubble up
+      }
+    }
+    console.log('✅ Site created:', netlifyData.id, '| Name:', finalSiteName)
+
+    // 1.5 — Link the GitHub repo via API to enable builds
+    let repoLinked = false
+    try {
+      console.log('⏳ Step 1.5/7: Linking GitHub repository...')
+      await netlifyService.linkRepoToSite(netlifyData.id)
+      console.log('✅ Repository linked successfully')
+      repoLinked = true
+    } catch (err) {
+      console.warn('⚠️  Could not link repository via API:', err.message)
+      console.warn('   You can link it manually in Netlify UI: Site settings → Build & deploy → Link repository')
+    }
 
     // 2 — Set env vars so the build knows which client/template to use
     console.log('⏳ Step 2/7: Setting environment variables...')
@@ -1048,7 +2302,7 @@ router.post('/:id/netlify/create', async (req, res) => {
     console.log('⏳ Step 4/7: Creating build hook...')
     const hookRes = await require('axios').post(
       `https://api.netlify.com/api/v1/sites/${netlifyData.id}/build_hooks`,
-      { title: 'CMS Deploy', branch: 'main' },
+      { title: 'CMS Deploy', branch: process.env.SITE_TEMPLATE_REPO_BRANCH || 'master' },
       { headers: { Authorization: 'Bearer ' + process.env.NETLIFY_TOKEN } }
     )
     const buildHook = hookRes.data.url
@@ -1068,7 +2322,7 @@ router.post('/:id/netlify/create', async (req, res) => {
         netlify: {
           ...existing,
           siteId:       netlifyData.id,
-          previewUrl:   `https://${siteName}.netlify.app`,
+          previewUrl:   `https://${finalSiteName}.netlify.app`,
           customDomain: customDomain,
           buildHook,
           template,
@@ -1079,7 +2333,7 @@ router.post('/:id/netlify/create', async (req, res) => {
         clientId: client.id,
         netlify: {
           siteId:       netlifyData.id,
-          previewUrl:   `https://${siteName}.netlify.app`,
+          previewUrl:   `https://${finalSiteName}.netlify.app`,
           customDomain: customDomain,
           buildHook,
           template,
@@ -1095,7 +2349,7 @@ router.post('/:id/netlify/create', async (req, res) => {
     })
 
     // Generate shareable preview URLs
-    const netlifyAppUrl = `https://${siteName}.netlify.app`
+    const netlifyAppUrl = `https://${finalSiteName}.netlify.app`
     const previewUrl = netlifyAppUrl
     
     console.log('🎉 Site creation complete!')
@@ -1126,9 +2380,12 @@ router.post('/:id/netlify/create', async (req, res) => {
     let userMessage = err.message
     let hint = ''
     
-    if (err.message.includes('not available') || err.message.includes('already taken')) {
-      userMessage = 'The generated site name is already taken on Netlify. This can happen even with unique domains because Netlify site names must be globally unique across all Netlify users.'
-      hint = 'The system has been updated to automatically add a random suffix to ensure uniqueness. Please try creating the site again - it should work now!'
+    if (err.message.includes('site limit') || err.message.includes('usage limit') || err.message.includes('exceeded') || err.message.includes('cannot create more')) {
+      userMessage = 'Your Netlify account has reached its site limit. Delete unused sites to free up a slot.'
+      hint = 'Go to https://app.netlify.com → select old/test sites → Site settings → Delete site. Then try again.'
+    } else if (err.message.includes('not available') || err.message.includes('already taken')) {
+      userMessage = 'Could not create site — the name was taken even after multiple retries with random suffixes.'
+      hint = 'Try again, or delete the old site from your Netlify dashboard: https://app.netlify.com'
     } else if (err.message.includes('authentication failed')) {
       hint = 'Update your NETLIFY_TOKEN in the .env file with a fresh token from https://app.netlify.com/account/applications'
     } else if (err.message.includes('permissions')) {
@@ -1367,11 +2624,26 @@ router.post('/:id/netlify/link-repo', async (req, res) => {
     const siteId = config?.netlify?.siteId
     if (!siteId) return res.status(400).json({ error: 'No Netlify site configured. Create one first.' })
 
-    // Linking via API overwrites Netlify's GitHub OAuth token and breaks builds.
-    // Connect the repo through Netlify UI: Site settings → Build & deploy → Link repository.
-    return res.status(400).json({
-      error: 'Repo linking via API is disabled. Connect GitHub through Netlify UI instead: Site settings → Build & deploy → Link repository → GitHub → select repo → master branch.'
+    const { branch } = req.body || {}
+    await netlifyService.linkRepoToSite(siteId, branch)
+
+    // Update config to mark repo as linked
+    await prisma.siteConfig.update({
+      where: { clientId: req.params.id },
+      data: {
+        netlify: {
+          ...config.netlify,
+          repoLinked: true
+        }
+      }
     })
+
+    log({
+      action: 'NETLIFY_REPO_LINKED', entity: 'Deployment',
+      userId: req.user.id, userName: req.user.name, clientId: req.params.id
+    })
+
+    res.json({ success: true, message: 'Repository linked successfully' })
   } catch (err) {
     console.error('❌ link-repo error:', err.message)
     res.status(500).json({ error: err.message })
@@ -1473,7 +2745,6 @@ router.use('/:id/navbar',     require('./navbar'))
 router.use('/:id/homepage',   require('./homepage'))
 router.use('/:id/alerts',     require('./alerts'))
 router.use('/:id/legal',      require('./legal'))
-router.use('/:id/payments',   require('./payments'))
 router.use('/:id/analytics',  require('./analytics'))
 
 module.exports = router

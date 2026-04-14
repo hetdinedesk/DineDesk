@@ -1,6 +1,8 @@
 import React from 'react'
+import { Home } from 'lucide-react'
 import { Container, DDLogo, useMediaQuery } from './Layout'
 import { C } from '../theme'
+import { API } from '../api/utils'
 
 export function TopNav({
   user,
@@ -16,7 +18,8 @@ export function TopNav({
   getSiteNavItems,
   canManageAll,
   isSuperAdmin,
-  isManager
+  isManager,
+  navigate
 }) {
   const isMobile = useMediaQuery('(max-width: 768px)')
   const isSmallMobile = useMediaQuery('(max-width: 480px)')
@@ -30,6 +33,7 @@ export function TopNav({
               setActiveSite(null)
               setGlobalNav('home')
               sessionStorage.removeItem('dd_active_site')
+              navigate('/home')
             }}
             style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: isMobile ? 0 : 8, cursor: 'pointer' }}>
             <DDLogo size={isMobile ? 24 : 32} />
@@ -41,9 +45,13 @@ export function TopNav({
             )}
           </div>
 
-          {!activeSite && globalNavItems.map(({ key, label }) => (
-            <button key={key} onClick={() => setGlobalNav(key)}
+          {!activeSite && globalNavItems.map(({ key, label, Icon }) => (
+            <button key={key} onClick={() => {
+              setGlobalNav(key)
+              navigate(`/${key}`)
+            }}
               style={{
+                display: 'flex', alignItems: 'center', gap: 6,
                 background: 'none', border: 'none', cursor: 'pointer',
                 color: globalNav === key ? '#FF6B2B' : '#7A8BAD',
                 fontWeight: globalNav === key ? 700 : 400,
@@ -51,6 +59,7 @@ export function TopNav({
                 borderBottom: globalNav === key ? '2px solid #FF6B2B' : '2px solid transparent',
                 padding: isMobile ? '8px 2px' : '14px 4px'
               }}>
+              {Icon && <Icon size={14} />}
               {label}
             </button>
           ))}
@@ -68,9 +77,13 @@ export function TopNav({
                 }}>{activeSite.name}</span>
               )}
               <div style={{ display: 'flex', gap: isMobile ? 4 : 8 }}>
-                {getSiteNavItems(activeSite).map(({ key, label }) => (
-                  <button key={key} onClick={() => setSiteNav(key)}
+                {getSiteNavItems(activeSite).map(({ key, label, Icon }) => (
+                  <button key={key} onClick={() => {
+                    setSiteNav(key)
+                    navigate(`/site/${activeSite.id}/${key}`)
+                  }}
                     style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
                       background: 'none', border: 'none', cursor: 'pointer',
                       color: siteNav === key ? '#FF6B2B' : '#7A8BAD',
                       fontWeight: siteNav === key ? 700 : 400,
@@ -78,6 +91,7 @@ export function TopNav({
                       borderBottom: siteNav === key ? '2px solid #FF6B2B' : '2px solid transparent',
                       padding: isMobile ? '8px 2px' : '14px 4px'
                     }}>
+                    {Icon && <Icon size={14} />}
                     {label}
                   </button>
                 ))}
@@ -122,7 +136,8 @@ export function SiteActionBar({
   buildMenu,
   setDeploying,
   setDeployStatus,
-  deploying
+  deploying,
+  navigate
 }) {
   const isMobile = useMediaQuery('(max-width: 768px)')
 
@@ -134,7 +149,10 @@ export function SiteActionBar({
     }}>
       <Container row rowWrap={isMobile} height="100%">
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, flex: 1, minWidth: 0 }}>
-          <button onClick={() => setSiteNav('dashboard')}
+          <button onClick={() => {
+            setSiteNav('dashboard')
+            navigate(`/site/${activeSite.id}/dashboard`)
+          }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0',
@@ -142,7 +160,7 @@ export function SiteActionBar({
               fontWeight: siteNav === 'dashboard' ? 700 : 500,
               fontSize: 13, fontFamily: 'inherit', transition: 'color 0.15s'
             }}>
-            <span style={{ fontSize: 16 }}>🏠</span>{!isMobile && 'Home'}
+            <Home size={16} />{!isMobile && 'Home'}
           </button>
           <div style={{ width: 1, height: 16, background: C.border, margin: '0 4px' }} />
           <span title={activeSite.name} style={{ fontSize: 13, fontWeight: 700, color: '#F1F5FF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{activeSite.name}</span>
@@ -166,7 +184,7 @@ export function SiteActionBar({
             <button type="button" onClick={async () => {
               setDeploying(true); setDeployStatus(null)
               try {
-                const res = await fetch(`http://localhost:3001/api/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
+                const res = await fetch(`${API}/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
                 const data = await res.json(); setDeployStatus(data.success ? 'success' : 'error')
               } catch { setDeployStatus('error') }
               finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
@@ -184,7 +202,7 @@ export function SiteActionBar({
                     onClick: async () => {
                       setBuildMenu(false); setDeploying(true); setDeployStatus(null)
                       try {
-                        const res = await fetch(`http://localhost:3001/api/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
+                        const res = await fetch(`${API}/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
                         const data = await res.json(); setDeployStatus(data.success ? 'success' : 'error')
                       } catch { setDeployStatus('error') }
                       finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
@@ -194,7 +212,7 @@ export function SiteActionBar({
                   {
                     label: 'View Live Site', hint: 'Open published Netlify site',
                     onClick: async () => {
-                      const res = await fetch(`http://localhost:3001/api/clients/${activeSite.id}/config`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
+                      const res = await fetch(`${API}/clients/${activeSite.id}/config`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
                       const cfg = await res.json(); const url = cfg.netlify?.siteUrl
                       if (url) window.open(url, '_blank'); else alert('No live site URL — add it in Config → Netlify Setup')
                     }

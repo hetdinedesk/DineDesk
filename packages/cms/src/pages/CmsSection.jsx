@@ -1,54 +1,123 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { MapPin, Menu, Home, Users, Tag, Settings, Layout, Image, PanelBottom, Megaphone, Wrench, Smartphone, Check, Star, Building2, ShoppingCart, CreditCard, Bell, Store } from 'lucide-react'
 import Table from '../Components/Table'
 import NavbarSection from './NavbarSection'
-import HomePageSection from './HomePageSection'
 import TeamSection from './TeamSection'
-import PageEditor from '../Components/PageEditor'
+import HomepageBanners from './HomepageBanners'
+import PromoTiles from './PromoTiles'
+import WelcomeContent from './WelcomeContent'
+import Specials from './Specials'
+import OnlineOrderingSection from './OnlineOrderingSection'
+import HomepageBuilder from './HomepageBuilder'
 import { getLocations, updateLocation, deleteLocation } from '../api/locations'
-import { getPages, updatePage, deletePage, createPage } from '../api/pages'
-import { getBanners, updateBanner, deleteBanner } from '../api/banners'
-import { getSpecials } from '../api/specials'
 import { C } from '../theme'
 
 const LEFT = [
-  { key:'locations', label:'Locations', icon:'📍' },
-  { key:'navigation', label:'Navigation', icon:'☰' },
-  { key:'pages', label:'Pages', icon:'📄' },
-  { key:'homepage', label:'Homepage', icon:'🏠' },
-  { key:'team', label:'Meet the Team', icon:'👥' },
-  { key:'specials', label:'Specials', icon:'🏷️' },
-  { key:'settings', label:'Settings', icon:'⚙️' },
+  { key:'locations', label:'Locations', Icon: MapPin },
+  { key:'navigation', label:'Navigation', Icon: Menu },
+  { key:'homepage', label:'Homepage', Icon: Home },
+  { key:'team', label:'Meet the Team', Icon: Users },
+  { key:'specials', label:'Specials', Icon: Tag },
+  { key:'ordering', label:'Online Ordering', Icon: ShoppingCart },
+  { key:'settings', label:'Settings', Icon: Settings },
 ]
 const RIGHT = {
-  locations: [{ key:'loc-list', label:'Locations', icon:'📍' }],
+  locations: [{ key:'locations', label:'Locations', Icon: MapPin }],
   navigation: [
-    { key:'header-sections', label:'Header Sections', icon:'☰' },
-    { key:'banners', label:'Banners', icon:'🖼️' },
-    { key:'footer-sections', label:'Footer Sections', icon:'🦶' }
+    { key:'header-sections', label:'Header Sections', Icon: Layout },
+    { key:'banners', label:'Banners', Icon: Image },
+    { key:'footer-sections', label:'Footer Sections', Icon: PanelBottom }
   ],
-  pages: [{ key:'pages-list', label:'All Pages', icon:'📄' }],
-  team: [{ key:'team-list', label:'Team Members', icon:'👥' }],
+  team: [
+    { key:'team-members', label:'Team Members', Icon: Users },
+    { key:'departments', label:'Departments', Icon: Building2 }
+  ],
   homepage: [
-    { key:'promo-tiles', label:'Promo Tiles (Coming Soon)', icon:'🏷️' },
-    { key:'homepage-banners', label:'Homepage Banners (Coming Soon)', icon:'🖼️' },
-    { key:'content', label:'Content (Coming Soon)', icon:'📝' }
+    { key:'homepage-builder', label:'Homepage Builder', Icon: Layout },
+    { key:'promo-tiles', label:'Promo Tiles', Icon: Tag },
+    { key:'homepage-banners', label:'Homepage Banners', Icon: Image },
+    { key:'content', label:'Content', Icon: Layout }
   ],
-  specials:  [{ key:'specials-list', label:'Specials (Coming Soon)', icon:'🏷️' }],
+  specials:  [{ key:'specials-list', label:'Specials', Icon: Megaphone }],
+  ordering:  [
+    { key:'ordering-config', label:'Ordering Config', Icon: Store },
+    { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
+    { key:'notifications', label:'Notifications', Icon: Bell }
+  ],
   settings: [
-    { key:'toolbox', label:'Toolbox (Coming Soon)', icon:'🔧' },
-    { key:'mobile-ctas', label:'Mobile CTAs (Coming Soon)', icon:'📱' }
+    { key:'toolbox', label:'Toolbox (Coming Soon)', Icon: Wrench },
+    { key:'mobile-ctas', label:'Mobile CTAs (Coming Soon)', Icon: Smartphone }
   ]
 }
 
 export default function CmsSection({ clientId }) {
-  const [lnav, setLnav] = useState(() => sessionStorage.getItem('dd_cms_lnav') || 'locations')
-  const [rnav, setRnav] = useState(() => sessionStorage.getItem('dd_cms_rnav') || 'loc-list')
+  const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Get subsection from URL or sessionStorage
+  const getSubsectionFromURL = () => {
+    const pathParts = location.pathname.split('/').filter(Boolean)
+    if (pathParts.length >= 4 && pathParts[0] === 'site' && pathParts[2] === 'cms') {
+      const subsection = pathParts[3]
+      // Map subsection to left/right navigation
+      for (const leftKey of Object.keys(RIGHT)) {
+        const rightItem = RIGHT[leftKey].find(item => item.key === subsection)
+        if (rightItem) {
+          return { left: leftKey, right: subsection }
+        }
+      }
+      // If subsection matches a left key
+      const leftItem = LEFT.find(item => item.key === subsection)
+      if (leftItem) {
+        const firstRight = RIGHT[leftItem.key]?.[0]?.key
+        return { left: subsection, right: firstRight }
+      }
+    }
+    return null
+  }
+  // Check for target section from cms-navigate event
+  const getInitialNav = () => {
+    const urlNav = getSubsectionFromURL()
+    if (urlNav) {
+      return urlNav
+    }
+    
+    const targetSection = sessionStorage.getItem('dd_cms_target_section')
+    if (targetSection) {
+      // Clear the stored target section
+      sessionStorage.removeItem('dd_cms_target_section')
+      // Map section keys to navigation
+      if (targetSection === 'contact-info') {
+        return { left: 'locations', right: 'locations' }
+      }
+      // Add more mappings here as needed
+    }
+    // Default navigation
+    return {
+      left: sessionStorage.getItem('dd_cms_lnav') || 'locations',
+      right: sessionStorage.getItem('dd_cms_rnav') || 'locations'
+    }
+  }
+  
+  const initialNav = getInitialNav()
+  const [lnav, setLnav] = useState(initialNav.left)
+  const [rnav, setRnav] = useState(initialNav.right)
 
   useEffect(() => {
     sessionStorage.setItem('dd_cms_lnav', lnav)
     sessionStorage.setItem('dd_cms_rnav', rnav)
-  }, [lnav, rnav])
+    // Only update URL if we're not already on the correct URL
+    const currentPath = window.location.pathname
+    const pathParts = currentPath.split('/').filter(Boolean)
+    if (pathParts.length >= 3 && pathParts[2] === 'cms') {
+      const expectedUrl = `/site/${pathParts[1]}/cms/${rnav}`
+      if (currentPath !== expectedUrl) {
+        navigate(expectedUrl, { replace: true })
+      }
+    }
+  }, [lnav, rnav, navigate])
 
   const handleLeft = key => {
     setLnav(key)
@@ -60,15 +129,16 @@ export default function CmsSection({ clientId }) {
     if(lnav==='navigation') {
       return <NavbarSection clientId={clientId} subsection={rnav} />
     }
-    if(lnav==='pages') return <PagesManager clientId={clientId}/>
-    if(lnav==='team') return <TeamSection clientId={clientId}/>
+    if(lnav==='team') return <TeamSection clientId={clientId} subsection={rnav} />
     if(lnav==='homepage') {
-      if(rnav==='promo-tiles') return <div style={{color:C.t2,fontSize:14}}>Promo Tiles - Content coming soon.</div>
-      if(rnav==='homepage-banners') return <div style={{color:C.t2,fontSize:14}}>Homepage Banners - Content coming soon.</div>
-      if(rnav==='content') return <div style={{color:C.t2,fontSize:14}}>Content - Content coming soon.</div>
+      if(rnav==='homepage-builder') return <HomepageBuilder clientId={clientId} />
+      if(rnav==='promo-tiles') return <PromoTiles clientId={clientId} />
+      if(rnav==='homepage-banners') return <HomepageBanners clientId={clientId} />
+      if(rnav==='content') return <WelcomeContent clientId={clientId} />
       return <div style={{color:C.t2,fontSize:14}}>Homepage section - Select a subsection from the sidebar.</div>
     }
-    if(lnav==='specials') return <div style={{color:C.t2,fontSize:14}}>Specials management coming soon.</div>
+    if(lnav==='specials') return <Specials clientId={clientId} />
+    if(lnav==='ordering') return <OnlineOrderingSection clientId={clientId} subsection={rnav} />
     if(lnav==='settings') {
       if(rnav==='toolbox') return <div style={{color:C.t2,fontSize:14}}>Toolbox - Content coming soon.</div>
       if(rnav==='mobile-ctas') return <div style={{color:C.t2,fontSize:14}}>Mobile CTAs - Content coming soon.</div>
@@ -79,20 +149,34 @@ export default function CmsSection({ clientId }) {
   return (
     <div style={{ display:'flex',flex:1,minHeight:0,overflow:'hidden' }}>
       <div style={{ width:160,background:C.panel,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column' }}>
-        {LEFT.map(item=><button key={item.key} onClick={()=>handleLeft(item.key)}
-          style={{ display:'flex',alignItems:'center',gap:10,padding:'11px 14px',border:'none',
-            background:lnav===item.key?'#1F2D4A':'transparent',color:lnav===item.key?C.t0:C.t2,
-            fontWeight:lnav===item.key?700:400,fontSize:13,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
-            borderLeft:`2px solid ${lnav===item.key?C.acc:'transparent'}` }}>
-          <span style={{fontSize:16}}>{item.icon}</span>{item.label}</button>)}
+        {LEFT.map(item => {
+          const Icon = item.Icon
+          return (
+            <button key={item.key} onClick={()=>handleLeft(item.key)}
+              style={{ display:'flex',alignItems:'center',gap:10,padding:'11px 14px',border:'none',
+                background:lnav===item.key?'#1F2D4A':'transparent',color:lnav===item.key?C.t0:C.t2,
+                fontWeight:lnav===item.key?700:400,fontSize:13,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
+                borderLeft:`2px solid ${lnav===item.key?C.acc:'transparent'}` }}>
+              <Icon size={16} />
+              {item.label}
+            </button>
+          )
+        })}
       </div>
       {RIGHT[lnav]&&<div style={{ width:200,background:C.panel,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column' }}>
-        {RIGHT[lnav].map(item=><button key={item.key} onClick={()=>setRnav(item.key)}
-          style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 14px',border:'none',
-            background:rnav===item.key?'#1F2D4A':'transparent',color:rnav===item.key?C.t0:C.t2,
-            fontWeight:rnav===item.key?700:400,fontSize:13,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
-            borderLeft:`2px solid ${rnav===item.key?C.cyan:'transparent'}` }}>
-          <span style={{fontSize:14}}>{item.icon}</span>{item.label}</button>)}
+        {RIGHT[lnav].map(item => {
+          const Icon = item.Icon
+          return (
+            <button key={item.key} onClick={()=>setRnav(item.key)}
+              style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 14px',border:'none',
+                background:rnav===item.key?'#1F2D4A':'transparent',color:rnav===item.key?C.t0:C.t2,
+                fontWeight:rnav===item.key?700:400,fontSize:13,cursor:'pointer',fontFamily:'inherit',textAlign:'left',
+                borderLeft:`2px solid ${rnav===item.key?C.cyan:'transparent'}` }}>
+              <Icon size={14} />
+              {item.label}
+            </button>
+          )
+        })}
       </div>}
       <div style={{ flex:1,padding:'24px 32px',overflowY:'auto',background:C.page }}>{render()}</div>
     </div>
@@ -100,14 +184,46 @@ export default function CmsSection({ clientId }) {
 }
 
 
-
 import LocationForm from '../Components/LocationForm'
+
+// Button styles matching NavbarSection
+const btnBase = { padding:'6px 12px', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:600, transition:'all 0.15s' }
+const btnCyan = { ...btnBase, background:C.cyan+'20', color:C.cyan, border:`1px solid ${C.cyan}40` }
+const btnDanger = { ...btnBase, background:C.red+'15', color:C.red, border:`1px solid ${C.red}40` }
+const btnGhost = { ...btnBase, background:'transparent', color:C.t2, border:`1px solid ${C.border}` }
+
+// Small toggle switch component
+function SmallToggle({ checked, onChange }) {
+  return (
+    <div 
+      onClick={onChange}
+      style={{
+        width: 36, height: 20, borderRadius: 10,
+        background: checked ? C.green : C.border,
+        cursor: 'pointer', position: 'relative',
+        transition: 'background 0.2s'
+      }}
+    >
+      <div style={{
+        width: 16, height: 16, borderRadius: '50%', background: '#fff',
+        position: 'absolute', top: 2, left: checked ? 18 : 2,
+        transition: 'left 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+      }} />
+    </div>
+  )
+}
 
 function LocationsList({ clientId }) {
   const qc = useQueryClient()
-  const { data:locations=[] } = useQuery({ queryKey:['locations',clientId], queryFn:()=>getLocations(clientId) })
+  const { data: rawLocations = [] } = useQuery({ queryKey: ['locations', clientId], queryFn: () => getLocations(clientId), enabled: !!clientId })
+  
+  // Sort locations by name to maintain stable order
+  const locations = useMemo(() => {
+    return [...rawLocations].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  }, [rawLocations])
   const [editModal, setEditModal] = useState(false)
   const [editLocation, setEditLocation] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
   
   const del = useMutation({ 
     mutationFn:id=>deleteLocation(clientId,id), 
@@ -128,6 +244,17 @@ function LocationsList({ clientId }) {
     setEditLocation(row)
     setEditModal(true)
   }
+
+  const handleDeleteClick = (loc) => {
+    setDeleteConfirm(loc)
+  }
+
+  const confirmDelete = () => {
+    if (deleteConfirm) {
+      del.mutate(deleteConfirm.id)
+      setDeleteConfirm(null)
+    }
+  }
   
   const handleFormClose = () => {
     setEditModal(false)
@@ -141,58 +268,57 @@ function LocationsList({ clientId }) {
   
   return (
     <div>
-      <h2 style={{ margin:'0 0 16px',fontSize:17,fontWeight:700,color:C.t0 }} >Locations ({locations.length})</h2>
-      <button onClick={handleAdd}
-        style={{ display:'flex',alignItems:'center',gap:7,background:'none',border:'none',color:C.acc,fontSize:13,cursor:'pointer',fontFamily:'inherit',padding:'4px 0',marginBottom:16,fontWeight:600 }}>
-        ＋ Add a Location
-      </button>
-      <Table 
-        title="Locations" 
-        headers={[
-          { key: 'name', label: 'Name' },
-          { key: 'address', label: 'Address' },
-          { key: 'phone', label: 'Phone' },
-          { key: 'isPrimary', label: 'Header', render: v => v ? '⭐' : '' },
-          { key: 'showInFooter', label: 'Footer', render: v => v ? '📋' : '' },
-          { 
-            key: 'isActive', 
-            label: 'Active', 
-            render: (val, row) => (
-              <div 
-                onClick={() => !toggleActive.isPending && toggleActive.mutate({ id: row.id, isActive: !val })}
-                style={{
-                  width: 44, 
-                  height: 24, 
-                  borderRadius: 12, 
-                  background: val ? '#22C55E' : '#1F2D4A', 
-                  cursor: toggleActive.isPending ? 'not-allowed' : 'pointer',
-                  position: 'relative',
-                  border: `1px solid ${val ? '#22C55E' : C.border2}`,
-                  opacity: toggleActive.isPending ? 0.6 : 1
-                }}
-              >
-                <div 
-                  style={{
-                    width: 18, 
-                    height: 18, 
-                    borderRadius: '50%', 
-                    background: '#fff', 
-                    position: 'absolute', 
-                    top: 2, 
-                    left: val ? 22 : 2, 
-                    transition: 'left 0.2s'
-                  }}
-                />
+      {/* Header - similar to Navigation section */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+        <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:C.t0 }}>Locations ({locations.length})</h2>
+        <button onClick={handleAdd} style={{ ...btnCyan, display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:14 }}>+</span> Add Location
+        </button>
+      </div>
+
+      {/* Location List - similar to Navigation headers list */}
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {locations.length === 0 ? (
+          <div style={{ padding:32, textAlign:'center', color:C.t3, background:C.card, border:`1px dashed ${C.border}`, borderRadius:12 }}>
+            No locations yet — click <strong style={{ color:C.acc }}>Add Location</strong> to get started.
+          </div>
+        ) : (
+          locations.map(loc => (
+            <div 
+              key={loc.id}
+              style={{
+                display:'flex', alignItems:'center', gap:12,
+                padding:'12px 14px', background:C.card,
+                border:`1px solid ${C.border}`, borderRadius:10,
+                transition:'all 0.15s'
+              }}
+            >
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, color:loc.isActive!==false ? C.t0 : C.t3, fontSize:14 }}>
+                  {loc.name}
+                  {loc.isPrimary && <Star size={14} style={{ color:C.acc, marginLeft:8, verticalAlign:'middle' }} />}
+                </div>
+                <div style={{ fontSize:12, color:C.t2, marginTop:4 }}>
+                  {loc.address || 'No address'} · {loc.phone || 'No phone'}
+                  {loc.showInFooter && <span style={{ color:C.green, marginLeft:8 }}>· Footer</span>}
+                </div>
               </div>
-            )
-          }
-        ]} 
-        data={locations}
-        empty="No locations yet"
-        onDelete={(row) => window.confirm(`Delete "${row.name}"?`) && del.mutate(row.id)}
-        onEdit={handleEdit}
-        showSearch={false}
-      />
+              
+              {/* Active Toggle */}
+              <SmallToggle 
+                checked={loc.isActive!==false} 
+                onChange={() => !toggleActive.isPending && toggleActive.mutate({ id: loc.id, isActive: loc.isActive===false })}
+              />
+              
+              {/* Edit Button */}
+              <button onClick={() => handleEdit(loc)} style={btnCyan}>Edit</button>
+              
+              {/* Delete Button */}
+              <button onClick={() => handleDeleteClick(loc)} style={btnDanger}>Delete</button>
+            </div>
+          ))
+        )}
+      </div>
       {editModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
           <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, maxWidth:'90vw', maxHeight:'90vh', overflow:'auto' }}>
@@ -208,276 +334,22 @@ function LocationsList({ clientId }) {
           </div>
         </div>
       )}
-    </div>
-  )
-}
 
-function PagesManager({ clientId }) {
-  const qc = useQueryClient()
-  const { data:pages=[], isLoading } = useQuery({ queryKey:['pages',clientId], queryFn:()=>getPages(clientId) })
-  const del = useMutation({ mutationFn:id=>deletePage(clientId,id), onSuccess:()=>qc.invalidateQueries(['pages',clientId]) })
-  
-  const [modal, setModal] = useState(null) // { id?, title, slug, content, status }
-
-  const handleSave = async () => {
-    if (!modal.title.trim()) return alert('Title is required')
-    if (!modal.slug.trim()) modal.slug = modal.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    
-    try {
-      if (modal.id) {
-        await updatePage(clientId, modal.id, modal)
-      } else {
-        await createPage(clientId, modal)
-      }
-      qc.invalidateQueries(['pages',clientId])
-      setModal(null)
-    } catch (e) {
-      alert(e.message)
-    }
-  }
-
-  if (isLoading) return <LoadingSpinner />
-
-  return (
-    <div>
-      <h2 style={{ margin:'0 0 16px',fontSize:17,fontWeight:700,color:C.t0 }}>Pages ({pages.length})</h2>
-      <button onClick={() => setModal({ title:'', slug:'', content:'', status:'draft' })}
-        style={{ display:'flex',alignItems:'center',gap:7,background:'none',border:'none',color:C.acc,fontSize:13,cursor:'pointer',fontFamily:'inherit',padding:'4px 0',marginBottom:16,fontWeight:600 }}>
-        ＋ Add a Page
-      </button>
-      <Table 
-        title="Pages" 
-        headers={[
-          { key: 'title', label: 'Title' },
-          { key: 'slug', label: 'Slug' },
-          { key: 'status', label: 'Status', render: (val) => (
-            <span style={{
-              background: val==='published'?'#052010':'#1A1000',
-              color: val==='published'?C.green:C.amber,
-              padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700
-            }}>{val}</span>
-          )}
-        ]} 
-        data={pages}
-        empty="No pages yet"
-        onDelete={(row) => window.confirm(`Delete "${row.title}"?`) && del.mutate(row.id)}
-        onEdit={(row) => setModal({ ...row })}
-      />
-
-      {modal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-          <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, width:'100%', maxWidth:900, maxHeight:'90vh', overflow:'auto', display:'flex', flexDirection:'column' }}>
-            <div style={{ padding:20, borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h3 style={{ margin:0, color:C.t0 }}>{modal.id ? 'Edit' : 'Create'} Page</h3>
-              <div style={{ display:'flex', gap:10 }}>
-                <button onClick={() => setModal(null)} style={{ padding:'8px 16px', background:'transparent', border:`1px solid ${C.border2}`, color:C.t2, borderRadius:8, cursor:'pointer' }}>Cancel</button>
-                <button onClick={handleSave} style={{ padding:'8px 20px', background:C.green, border:'none', color:'#fff', borderRadius:8, fontWeight:700, cursor:'pointer' }}>Save Page</button>
-              </div>
-            </div>
-            <div style={{ padding:24, overflowY:'auto' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
-                <div>
-                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Title *</label>
-                  <input value={modal.title} onChange={e => setModal({...modal, title:e.target.value})} style={inpStyle} placeholder="Page Title" />
-                </div>
-                <div>
-                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Slug (URL Path)</label>
-                  <input value={modal.slug} onChange={e => setModal({...modal, slug:e.target.value})} style={inpStyle} placeholder="e.g. about-us" />
-                </div>
-              </div>
-              <div style={{ marginBottom:20 }}>
-                <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Content</label>
-                <div style={{ border:`1px solid ${C.border}`, borderRadius:8, overflow:'hidden' }}>
-                  <PageEditor clientId={clientId} content={modal.content} onUpdate={c => setModal({...modal, content:c})} />
-                </div>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase' }}>Status:</label>
-                <select value={modal.status} onChange={e => setModal({...modal, status:e.target.value})} style={{ ...inpStyle, width:'auto' }}>
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                </select>
-              </div>
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:12, maxWidth:400, width:'100%', padding:24 }}>
+            <h3 style={{ margin:'0 0 12px', fontSize:16, fontWeight:700, color:C.t0 }}>Delete Location</h3>
+            <p style={{ margin:'0 0 20px', fontSize:14, color:C.t2 }}>
+              Permanently delete "{deleteConfirm.name}"? This cannot be undone.
+            </p>
+            <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
+              <button onClick={() => setDeleteConfirm(null)} style={{ ...btnGhost, padding:'8px 16px' }}>Cancel</button>
+              <button onClick={confirmDelete} style={{ ...btnDanger, padding:'8px 16px' }}>Delete</button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-const inpStyle = { width: '100%', padding: '10px 12px', background: '#111827', border: `1px solid ${C.border}`, borderRadius: 8, color: '#F1F5FF', fontSize: 14, boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }
-
-function BannersManager({ clientId }) {
-  const qc = useQueryClient()
-  const { data:banners=[] } = useQuery({ queryKey:['banners',clientId], queryFn:()=>getBanners(clientId) })
-  const toggle = useMutation({ mutationFn:({id,isActive})=>updateBanner(clientId,id,{isActive}), onSuccess:()=>qc.invalidateQueries(['banners',clientId]) })
-  const del = useMutation({ mutationFn:id=>deleteBanner(clientId,id), onSuccess:()=>qc.invalidateQueries(['banners',clientId]) })
-  return (
-    <div>
-      <h2 style={{ margin:'0 0 16px',fontSize:17,fontWeight:700,color:C.t0 }}>Banners ({banners.length})</h2>
-      <Table 
-        title="Banners" 
-        headers={[
-          { key: 'text', label: 'Text' },
-          { key: 'isActive', label: 'Active', render: (val, row) => (
-            <div onClick={() => toggle.mutate({id: row.id, isActive: !val})}
-              style={{
-                width: 36, height: 20, borderRadius: 10,
-                background: val ? '#FF6B2B' : '#1F2D4A', cursor: 'pointer', position: 'relative',
-                border: `1px solid ${val ? '#FF6B2B' : C.border2}`
-              }}
-            >
-              <div style={{
-                width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                position: 'absolute', top: 2, left: val ? 18 : 2, transition: 'left 0.15s'
-              }}/>
-            </div>
-          )}
-        ]}
-        data={banners}
-        empty="No banners yet"
-        onDelete={(row) => window.confirm('Delete banner?') && del.mutate(row.id)}
-      />
-    </div>
-  )
-}
-
-// Footer CMS Section - Quick editor for footer content
-function FooterCmsSection({ clientId }) {
-  const qc = useQueryClient()
-  const { data: config = {} } = useQuery({
-    queryKey: ['config', clientId],
-    queryFn: async () => {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/config`, {
-        headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
-      })
-      return res.json()
-    }
-  })
-
-  const [footer, setFooter] = useState(config.footer || {})
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    setFooter(config.footer || {})
-  }, [config])
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`http://localhost:3001/api/clients/${clientId}/config`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + localStorage.getItem('dd_token')
-        },
-        body: JSON.stringify({ footer })
-      })
-      return res.json()
-    },
-    onSuccess: () => {
-      qc.invalidateQueries(['config', clientId])
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    }
-  })
-
-  const set = (k, v) => setFooter(prev => ({ ...prev, [k]: v }))
-  const setSocial = (platform, url) => setFooter(prev => ({
-    ...prev, socialLinks: { ...(prev.socialLinks || {}), [platform]: url }
-  }))
-
-  const SOCIAL_PLATFORMS = [
-    { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/yourpage' },
-    { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourhandle' },
-    { key: 'google', label: 'Google', placeholder: 'https://g.page/r/...' },
-    { key: 'tripadvisor', label: 'TripAdvisor', placeholder: 'https://tripadvisor.com/...' },
-  ]
-
-  return (
-    <div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-        <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:C.t0 }}>Footer Content</h2>
-        <button
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-          style={{ padding:'8px 20px', background: mutation.isPending ? C.card : C.acc,
-            border:'none', borderRadius:6, color:'#fff', fontWeight:600, fontSize:13,
-            cursor: mutation.isPending ? 'not-allowed' : 'pointer' }}>
-          {mutation.isPending ? 'Saving...' : 'Save Footer'}
-        </button>
-      </div>
-
-      {saved && (
-        <div style={{ marginBottom:16, padding:'10px 14px', background:'#052010', border:'1px solid #22C55E40',
-          borderRadius:8, color:C.green, fontSize:13 }}>
-          Footer saved successfully!
-        </div>
-      )}
-
-      {/* Brand Section */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20, marginBottom:16 }}>
-        <h3 style={{ margin:'0 0 16px', fontSize:14, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.05em' }}>
-          Brand
-        </h3>
-        <div style={{ display:'grid', gap:14 }}>
-          <div>
-            <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em',
-              display:'block', marginBottom:5 }}>Tagline</label>
-            <input
-              value={footer.tagline || ''}
-              onChange={e => set('tagline', e.target.value)}
-              placeholder="e.g. Proudly serving Melbourne since 2012"
-              style={{ width:'100%', padding:'9px 11px', background:C.input, border:`1px solid ${C.border}`,
-                borderRadius:7, color:C.t0, fontSize:13, fontFamily:'inherit', outline:'none' }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em',
-              display:'block', marginBottom:5 }}>Copyright Text</label>
-            <input
-              value={footer.copyrightText || ''}
-              onChange={e => set('copyrightText', e.target.value)}
-              placeholder={`e.g. © ${new Date().getFullYear()} Restaurant Name. All rights reserved.`}
-              style={{ width:'100%', padding:'9px 11px', background:C.input, border:`1px solid ${C.border}`,
-                borderRadius:7, color:C.t0, fontSize:13, fontFamily:'inherit', outline:'none' }}
-            />
-            <span style={{ fontSize:11, color:C.t3, marginTop:4, display:'block' }}>
-              Leave blank to auto-generate from restaurant name
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Social Links */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20, marginBottom:16 }}>
-        <h3 style={{ margin:'0 0 16px', fontSize:14, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.05em' }}>
-          Social Links
-        </h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-          {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
-            <div key={key}>
-              <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em',
-                display:'block', marginBottom:5 }}>{label}</label>
-              <input
-                value={footer.socialLinks?.[key] || ''}
-                onChange={e => setSocial(key, e.target.value)}
-                placeholder={placeholder}
-                style={{ width:'100%', padding:'9px 11px', background:C.input, border:`1px solid ${C.border}`,
-                  borderRadius:7, color:C.t0, fontSize:13, fontFamily:'inherit', outline:'none' }}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Preview Note */}
-      <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10, padding:14 }}>
-        <div style={{ fontSize:12, color:C.t2, lineHeight:1.6 }}>
-          <strong style={{ color:C.t1 }}>Note:</strong> Footer content is also editable in Config → Footer section.
-          Changes here will be reflected on the live site after the next deploy.
-        </div>
-      </div>
     </div>
   )
 }

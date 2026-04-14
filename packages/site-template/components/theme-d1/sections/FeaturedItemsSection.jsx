@@ -3,12 +3,11 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../../contexts/CMSContext';
 
-export const FeaturedItemsSection = ({ title, subtitle }) => {
+export const FeaturedItemsSection = ({ title, subtitle, items }) => {
   const { menuItems } = useCMS();
 
-  const featuredItems = menuItems
-    .filter((item) => item.isFeatured && item.isAvailable)
-    .slice(0, 6);
+  // Use passed items or fetch from CMS
+  const featuredItems = items || menuItems?.filter((item) => item.isFeatured && item.isAvailable).slice(0, 6) || [];
 
   if (featuredItems.length === 0) return null;
 

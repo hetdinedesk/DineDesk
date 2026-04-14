@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
-import { Search } from 'lucide-react';
+import { useCart } from '../../contexts/CartContext';
+import { Search, Plus } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 
 // Image URLs
@@ -16,10 +17,15 @@ const IMAGES = {
   item8: 'https://images.unsplash.com/photo-1737700088028-fae0666feb83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaG9jb2xhdGUlMjBkZXNzZXJ0JTIwZWxlZ2FudHxlbnwxfHx8fDE3NzQ4MjEwOTB8MA&ixlib=rb-4.1.0&q=80&w=1080',
 };
 
-export default function MenuPage() {
-  const { menuCategories, menuItems, shortcodes } = useCMS();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+export default function MenuPage({ data, page, banner }) {
+  const { menuCategories, menuItems, shortcodes, contentPages, ordering } = useCMS();
+  const { addItem, isEnabled: orderingEnabled } = useCart();
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const menuPage = (contentPages || []).find(p => p.slug === 'menu' || p.pageType === 'menu');
+  const pageTitle = replaceShortcodes(menuPage?.title || 'Our Menu', shortcodes);
+  const pageSubtitle = replaceShortcodes(menuPage?.subtitle || menuPage?.metaDesc || 'Crafted with passion, served with excellence', shortcodes);
 
   const activeCategories = menuCategories
     .filter((cat) => cat.isActive)
@@ -39,34 +45,83 @@ export default function MenuPage() {
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Assign images to items
-  const getItemImage = (itemId) => {
+  const getItemImage = (item) => {
+    if (item.image) return item.image;
     const imageKeys = Object.keys(IMAGES);
-    const index = parseInt(itemId.split('-')[1]) % imageKeys.length;
-    return IMAGES[imageKeys[index]];
+    const hash = (item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    return IMAGES[imageKeys[Math.abs(hash) % imageKeys.length]];
   };
 
   return (
-    <div className="min-h-screen pt-20">
-      {/* Header */}
-      <div className="bg-[var(--color-primary)] text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
+    <div className="min-h-screen">
+      {/* Hero Banner - Full height with gradient or banner image */}
+      <div 
+        className="relative flex items-center justify-center text-white overflow-hidden"
+        style={{ 
+          minHeight: '60vh',
+          marginTop: 'calc(var(--header-offset, 5rem) * -1)',
+          paddingTop: 'var(--header-offset, 5rem)',
+          background: banner?.imageUrl ? 'transparent' : 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary, #8B5A2B) 100%)'
+        }}
+      >
+        {/* Banner Image Background */}
+        {banner?.imageUrl && (
+          <>
+            <img 
+              src={banner.imageUrl} 
+              alt="" 
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/55" />
+          </>
+        )}
+        
+        {/* Background Pattern (only when no banner) */}
+        {!banner?.imageUrl && (
+          <div 
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            }}
+          />
+        )}
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+          <motion.h1 
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-5xl md:text-6xl font-bold mb-4"
-            style={{ fontFamily: 'var(--font-heading, inherit)' }}
+            transition={{ duration: 0.6 }}
+            className="text-4xl sm:text-5xl md:text-7xl font-bold mb-6"
+            style={{ 
+              fontFamily: 'var(--font-heading, inherit)',
+              textShadow: '0 4px 20px rgba(0,0,0,0.3)'
+            }}
           >
-            Our Menu
+            {pageTitle}
           </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-xl"
-          >
-            Crafted with passion, served with excellence
-          </motion.p>
+          
+          {pageSubtitle && (
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-xl md:text-2xl max-w-2xl mx-auto opacity-90"
+              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
+            >
+              {pageSubtitle}
+            </motion.p>
+          )}
+        </div>
+
+        {/* Bottom Wave */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path 
+              d="M0 120L60 110C120 100 240 80 360 75C480 70 600 80 720 85C840 90 960 90 1080 85C1200 80 1320 70 1380 65L1440 60V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" 
+              fill="white"
+            />
+          </svg>
         </div>
       </div>
 
@@ -151,7 +206,7 @@ export default function MenuPage() {
                     >
                       <div className="w-32 h-32 flex-shrink-0">
                         <img
-                          src={getItemImage(item.id)}
+                          src={getItemImage(item)}
                           alt={name}
                           className="w-full h-full object-cover"
                         />
@@ -172,22 +227,39 @@ export default function MenuPage() {
                             {description}
                           </p>
                         </div>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mt-2">
                           <span className="text-xl font-bold text-[var(--color-secondary)]">
                             ${item.price.toFixed(2)}
                           </span>
-                          {item.dietary.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {item.dietary.slice(0, 2).map((diet) => (
-                                <span
-                                  key={diet}
-                                  className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full"
-                                >
-                                  {diet}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {item.dietary.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {item.dietary.slice(0, 2).map((diet) => (
+                                  <span
+                                    key={diet}
+                                    className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full"
+                                  >
+                                    {diet}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {orderingEnabled && (
+                              <button
+                                onClick={() => addItem({
+                                  id: item.id,
+                                  name,
+                                  price: item.price,
+                                  image: getItemImage(item),
+                                })}
+                                className="inline-flex items-center justify-center text-sm font-medium text-white h-8 rounded-md gap-1.5 px-3 transition-colors hover:opacity-90"
+                                style={{ background: 'var(--color-primary)' }}
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>

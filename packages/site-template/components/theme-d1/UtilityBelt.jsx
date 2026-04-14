@@ -78,8 +78,24 @@ export const UtilityBelt = ({ isDark }) => {
 
   const primaryLocation = locations.find(l => l.isPrimary) || locations[0];
   const utilityItems = rawHeader?.utilityItems || {};
-  const rawOrder = utilityItems.order || ['contact-info', 'social-links', 'reviews', 'header-ctas'];
-  const order = Array.isArray(rawOrder) ? rawOrder : ['contact-info', 'social-links', 'reviews', 'header-ctas'];
+  
+  // Check if utility items are enabled - support both boolean and object formats
+  const isItemEnabled = (key) => {
+    const item = utilityItems[key];
+    if (typeof item === 'boolean') return item;
+    if (typeof item === 'object' && item !== null) return item.active !== false;
+    return true; // Default to enabled if not specified
+  };
+  
+  // Map CMS utility items to component keys based on actual data structure
+  const cmsOrder = [];
+  if (isItemEnabled('contact-info')) cmsOrder.push('contact-info');
+  if (isItemEnabled('social-links')) cmsOrder.push('social-links');
+  if (isItemEnabled('reviews')) cmsOrder.push('reviews');
+  if (isItemEnabled('header-ctas')) cmsOrder.push('header-ctas');
+  
+  // Remove duplicates and use fallback if no CMS configuration
+  const order = cmsOrder.length > 0 ? [...new Set(cmsOrder)] : ['contact-info', 'social-links', 'reviews', 'header-ctas'];
 
   // Helper function to create Google Maps directions URL
   const getDirectionsUrl = (location) => {
@@ -97,7 +113,8 @@ export const UtilityBelt = ({ isDark }) => {
   };
 
   const renderItem = (key) => {
-    if (utilityItems[key] === false) return null;
+    // Check if this item is disabled in CMS configuration
+    if (!isItemEnabled(key)) return null;
 
     switch (key) {
       case 'contact-info':
@@ -124,22 +141,25 @@ export const UtilityBelt = ({ isDark }) => {
         );
 
       case 'social-links':
+        // Check both header utilityItems toggle AND social.showInUtility setting
+        if (!isItemEnabled('social-links') || siteConfig?.social?.showInUtility === false) return null;
+        
         const activeSocials = Object.entries(siteConfig.social || {})
           .filter(([platform, url]) => url && typeof url === 'string' && platform !== 'showInFooter' && platform !== 'showInUtility');
         
         if (activeSocials.length === 0) return null;
 
         return (
-          <div key={key} className="flex items-center space-x-3">
+          <div key={key} className="flex items-center gap-2">
             {activeSocials.map(([platform, url]) => (
               <a 
                 key={platform} 
                 href={url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="hover:opacity-80 transition-opacity"
+                className="hover:opacity-80 transition-opacity p-1"
               >
-                <SocialIcon platform={platform} />
+                <SocialIcon platform={platform} size={14} />
               </a>
             ))}
           </div>
@@ -165,7 +185,7 @@ export const UtilityBelt = ({ isDark }) => {
             </div>
           );
         }
-        return null;
+        
         // Fallback to regular reviews
         if (!reviews || reviews.length === 0) return null;
         const avgRating = reviews.reduce((acc, rev) => acc + rev.rating, 0) / reviews.length;
@@ -186,7 +206,7 @@ export const UtilityBelt = ({ isDark }) => {
         if (activeCtas.length === 0) return null;
 
         return (
-          <div key={key} className="flex items-center space-x-2">
+          <div key={key} className="flex flex-wrap items-center gap-2">
             {activeCtas.map(cta => {
               const variantStyles = {
                 primary: isDark ? 'bg-white text-gray-900 px-3 py-1 rounded shadow-sm' : 'bg-white text-[var(--color-primary)] px-3 py-1 rounded shadow-sm',
@@ -204,14 +224,14 @@ export const UtilityBelt = ({ isDark }) => {
                       href={cta.value || '#'} 
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`text-xs font-bold transition-all ${style}`}
+                      className={`text-xs font-bold transition-all whitespace-nowrap ${style}`}
                     >
                       {cta.label}
                     </a>
                   ) : (
                     <Link 
                       href={cta.value || '#'} 
-                      className={`text-xs font-bold transition-all ${style}`}
+                      className={`text-xs font-bold transition-all whitespace-nowrap ${style}`}
                     >
                       {cta.label}
                     </Link>
@@ -229,20 +249,21 @@ export const UtilityBelt = ({ isDark }) => {
 
   return (
     <div 
-      className="w-full py-2 px-4 sm:px-6 lg:px-8 text-white z-[60]"
+      className="w-full py-2 px-4 sm:px-6 lg:px-8 z-[60]"
       style={{ 
-        backgroundColor: isDark ? '#000000' : 'var(--color-secondary)',
+        backgroundColor: 'var(--color-utility-belt-bg)',
+        color: 'var(--color-utility-belt-text)',
         fontFamily: 'var(--font-heading, inherit)'
       }}
     >
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between sm:gap-6">
+      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center sm:justify-between gap-2 sm:gap-6">
         {/* Left side: Contact & Reviews */}
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
           {order.filter(k => k === 'contact-info' || k === 'reviews').map(key => renderItem(key))}
         </div>
 
         {/* Right side: Social & CTAs */}
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6">
           {order.filter(k => ['social-links', 'header-ctas'].includes(k)).map(key => renderItem(key))}
         </div>
       </div>

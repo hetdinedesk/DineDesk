@@ -25,21 +25,30 @@ function adaptCMSData(data) {
     footerSections = [],
     homeSections = [],
     pages = [],
+    banners = [],
+    promoTiles = [],
+    promoConfig = {},
+    teamDepartments = [],
+    welcomeContent = {},
+    specialsConfig = {},
     reviews = {},
     shortcodes = {},
     header = {},
     footer = {},
     headerCtas = [],
+    ordering = {},
+    _homeBanner = null,
+    _homePage = null,
   } = data || {};
 
   // Find primary location
-  const primaryLoc = client.locations?.find(l => l.isPrimary) || client.locations?.[0] || {};
+  const primaryLoc = client?.locations?.find(l => l.isPrimary) || client?.locations?.[0] || {};
 
   // Build restaurant object
   const restaurant = {
-    id: client.id || 'rest-1',
-    name: settings.displayName || settings.restaurantName || client.name || 'Restaurant',
-    domain: client.domain || '',
+    id: client?.id || 'rest-1',
+    name: settings.displayName || settings.restaurantName || client?.name || 'Restaurant',
+    domain: client?.domain || '',
     branding: {
       primaryColor: colours.primary || '#1a1a1a',
       secondaryColor: colours.secondary || '#d4af37',
@@ -57,35 +66,191 @@ function adaptCMSData(data) {
   const homepageSections = (homeSections || []).map(section => ({
     ...section,
     // Ensure content is parsed if it's a string (from DB)
-    content: typeof section.content === 'string' ? JSON.parse(section.content) : (section.content || {})
+    content: (() => {
+      if (typeof section.content !== 'string') return section.content || {}
+      try { return JSON.parse(section.content) } catch { return {} }
+    })()
   }));
 
+  // Normalize hours to always be an array of { day, open, close, closed }
+  // Always returns all 7 days in consistent order for consistent display across clients
+  const normalizeHours = (hours) => {
+    const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    // Map abbreviated day names to full names
+    const dayNameMap = {
+      'Mon': 'Monday', 'Mon.': 'Monday', 'Monday': 'Monday',
+      'Tue': 'Tuesday', 'Tue.': 'Tuesday', 'Tuesday': 'Tuesday',
+      'Wed': 'Wednesday', 'Wed.': 'Wednesday', 'Wednesday': 'Wednesday',
+      'Thu': 'Thursday', 'Thu.': 'Thursday', 'Thursday': 'Thursday',
+      'Fri': 'Friday', 'Fri.': 'Friday', 'Friday': 'Friday',
+      'Sat': 'Saturday', 'Sat.': 'Saturday', 'Saturday': 'Saturday',
+      'Sun': 'Sunday', 'Sun.': 'Sunday', 'Sunday': 'Sunday'
+    };
+    // Map numeric indices to day names (0=Monday, 6=Sunday)
+    const indexToDay = {
+      '0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday',
+      '4': 'Friday', '5': 'Saturday', '6': 'Sunday'
+    };
+    
+    if (!hours) {
+      // Return all days as closed if no hours data
+      return allDays.map(day => ({ day, open: '', close: '', closed: true }));
+    }
+    
+    // Build a map of existing hours
+    const hoursMap = {};
+    
+    if (Array.isArray(hours)) {
+      hours.forEach(h => {
+        const hasTimes = h.open && h.close;
+        const isClosed = !hasTimes && (h.closed === true || h.closed !== false);
+        hoursMap[h.day] = {
+          day: h.day,
+          open: h.open || '',
+          close: h.close || '',
+          closed: isClosed
+        };
+      });
+    } else if (typeof hours === 'object') {
+      // Object format: { Monday: { open, close, closed }, ... } 
+      // or { Mon: {...}, Tue: {...} }
+      // or { 0: {...}, 1: {...}, Fri: {...} } (mixed format from API)
+      
+      const abbreviatedKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const fullNameKeys = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      
+      const entries = Object.entries(hours);
+      
+      // Check if ANY abbreviated key exists (CMS has been used)
+      const hasAbbreviatedKeys = entries.some(([key]) => abbreviatedKeys.includes(key));
+      
+      // Process abbreviated keys first (prioritize CMS data)
+      entries.forEach(([key, h]) => {
+        if (!abbreviatedKeys.includes(key)) return;
+        
+        const fullDayName = dayNameMap[key];
+        if (!fullDayName) return;
+        
+        const hasTimes = h?.open && h?.close;
+        const isClosed = h?.closed === true || (!hasTimes && h?.closed !== false);
+        
+        hoursMap[fullDayName] = {
+          day: fullDayName,
+          open: h?.open || '',
+          close: h?.close || '',
+          closed: isClosed
+        };
+      });
+      
+      // Only use full names if NO abbreviated keys exist at all (pure seed data)
+      if (!hasAbbreviatedKeys) {
+        entries.forEach(([key, h]) => {
+          if (!fullNameKeys.includes(key)) return;
+          
+          const hasTimes = h?.open && h?.close;
+          const isClosed = h?.closed === true || (!hasTimes && h?.closed !== false);
+          
+          hoursMap[key] = {
+            day: key,
+            open: h?.open || '',
+            close: h?.close || '',
+            closed: isClosed
+          };
+        });
+      }
+      // If abbreviated keys exist, days not in hoursMap remain closed (default)
+      
+      // Process numeric indices only if no other format exists
+      if (!hasAbbreviatedKeys) {
+        entries.forEach(([key, h]) => {
+          if (!indexToDay[key]) return;
+          
+          const fullDayName = indexToDay[key];
+          
+          // Skip if already set
+          if (hoursMap[fullDayName]) return;
+          
+          const hasTimes = h?.open && h?.close;
+          const isClosed = h?.closed === true || (!hasTimes && h?.closed !== false);
+          
+          hoursMap[fullDayName] = {
+            day: fullDayName,
+            open: h?.open || '',
+            close: h?.close || '',
+            closed: isClosed
+          };
+        });
+      }
+    }
+    
+    // Return all 7 days, using saved data or defaulting to closed
+    const result = allDays.map(day => {
+      if (hoursMap[day]) {
+        return hoursMap[day];
+      }
+      return { day, open: '', close: '', closed: true };
+    });
+    
+    return result;
+  };
+
   // Map locations
-  const locations = (client.locations || []).map(loc => ({
-    id: loc.id,
-    name: loc.name || 'Main Location',
-    address: {
-      street: typeof loc.address === 'string' ? loc.address : (loc.address?.street || ''),
-      city: loc.city || loc.address?.city || '',
-      state: loc.state || loc.address?.state || '',
-      zipCode: loc.postcode || loc.address?.zipCode || loc.address?.postcode || '',
-      country: loc.country || loc.address?.country || '',
-    },
-    coordinates: {
-      latitude: loc.lat || 0,
-      longitude: loc.lng || 0,
-    },
-    contact: {
+  const locations = (client?.locations || []).map(loc => {
+    // Handle address field - can be string or object
+    const addressStr = typeof loc.address === 'string' ? loc.address : (loc.address?.street || '');
+    
+    const normalizedHours = normalizeHours(loc.hours);
+    
+    return {
+      id: loc.id,
+      name: loc.name || 'Main Location',
+      address: {
+        street: addressStr,
+        suburb: loc.suburb || loc.address?.suburb || '',
+        city: loc.city || loc.address?.city || '',
+        state: loc.state || loc.address?.state || '',
+        zipCode: loc.postcode || loc.address?.zipCode || loc.address?.postcode || '',
+        country: loc.country || loc.address?.country || '',
+        postcode: loc.postcode || loc.address?.postcode || '',
+      },
+      coordinates: {
+        latitude: loc.lat || 0,
+        longitude: loc.lng || 0,
+      },
+      contact: {
+        phone: loc.phone || '',
+        email: loc.formEmail || loc.email || '',
+      },
       phone: loc.phone || '',
-      email: loc.email || '',
-    },
-    phone: loc.phone || '', // Flat access for themes
-    email: loc.email || '', // Flat access for themes
-    hours: loc.hours || [],
-    deliveryOptions: loc.deliveryOptions || { dineIn: true, takeout: true, delivery: true },
-    isPrimary: loc.isPrimary,
-    isActive: loc.isActive !== false,
-  }));
+      email: loc.formEmail || loc.email || '',
+      hours: normalizedHours,
+      gallery: (() => {
+        // Priority: exteriorImages (new array) > exteriorImage (legacy single) > galleryImages
+        const exteriorImages = loc.exteriorImages || [];
+        if (Array.isArray(exteriorImages) && exteriorImages.length > 0) {
+          return exteriorImages;
+        }
+        if (loc.exteriorImage) {
+          return [loc.exteriorImage];
+        }
+        const galleryImages = loc.galleryImages || loc.gallery || [];
+        if (typeof galleryImages === 'string') {
+          try {
+            return JSON.parse(galleryImages);
+          } catch {
+            return [];
+          }
+        }
+        return Array.isArray(galleryImages) ? galleryImages : [];
+      })(),
+      deliveryOptions: loc.deliveryOptions || null,
+      servicesAvailable: loc.servicesAvailable || [],
+      isPrimary: loc.isPrimary,
+      isActive: loc.isActive !== false,
+      showInFooter: loc.showInFooter === true,
+      alternateStyling: loc.alternateStyling === true,
+    };
+  });
 
   // Map menu categories and items
   const menuItems = (rawMenuItems || []).map(item => ({
@@ -109,21 +274,42 @@ function adaptCMSData(data) {
     sortOrder: cat.sortOrder || 0,
   }));
 
-  // Map specials
+  // Map specials — DB uses startDate/endDate; mock data uses validFrom/validUntil
   const mappedSpecials = (specials || []).map(s => ({
     id: s.id,
     title: s.title,
     description: s.description || '',
     price: s.price || 0,
-    image: s.image || '',
+    image: s.imageUrl || s.bannerImage || s.image || '',
     isActive: s.isActive !== false,
+    isHighlighted: s.isHighlighted || false,
+    originalPrice: s.originalPrice || null,
+    validFrom: s.startDate || s.validFrom || null,
+    validUntil: s.endDate || s.validUntil || null,
   }));
 
+  // Flatten navigation tree (export returns hierarchical tree — flatten so children are included)
+  function flattenNavItems(items, forcedParentId) {
+    const flat = [];
+    (items || []).forEach(item => {
+      flat.push({ ...item, parentId: item.parentId || forcedParentId || null });
+      if (item.children && item.children.length > 0) {
+        flattenNavItems(item.children, item.id).forEach(c => flat.push(c));
+      }
+    });
+    return flat;
+  }
+
   // Map navigation
-  let navigation = (navigationItems || []).map(nav => {
+  let navigation = flattenNavItems(navigationItems).map(nav => {
     let url = nav.url;
     if (nav.pageId && nav.page) {
-      url = `/${nav.page.slug.replace(/^\//, '')}`;
+      // Home pages should always link to root path
+      if (nav.page.pageType === 'home') {
+        url = '/';
+      } else {
+        url = `/${nav.page.slug.replace(/^\//, '')}`;
+      }
     }
     return {
       id: nav.id,
@@ -139,7 +325,7 @@ function adaptCMSData(data) {
 
   // Site Config
   const siteConfig = {
-    siteName: settings.displayName || settings.restaurantName || client.name || 'Restaurant',
+    siteName: settings.displayName || settings.restaurantName || client?.name || 'Restaurant',
     tagline: settings.tagline || footer.tagline || '',
     theme: {
       headerType: rawHeader.type || 'standard-full',
@@ -150,10 +336,11 @@ function adaptCMSData(data) {
       utilityBelt: rawHeader.utilityBelt !== false,
     },
     social: {
-      facebook:  data.socialLinks?.facebook || data.social?.facebook || data.footer?.socialLinks?.facebook || null,
-      instagram: data.socialLinks?.instagram || data.social?.instagram || data.footer?.socialLinks?.instagram || null,
-      twitter:   data.socialLinks?.twitter   || data.social?.twitter   || data.footer?.socialLinks?.twitter || null,
-      showInFooter:  data.social?.showInFooter !== false,
+      facebook: data.facebook || data.social?.facebook || null,
+      instagram: data.instagram || data.social?.instagram || null,
+      twitter: data.twitter || data.social?.twitter || null,
+      linkedin: data.linkedin || data.social?.linkedin || null,
+      showInFooter: data.social?.showInFooter !== false,
       showInUtility: data.social?.showInUtility !== false,
     },
     features: {
@@ -174,7 +361,7 @@ function adaptCMSData(data) {
       carouselHeading: reviews.carouselHeading || 'Customer Reviews',
       carouselSubHeading: reviews.carouselSubHeading || 'What our customers are saying',
       carouselContent: reviews.carouselContent || '',
-      showReviewsCarousel: reviews.showReviewsCarousel === true,
+      showReviewsCarousel: reviews.showReviewsCarousel === true || (reviews.reviews && reviews.reviews.length > 0),
       alternateStyles: reviews.alternateStyles === true
     }
   };
@@ -200,17 +387,17 @@ function adaptCMSData(data) {
     showReviewCta: reviews.showReviewCta !== false,
     reviews: reviews.reviews || [],
     // Carousel content options
-    showReviewsCarousel: reviews.showReviewsCarousel === true,
+    showReviewsCarousel: reviews.showReviewsCarousel === true || (reviews.reviews && reviews.reviews.length > 0),
     alternateStyles: reviews.alternateStyles === true
   };
 
   // Calculate final shortcodes values
   const rawShortcodes = shortcodes || {};
   const overrides = rawShortcodes._overrides || {};
-  const group = client.group || {};
+  const group = client?.group || {};
 
   const autoShortcodes = {
-    restaurantName: settings.displayName || settings.restaurantName || client.name || 'Restaurant',
+    restaurantName: settings.displayName || settings.restaurantName || client?.name || 'Restaurant',
     group: group.name || '',
     address: primaryLoc.address || '',
     suburb: primaryLoc.suburb || settings.suburb || '',
@@ -222,6 +409,34 @@ function adaptCMSData(data) {
 
   const processedShortcodes = { ...autoShortcodes, ...overrides };
   
+  // Transform headerCtas from object to array format for UtilityBelt
+  // Handle both object format (legacy) and array format (CMS standard)
+  let mappedHeaderCtas = [];
+  if (headerCtas && Array.isArray(headerCtas)) {
+    // Already in array format (CMS standard)
+    mappedHeaderCtas = headerCtas;
+  } else if (headerCtas && typeof headerCtas === 'object') {
+    // Object format (legacy) - convert to array
+    if (headerCtas.primary && headerCtas.primary.show) {
+      mappedHeaderCtas.push({
+        id: 'primary',
+        label: headerCtas.primary.label || 'Primary',
+        value: headerCtas.primary.url || '#',
+        variant: 'primary',
+        active: true
+      });
+    }
+    if (headerCtas.secondary && headerCtas.secondary.show) {
+      mappedHeaderCtas.push({
+        id: 'secondary', 
+        label: headerCtas.secondary.label || 'Secondary',
+        value: headerCtas.secondary.url || '#',
+        variant: 'secondary',
+        active: true
+      });
+    }
+  }
+
   return {
     restaurant,
     locations,
@@ -231,10 +446,32 @@ function adaptCMSData(data) {
     navigation,
     homepageSections,
     contentPages: pages,
-    footerColumns: footerSections,
+    footerColumns: (footerSections || [])
+      .filter(s => s.isActive !== false)
+      .map(s => ({
+        ...s,
+        links: (s.links || []).map(l => ({
+          ...l,
+          url: l.pageId && l.page
+            ? l.page.pageType === 'home'
+              ? '/'
+              : `/${(l.page.slug || '').replace(/^\//, '')}`
+            : (l.externalUrl || '#')
+        }))
+      })),
+    unassignedFooterLinks: (data?.unassignedFooterLinks || [])
+      .filter(l => l.isActive !== false)
+      .map(l => ({
+        ...l,
+        url: l.pageId && l.page
+          ? l.page.pageType === 'home'
+            ? '/'
+            : `/${(l.page.slug || '').replace(/^\//, '')}`
+          : (l.externalUrl || '#')
+      })),
     siteConfig,
     reviews: mappedReviews,
-    headerCtas: headerCtas || [],
+    headerCtas: mappedHeaderCtas,
     booking: {
       url: booking.bookingUrl || '',
       label: booking.bookLabel || 'Book Table',
@@ -250,6 +487,20 @@ function adaptCMSData(data) {
     shortcodes: processedShortcodes,
     rawShortcodes: rawShortcodes,
     rawData: data,
+    _homeBanner,
+    _homePage,
+    // Homepage data (new unified structure)
+    banners: data?.banners || [],
+    homePage: _homePage || data?.homePage || null,
+    promoTiles: data?.promoTiles || [],
+    promoConfig: data?.promoConfig || { heading: null, subheading: null, isActive: true },
+    featuredConfig: data?.featuredConfig || { heading: null, subheading: null, isActive: true },
+    welcomeContent: data?.welcomeContent || { subtitle: null, heading: null, text: null, imageUrl: null, ctaText: null, ctaUrl: null, isExternal: false, isActive: true },
+    specialsConfig: data?.specialsConfig || { heading: null, subheading: null, showOnHomepage: false, maxItems: 2, isActive: true },
+    teamDepartments: data?.teamDepartments || [],
+    homepageLayout: data?.homepageLayout || { components: [] },
+    customTextBlocks: data?.customTextBlocks || [],
+    ordering: ordering || { enabled: false },
   }
 }
 
@@ -275,6 +526,8 @@ export const CMSProvider = ({ data, children }) => {
       document.documentElement.style.setProperty('--color-cta-bg', colours.ctaBg || '#C8823A');
       document.documentElement.style.setProperty('--color-cta-text', colours.ctaText || '#ffffff');
       document.documentElement.style.setProperty('--color-accent-bg', colours.accentBg || '#F7F2EA');
+      document.documentElement.style.setProperty('--color-utility-belt-bg', colours.utilityBeltBg || colours.primary || '#C8823A');
+      document.documentElement.style.setProperty('--color-utility-belt-text', colours.utilityBeltText || '#ffffff');
       
       // Also update the branding object for backward compatibility
       if (cmsData.restaurant?.branding) {
