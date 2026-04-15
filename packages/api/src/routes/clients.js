@@ -100,6 +100,11 @@ router.get('/test-export', (req, res) => {
   res.json({ message: 'Export pattern works', timestamp: new Date().toISOString() })
 })
 
+// Test parameterized route
+router.get('/test/:id', (req, res) => {
+  res.json({ message: 'Parameterized route works', id: req.params.id, timestamp: new Date().toISOString() })
+})
+
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
