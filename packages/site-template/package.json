@@ -75,6 +75,6 @@
     "typescript": "^5"
   },
   "resolutions": {
-    "@exodus/bytes": "1.2.0"
+    "@exodus/bytes": "0.1.2"
   }
 }
