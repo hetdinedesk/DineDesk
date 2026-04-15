@@ -90,6 +90,11 @@ function setCachedExport(clientId, data) {
 // MUST stay above router.use(authenticateToken)
 // ═══════════════════════════════════════════════════════════════
 
+// Test endpoint to verify public routing works
+router.get('/test-public', (req, res) => {
+  res.json({ message: 'Public route works', timestamp: new Date().toISOString() })
+})
+
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
