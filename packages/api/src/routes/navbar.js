@@ -201,6 +201,7 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
  * Replace footer sections (full replace)
  */
 async function replaceFooterSections (tx, clientId, footerSections) {
+  // Delete all existing footer links and sections
   await tx.footerLink.deleteMany({
     where: { footerSection: { clientId } }
   })
@@ -220,6 +221,10 @@ async function replaceFooterSections (tx, clientId, footerSections) {
     const links = Array.isArray(section.links) ? section.links : []
     for (let li = 0; li < links.length; li++) {
       const link = links[li]
+      // Skip links without label or without both pageId and externalUrl
+      if (!link.label || (!link.pageId && !link.externalUrl)) {
+        continue
+      }
       await tx.footerLink.create({
         data: {
           clientId,
