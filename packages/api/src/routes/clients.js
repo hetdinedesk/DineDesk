@@ -95,6 +95,11 @@ router.get('/test-public', (req, res) => {
   res.json({ message: 'Public route works', timestamp: new Date().toISOString() })
 })
 
+// Test export endpoint with fixed ID to verify pattern works
+router.get('/test-export', (req, res) => {
+  res.json({ message: 'Export pattern works', timestamp: new Date().toISOString() })
+})
+
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
