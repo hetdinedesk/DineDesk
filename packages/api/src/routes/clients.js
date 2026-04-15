@@ -90,27 +90,9 @@ function setCachedExport(clientId, data) {
 // MUST stay above router.use(authenticateToken)
 // ═══════════════════════════════════════════════════════════════
 
-// Test endpoint to verify public routing works
-router.get('/test-public', (req, res) => {
-  res.json({ message: 'Public route works', timestamp: new Date().toISOString() })
-})
-
-// Test export endpoint with fixed ID to verify pattern works
-router.get('/test-export', (req, res) => {
-  res.json({ message: 'Export pattern works', timestamp: new Date().toISOString() })
-})
-
-// Test parameterized route
-router.get('/test/:id', (req, res) => {
-  res.json({ message: 'Parameterized route works', id: req.params.id, timestamp: new Date().toISOString() })
-})
-
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
-
-    // TEMP: Simplified response to test if route works
-    return res.json({ message: 'Export route works', id, timestamp: new Date().toISOString() })
 
     // Check cache first
     const cached = getCachedExport(id)
@@ -300,13 +282,13 @@ router.get('/:id/export', async (req, res) => {
       }),
       prisma.promoConfig.findUnique({
         where: { clientId: id }
-      }),
+      }).catch(() => null), // Handle missing table gracefully
       prisma.featuredConfig.findUnique({
         where: { clientId: id }
-      }),
+      }).catch(() => null), // Handle missing table gracefully
       prisma.welcomeContent.findUnique({
         where: { clientId: id }
-      }),
+      }).catch(() => null), // Handle missing table gracefully
       prisma.teamDepartment.findMany({
         where: { clientId: id, isActive: true },
         orderBy: { sortOrder: 'asc' },
@@ -319,10 +301,10 @@ router.get('/:id/export', async (req, res) => {
       }),
       prisma.specialsConfig.findUnique({
         where: { clientId: id }
-      }),
+      }).catch(() => null), // Handle missing table gracefully
       prisma.homepageLayout.findUnique({
         where: { clientId: id }
-      }),
+      }).catch(() => null), // Handle missing table gracefully
       prisma.customTextBlock.findMany({
         where: { clientId: id, isActive: true },
         orderBy: { createdAt: 'asc' },
@@ -333,7 +315,7 @@ router.get('/:id/export', async (req, res) => {
           isActive: true,
           createdAt: true
         }
-      }),
+      }).catch(() => []), // Handle missing table gracefully
       prisma.paymentGateway.findUnique({
         where: { clientId: id },
         select: {
