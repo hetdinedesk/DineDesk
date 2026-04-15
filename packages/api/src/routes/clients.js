@@ -1596,7 +1596,7 @@ router.post('/:id/pages', async (req, res) => {
             footerSectionId: null, // Unassigned footer link
             pageId: created.id,
             label: created.title,
-            url: slug ? `/${slug}` : '/',
+            externalUrl: slug ? `/${slug}` : '/',
             sortOrder: (maxFooterLink._max.sortOrder ?? -1) + 1,
             isActive: true
           }
@@ -1621,7 +1621,7 @@ router.post('/:id/pages', async (req, res) => {
           footerSectionId: null, // Unassigned footer link
           pageId: created.id,
           label: created.title,
-          url: String(created.slug || '').replace(/^\//, '') ? `/${String(created.slug || '').replace(/^\//, '')}` : '/',
+          externalUrl: String(created.slug || '').replace(/^\//, '') ? `/${String(created.slug || '').replace(/^\//, '')}` : '/',
           sortOrder: (maxFooterLink._max.sortOrder ?? -1) + 1,
           isActive: true
         }
