@@ -4,7 +4,7 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "build": "node node_modules/prisma/build/index.js generate && node node_modules/prisma/build/index.js migrate deploy",
+    "build": "node node_modules/prisma/build/index.js generate && node node_modules/prisma/build/index.js db push --skip-generate",
     "start": "node src/index.js",
     "prisma:generate": "npx prisma generate",
     "prisma:push": "npx prisma db push",
