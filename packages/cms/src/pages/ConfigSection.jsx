@@ -4943,11 +4943,15 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
                       onFocus={e => e.target.style.borderColor = C.acc}
                       onBlur={e => e.target.style.borderColor = C.border}
                     />
-                    <button onClick={mutation.mutate}
-                      style={{ padding:'7px 14px', background:C.acc, border:'none',
-                        borderRadius:6, color:'#fff', fontWeight:600, fontSize:12,
-                        cursor:'pointer', fontFamily:'inherit' }}>
-                      Save
+                    <button onClick={() => {
+                      mutation.mutate()
+                    }}
+                    disabled={mutation.isPending}
+                    style={{ padding:'7px 14px', background: mutation.isPending ? C.card : C.acc, border:'none',
+                      borderRadius:6, color:'#fff', fontWeight:600, fontSize:12,
+                      cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+                      opacity: mutation.isPending ? 0.6 : 1 }}>
+                      {mutation.isPending ? 'Saving...' : 'Save'}
                     </button>
                   </div>
                   {!form.buildHook && (
