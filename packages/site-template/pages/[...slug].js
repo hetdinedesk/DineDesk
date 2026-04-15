@@ -9,7 +9,7 @@ import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate.jsx'
 import TeamTemplate from '../templates/theme-d1/TeamTemplate.jsx'
 import LocationsTemplate from '../templates/theme-d1/LocationsTemplate.jsx'
 import CustomTemplate from '../templates/theme-d1/CustomTemplate.jsx'
-import DOMPurify from 'isomorphic-dompurify'
+import DOMPurify from 'dompurify'
 
 export async function getServerSideProps({ query, params }) {
   const slugParts = Array.isArray(params?.slug) ? params.slug : []
