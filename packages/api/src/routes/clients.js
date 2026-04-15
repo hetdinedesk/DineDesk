@@ -2305,7 +2305,7 @@ router.post('/:id/netlify/create', async (req, res) => {
     console.log('⏳ Step 4/7: Creating build hook...')
     const hookRes = await require('axios').post(
       `https://api.netlify.com/api/v1/sites/${netlifyData.id}/build_hooks`,
-      { title: 'CMS Deploy', branch: process.env.SITE_TEMPLATE_REPO_BRANCH || 'master' },
+      { title: 'CMS Deploy', branch: process.env.SITE_TEMPLATE_REPO_BRANCH || 'main' },
       { headers: { Authorization: 'Bearer ' + process.env.NETLIFY_TOKEN } }
     )
     const buildHook = hookRes.data.url
@@ -2738,6 +2738,42 @@ router.post('/:id/netlify/rollback/:deployId', async (req, res) => {
   } catch (err) {
     console.error('❌ Rollback error:', err.message)
     res.status(500).json({ error: 'Failed to rollback deploy', details: err.message })
+  }
+})
+
+// Delete Netlify site
+router.delete('/:id/netlify', async (req, res) => {
+  try {
+    const config = await prisma.siteConfig.findUnique({ where: { clientId: req.params.id } })
+    const siteId = config?.netlify?.siteId
+    
+    if (!siteId) {
+      return res.status(400).json({ error: 'No Netlify site configured' })
+    }
+
+    // Delete the site from Netlify
+    await netlifyService.deleteSite(siteId)
+
+    // Clear the Netlify configuration from database
+    await prisma.siteConfig.update({
+      where: { clientId: req.params.id },
+      data: {
+        netlify: null
+      }
+    })
+
+    log({
+      action: 'NETLIFY_SITE_DELETED',
+      entity: 'Deployment',
+      userId: req.user.id,
+      userName: req.user.name,
+      clientId: req.params.id
+    })
+
+    res.json({ success: true, message: 'Netlify site deleted successfully' })
+  } catch (err) {
+    console.error('❌ Delete Netlify site error:', err.message)
+    res.status(500).json({ error: 'Failed to delete Netlify site', details: err.message })
   }
 })
 
