@@ -16,7 +16,18 @@ const corsOrigins = process.env.CORS_ORIGINS
     ]
 
 app.use(cors({
-  origin: corsOrigins,
+  origin: (origin, callback) => {
+    // Allow all Netlify domains (*.netlify.app) plus configured origins
+    const isNetlify = origin && origin.endsWith('.netlify.app')
+    const isConfigured = corsOrigins.includes(origin)
+    const isLocal = !origin // Allow requests with no origin (like mobile apps, curl)
+    
+    if (isNetlify || isConfigured || isLocal) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
