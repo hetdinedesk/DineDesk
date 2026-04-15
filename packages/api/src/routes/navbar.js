@@ -222,6 +222,7 @@ async function replaceFooterSections (tx, clientId, footerSections) {
       const link = links[li]
       await tx.footerLink.create({
         data: {
+          clientId,
           label: String(link.label || '').trim() || 'Link',
           pageId: link.pageId || null,
           externalUrl: link.externalUrl || null,
