@@ -93,6 +93,7 @@ function setCachedExport(clientId, data) {
 // ═══════════════════════════════════════════════════════════════
 
 router.get('/:id/export', async (req, res) => {
+  console.log('📥 Export route called for ID:', req.params.id)
   try {
     const id = req.params.id
 
