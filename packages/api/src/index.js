@@ -6,6 +6,9 @@ const path = require('path')
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Trust proxy for Railway deployment (required for rate limiting behind proxy)
+app.set('trust proxy', true)
+
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
   : [
