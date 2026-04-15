@@ -73,5 +73,8 @@
     "eslint-config-next": "16.2.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "resolutions": {
+    "@exodus/bytes": "1.2.0"
   }
 }
