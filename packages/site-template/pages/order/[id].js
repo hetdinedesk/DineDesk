@@ -325,7 +325,7 @@ export default function OrderStatusPage({ data, orderId }) {
           </button>
           <button
             onClick={() => window.print()}
-            style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8' }}
+            style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
           >
             <Receipt size={16} />
             Print Receipt
