@@ -10,6 +10,8 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const fs = require('fs')
 const path = require('path')
 
+console.log('✅ Clients route file loaded')
+
 // Generate short random ID (8 characters)
 const generateShortId = () => {
   return Math.random().toString(36).substring(2, 10)
