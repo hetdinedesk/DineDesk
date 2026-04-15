@@ -24,7 +24,7 @@ export async function getServerSideProps({ query, params }) {
   const rawSite = query.site
   const siteId = (rawSite && rawSite !== 'undefined' && rawSite.trim() !== '')
     ? rawSite
-    : (process.env.SITE_ID || '')
+    : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
 
   return {
