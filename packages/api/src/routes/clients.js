@@ -109,6 +109,9 @@ router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
 
+    // TEMP: Simplified response to test if route works
+    return res.json({ message: 'Export route works', id, timestamp: new Date().toISOString() })
+
     // Check cache first
     const cached = getCachedExport(id)
     if (cached) {
