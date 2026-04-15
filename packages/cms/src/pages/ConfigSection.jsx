@@ -4924,6 +4924,38 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
                     </a>
                   </div>
                 </div>
+
+                {/* Build Hook URL - for manual configuration */}
+                <div>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>
+                    Build Hook URL
+                    <span style={{ color:C.amber, marginLeft:6 }}>(Required for CMS rebuilds)</span>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <input
+                      value={form.buildHook || ''}
+                      onChange={e => s('buildHook', e.target.value)}
+                      placeholder="https://api.netlify.com/build_hooks/..."
+                      style={{ flex:1, padding:'7px 12px', background:'#0A0F1A',
+                        border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                        fontSize:12, fontFamily:'monospace', outline:'none' }}
+                      onFocus={e => e.target.style.borderColor = C.acc}
+                      onBlur={e => e.target.style.borderColor = C.border}
+                    />
+                    <button onClick={mutation.mutate}
+                      style={{ padding:'7px 14px', background:C.acc, border:'none',
+                        borderRadius:6, color:'#fff', fontWeight:600, fontSize:12,
+                        cursor:'pointer', fontFamily:'inherit' }}>
+                      Save
+                    </button>
+                  </div>
+                  {!form.buildHook && (
+                    <div style={{ marginTop:6, fontSize:11, color:C.amber }}>
+                      ⚠️ Build hook missing. Get it from Netlify → Site → Build & deploy → Build hooks
+                    </div>
+                  )}
+                </div>
                 {form.primaryDomain && (
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.t3,
