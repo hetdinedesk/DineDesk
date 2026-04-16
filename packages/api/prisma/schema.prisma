@@ -239,20 +239,22 @@ model Banner {
 }
 
 model PromoTile {
-  id          String  @id @default(cuid())
-  clientId    String
-  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  heading     String?
-  subheading  String?
-  imageUrl    String?
-  linkUrl     String?
-  linkLabel   String?
-  isExternal  Boolean @default(false)
-  isActive    Boolean @default(true)
-  sortOrder   Int     @default(0)
+  id              String  @id @default(cuid())
+  clientId        String
+  client          Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  heading         String?
+  subheading      String?
+  extraHeading    String?
+  extraSubheading String?
+  imageUrl        String?
+  linkUrl         String?
+  linkLabel       String?
+  isExternal      Boolean @default(false)
+  isActive        Boolean @default(true)
+  sortOrder       Int     @default(0)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
 
   @@index([clientId])
 }

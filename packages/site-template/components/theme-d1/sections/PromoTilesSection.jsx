@@ -83,6 +83,22 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
                     </p>
                   )}
 
+                  {promo.extraHeading && (
+                    <div className="mb-3">
+                      <p className="text-sm font-semibold text-[var(--color-secondary)]">
+                        {replaceShortcodes(promo.extraHeading)}
+                      </p>
+                    </div>
+                  )}
+
+                  {promo.extraSubheading && (
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600">
+                        {replaceShortcodes(promo.extraSubheading)}
+                      </p>
+                    </div>
+                  )}
+
                   {/* CTA Button */}
                   {hasCta && (
                     <Link

@@ -105,7 +105,7 @@ export default function PromoTiles({ clientId }) {
   }
 
   const openAddTile = () => setTileModal({
-    heading: '', subheading: '', imageUrl: '', linkUrl: '', linkLabel: '', 
+    heading: '', subheading: '', extraHeading: '', extraSubheading: '', imageUrl: '', linkUrl: '', linkLabel: '',
     isExternal: false, isActive: true, sortOrder: tiles.length
   })
   
@@ -119,6 +119,8 @@ export default function PromoTiles({ clientId }) {
     const body = {
       heading: tileModal.heading || null,
       subheading: tileModal.subheading || null,
+      extraHeading: tileModal.extraHeading || null,
+      extraSubheading: tileModal.extraSubheading || null,
       imageUrl: tileModal.imageUrl || null,
       linkUrl: tileModal.linkUrl || null,
       linkLabel: tileModal.linkLabel || null,
@@ -260,6 +262,8 @@ export default function PromoTiles({ clientId }) {
               <div style={{ marginBottom: 16 }}>
                 <ImageUpload clientId={clientId} label="Tile Image" value={tileModal.imageUrl} onChange={(url) => setTileModal({ ...tileModal, imageUrl: url })} displayDimensions={{ width: 400, height: 300 }} />
               </div>
+              <InputField label="Extra Heading" value={tileModal.extraHeading} onChange={(e) => setTileModal({ ...tileModal, extraHeading: e.target.value })} placeholder="e.g., Pricing" hint="Optional: Extra heading for additional info like pricing" />
+              <InputField label="Extra Subheading" value={tileModal.extraSubheading} onChange={(e) => setTileModal({ ...tileModal, extraSubheading: e.target.value })} placeholder="e.g., $25 per person" hint="Optional: Extra subheading for additional info" />
               <InputField label="Link URL" value={tileModal.linkUrl} onChange={(e) => setTileModal({ ...tileModal, linkUrl: e.target.value })} placeholder="/menu or https://..." hint="Internal: /page-path | External: https://..." />
               <InputField label="Link Label / CTA Text" value={tileModal.linkLabel} onChange={(e) => setTileModal({ ...tileModal, linkLabel: e.target.value })} placeholder="View Deal" hint="If set, clicking CTA button. Otherwise clicking tile." />
               <div style={{ marginTop: 12 }}>
