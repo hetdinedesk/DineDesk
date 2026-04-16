@@ -1,9 +1,13 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
+import { withSiteParam, getSiteId } from '../../../lib/links';
 
 export const HeroSection = ({ title, subtitle, image, cta }) => {
+  const router = useRouter();
+  const siteId = getSiteId(router);
   return (
     <section className="relative h-screen flex items-center justify-center overflow-hidden">
       {/* Background Image */}
@@ -53,7 +57,7 @@ export const HeroSection = ({ title, subtitle, image, cta }) => {
               </a>
             ) : (
               <Link
-                href={cta.url}
+                href={withSiteParam(cta.url, siteId)}
                 className="inline-flex items-center space-x-2 bg-[var(--color-secondary)] text-white px-8 py-4 rounded-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
               >
                 <span className="font-semibold">{cta.text}</span>

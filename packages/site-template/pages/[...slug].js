@@ -4,6 +4,7 @@ import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
 import { Header } from '../components/theme-d1/Header'
 import { Footer } from '../components/theme-d1/Footer'
+import { FloatingReviewWidget } from '../components/theme-d1/FloatingReviewWidget'
 import MenuTemplate from '../templates/theme-d1/MenuTemplate.jsx'
 import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate.jsx'
 import TeamTemplate from '../templates/theme-d1/TeamTemplate.jsx'
@@ -80,6 +81,7 @@ export default function DynamicPage({ data, slug }) {
         <Header />
         <MenuTemplate data={data} />
         <Footer />
+        <FloatingReviewWidget />
       </CMSProvider>
     )
   }
@@ -91,6 +93,7 @@ export default function DynamicPage({ data, slug }) {
         <Header />
         <SpecialsTemplate data={data} />
         <Footer />
+        <FloatingReviewWidget />
       </CMSProvider>
     )
   }
@@ -102,6 +105,7 @@ export default function DynamicPage({ data, slug }) {
         <Header />
         <TeamTemplate data={data} />
         <Footer />
+        <FloatingReviewWidget />
       </CMSProvider>
     )
   }
@@ -113,6 +117,7 @@ export default function DynamicPage({ data, slug }) {
         <Header />
         <LocationsTemplate data={data} page={page} banner={banner} />
         <Footer />
+        <FloatingReviewWidget />
       </CMSProvider>
     )
   }
@@ -129,6 +134,7 @@ export default function DynamicPage({ data, slug }) {
           <p className="text-lg text-gray-600">This page isn&apos;t published yet or the link is incorrect.</p>
         </main>
         <Footer />
+        <FloatingReviewWidget />
       </CMSProvider>
     )
   }
@@ -144,6 +150,7 @@ export default function DynamicPage({ data, slug }) {
         <Header />
         <CustomTemplate data={data} page={page} banner={banner} />
         <Footer />
+        <FloatingReviewWidget />
       </CMSProvider>
     )
   }
@@ -215,8 +222,8 @@ export default function DynamicPage({ data, slug }) {
           />
         </div>
       </main>
-
       <Footer />
+      <FloatingReviewWidget />
     </CMSProvider>
   )
 }

@@ -1,9 +1,13 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useCMS } from '../../contexts/CMSContext';
+import { withSiteParam, getSiteId } from '../../lib/links';
 
 export const Footer = () => {
-  const { footerColumns, unassignedFooterLinks, siteConfig, locations, restaurant } = useCMS();
+  const { footerColumns, unassignedFooterLinks, siteConfig, locations, restaurant, rawData } = useCMS();
+  const router = useRouter();
+  const siteId = getSiteId(router) || rawData?.client?.id || '';
 
   const primaryLocation = (locations || []).find((loc) => loc.isPrimary && loc.isActive) || (locations || [])[0];
   const footerLocations = (locations || []).filter((loc) => loc.showInFooter && loc.isActive);
@@ -25,7 +29,7 @@ export const Footer = () => {
         <div className="flex flex-col lg:flex-row lg:items-start gap-8 mb-8">
           {/* Brand */}
           <div className="lg:w-1/4">
-            <Link href="/" className="flex items-center space-x-3 mb-4 group">
+            <Link href={withSiteParam('/', siteId)} className="flex items-center space-x-3 mb-4 group">
               {displayLogo && (
                 <img 
                   src={displayLogo} 
@@ -61,7 +65,7 @@ export const Footer = () => {
                         {(column.links || []).map((link, index) => (
                           <li key={index}>
                             <Link
-                              href={link.url || '#'}
+                              href={withSiteParam(link.url || '#', siteId)}
                               className={`text-sm ${
                                 isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                               } transition-colors`}
@@ -80,7 +84,7 @@ export const Footer = () => {
                         {unassignedFooterLinks.map((link, index) => (
                           <li key={index}>
                             <Link
-                              href={link.url || '#'}
+                              href={withSiteParam(link.url || '#', siteId)}
                               className={`text-sm ${
                                 isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                               } transition-colors`}

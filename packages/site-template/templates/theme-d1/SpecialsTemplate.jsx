@@ -1,14 +1,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
-import { Clock, Tag, Calendar } from 'lucide-react';
+import { useCart } from '../../contexts/CartContext';
+import { Clock, Tag, Calendar, Plus } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 
 const SPECIAL_IMAGE = 'https://images.unsplash.com/photo-1759283084358-0565ea8e2885?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aW5lJTIwcGFpcmluZyUyMGRpbm5lcnxlbnwxfHx8fDE3NzQ4NDc3ODh8MA&ixlib=rb-4.1.0&q=80&w=1080';
 const SPECIAL_IMAGE_2 = 'https://images.unsplash.com/photo-1755811248324-3c9b7c8865fc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb3VybWV0JTIwZm9vZCUyMHBsYXRpbmd8ZW58MXx8fHwxNzc0NzY0ODA5fDA&ixlib=rb-4.1.0&q=80&w=1080';
 
 export default function SpecialsPage({ data, page, banner }) {
-  const { specials, shortcodes, contentPages } = useCMS();
+  const { specials, shortcodes, contentPages, ordering } = useCMS();
+  const { addItem, isEnabled: orderingEnabled } = useCart();
 
   const specialsPage = (contentPages || []).find(p => p.slug === 'specials' || p.pageType === 'specials');
   const pageTitle = replaceShortcodes(specialsPage?.title || 'Current Specials', shortcodes);
@@ -161,6 +163,23 @@ export default function SpecialsPage({ data, page, banner }) {
                             )}
                           </div>
                         )}
+                        
+                        {orderingEnabled && special.price && (
+                          <button
+                            onClick={() => addItem({
+                              id: special.id,
+                              name: title,
+                              price: special.price,
+                              image: special.image || (index % 2 === 0 ? SPECIAL_IMAGE : SPECIAL_IMAGE_2),
+                              description: description,
+                              category: 'Special'
+                            })}
+                            className="bg-white text-[var(--color-primary)] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors flex items-center space-x-2"
+                          >
+                            <Plus size={18} />
+                            <span className="hidden sm:inline">Add to Cart</span>
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex items-center text-sm text-gray-300 mt-4 space-x-4">
@@ -224,8 +243,26 @@ export default function SpecialsPage({ data, page, banner }) {
                       </h3>
                       <p className="text-gray-600 mb-4">{description}</p>
                       {special.price && (
-                        <div className="text-2xl font-bold text-[var(--color-secondary)]">
-                          ${special.price.toFixed(2)}
+                        <div className="flex items-center justify-between">
+                          <div className="text-2xl font-bold text-[var(--color-secondary)]">
+                            ${special.price.toFixed(2)}
+                          </div>
+                          {orderingEnabled && (
+                            <button
+                              onClick={() => addItem({
+                                id: special.id,
+                                name: title,
+                                price: special.price,
+                                image: special.image || SPECIAL_IMAGE,
+                                description: description,
+                                category: 'Special'
+                              })}
+                              className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-colors flex items-center space-x-2"
+                            >
+                              <Plus size={16} />
+                              <span>Add</span>
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

@@ -258,7 +258,7 @@ export default function PromoTiles({ clientId }) {
               <InputField label="Heading" value={tileModal.heading} onChange={(e) => setTileModal({ ...tileModal, heading: e.target.value })} placeholder="Special Offer" required />
               <InputField label="Subheading" value={tileModal.subheading} onChange={(e) => setTileModal({ ...tileModal, subheading: e.target.value })} placeholder="50% off this week" />
               <div style={{ marginBottom: 16 }}>
-                <ImageUpload clientId={clientId} label="Tile Image" value={tileModal.imageUrl} onChange={(url) => setTileModal({ ...tileModal, imageUrl: url })} />
+                <ImageUpload clientId={clientId} label="Tile Image" value={tileModal.imageUrl} onChange={(url) => setTileModal({ ...tileModal, imageUrl: url })} displayDimensions={{ width: 400, height: 300 }} />
               </div>
               <InputField label="Link URL" value={tileModal.linkUrl} onChange={(e) => setTileModal({ ...tileModal, linkUrl: e.target.value })} placeholder="/menu or https://..." hint="Internal: /page-path | External: https://..." />
               <InputField label="Link Label / CTA Text" value={tileModal.linkLabel} onChange={(e) => setTileModal({ ...tileModal, linkLabel: e.target.value })} placeholder="View Deal" hint="If set, clicking CTA button. Otherwise clicking tile." />

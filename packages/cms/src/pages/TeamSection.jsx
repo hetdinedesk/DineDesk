@@ -234,7 +234,25 @@ export default function TeamSection({ clientId, subsection = 'team-members' }) {
                   onDelete={() => handleDelete(member.id)}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img src={member.imageUrl || 'https://via.placeholder.com/40'} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: C.card }} />
+                    {member.imageUrl ? (
+                      <img src={member.imageUrl} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: C.card }} />
+                    ) : (
+                      <div style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: '50%', 
+                        background: C.card, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        color: C.t3,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        border: `1px solid ${C.border}`
+                      }}>
+                        {member.title ? member.title.charAt(0).toUpperCase() : '?'}
+                      </div>
+                    )}
                     <div>
                       <div style={{ fontWeight: 600, color: member.isActive ? C.t0 : C.t3 }}>{member.title}</div>
                       <div style={{ fontSize: 12, color: C.t2 }}>{member.content}</div>

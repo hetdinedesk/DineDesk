@@ -1,8 +1,12 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { withSiteParam, getSiteId } from '../../../lib/links';
 
 export default function PromoTilesSection({ promos = [], title, subtitle, shortcodes = {} }) {
+  const router = useRouter();
+  const siteId = getSiteId(router);
   if (!promos || promos.length === 0) return null;
 
   const replaceShortcodes = (text) => {
@@ -57,7 +61,7 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
                   <h3 className="text-xl font-semibold text-[var(--color-primary)] mb-2">
                     {promo.linkUrl ? (
                       <Link
-                        href={promo.linkUrl}
+                        href={promo.isExternal ? promo.linkUrl : withSiteParam(promo.linkUrl, siteId)}
                         target={promo.isExternal ? '_blank' : '_self'}
                         rel={promo.isExternal ? 'noopener noreferrer' : undefined}
                         className="hover:opacity-80 transition-opacity"
@@ -78,7 +82,7 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
                 {/* CTA Button */}
                 {promo.linkLabel && promo.linkUrl ? (
                   <Link
-                    href={promo.linkUrl}
+                    href={promo.isExternal ? promo.linkUrl : withSiteParam(promo.linkUrl, siteId)}
                     target={promo.isExternal ? '_blank' : '_self'}
                     rel={promo.isExternal ? 'noopener noreferrer' : undefined}
                     className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-primary)] hover:opacity-80 transition-opacity"
@@ -92,7 +96,7 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
               {/* Full tile link if no CTA */}
               {!promo.linkLabel && promo.linkUrl && (
                 <Link
-                  href={promo.linkUrl}
+                  href={promo.isExternal ? promo.linkUrl : withSiteParam(promo.linkUrl, siteId)}
                   target={promo.isExternal ? '_blank' : '_self'}
                   rel={promo.isExternal ? 'noopener noreferrer' : undefined}
                   className="absolute inset-0"

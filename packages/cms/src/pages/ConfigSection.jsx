@@ -3924,7 +3924,7 @@ function FooterConfig({ clientId, config, setHasUnsavedChanges }) {
 
       {/* Legal Links */}
       <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:20, marginBottom:24 }}>
+        borderRadius:12, padding:20, marginBottom:16 }}>
         <div style={{ fontSize:12, fontWeight:700, color:C.t3,
           textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
           Legal Links
@@ -3981,6 +3981,175 @@ function FooterConfig({ clientId, config, setHasUnsavedChanges }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Footer Columns */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:24 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+            textTransform:'uppercase', letterSpacing:'0.08em' }}>
+            Footer Columns
+          </div>
+          <button
+            onClick={() => {
+              const columns = [...(f.footerColumns || [])]
+              columns.push({
+                id: Date.now().toString(),
+                title: `Column ${columns.length + 1}`,
+                links: [],
+                isActive: true,
+                sortOrder: columns.length
+              })
+              s('footerColumns', columns)
+            }}
+            style={{ padding:'6px 12px', background:C.acc, color:'#fff', border:'none',
+              borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}
+          >
+            + Add Column
+          </button>
+        </div>
+        
+        {(f.footerColumns || []).map((column, colIndex) => (
+          <div key={column.id || colIndex} style={{ 
+            background:C.panel, 
+            border:`1px solid ${C.border}`, 
+            borderRadius:8, 
+            padding:16, 
+            marginBottom:12 
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.06em',
+                  display:'block', marginBottom:5 }}>Column Title</label>
+                <input
+                  value={column.title || ''}
+                  onChange={e => {
+                    const columns = [...(f.footerColumns || [])]
+                    columns[colIndex] = { ...columns[colIndex], title: e.target.value }
+                    s('footerColumns', columns)
+                  }}
+                  style={{ width:'100%', padding:'9px 11px', background:C.input,
+                    border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                    fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  onFocus={e => e.target.style.borderColor = C.acc}
+                  onBlur={e  => e.target.style.borderColor = C.border}
+                />
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:20 }}>
+                <button
+                  onClick={() => {
+                    const columns = [...(f.footerColumns || [])]
+                    if (colIndex > 0) {
+                      [columns[colIndex], columns[colIndex - 1]] = [columns[colIndex - 1], columns[colIndex]]
+                      columns.forEach((col, i) => col.sortOrder = i)
+                      s('footerColumns', columns)
+                    }
+                  }}
+                  disabled={colIndex === 0}
+                  style={{ padding:'6px 10px', background:colIndex === 0 ? C.card : C.hover, 
+                    border:`1px solid ${C.border}`, borderRadius:6, fontSize:12,
+                    cursor:colIndex === 0 ? 'not-allowed' : 'pointer' }}
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={() => {
+                    const columns = [...(f.footerColumns || [])]
+                    if (colIndex < columns.length - 1) {
+                      [columns[colIndex], columns[colIndex + 1]] = [columns[colIndex + 1], columns[colIndex]]
+                      columns.forEach((col, i) => col.sortOrder = i)
+                      s('footerColumns', columns)
+                    }
+                  }}
+                  disabled={colIndex === (f.footerColumns || []).length - 1}
+                  style={{ padding:'6px 10px', background:colIndex === (f.footerColumns || []).length - 1 ? C.card : C.hover, 
+                    border:`1px solid ${C.border}`, borderRadius:6, fontSize:12,
+                    cursor:colIndex === (f.footerColumns || []).length - 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  ↓
+                </button>
+                <button
+                  onClick={() => {
+                    const columns = [...(f.footerColumns || [])]
+                    columns.splice(colIndex, 1)
+                    s('footerColumns', columns)
+                  }}
+                  style={{ padding:'6px 10px', background:C.card, color:'#e74c3c',
+                    border:`1px solid ${C.border}`, borderRadius:6, fontSize:12, cursor:'pointer' }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+
+            {/* Links in this column */}
+            <div style={{ fontSize:11, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>
+              Links
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {(column.links || []).map((link, linkIndex) => (
+                <div key={linkIndex} style={{ display:'grid', gridTemplateColumns:'2fr 3fr auto', gap:8 }}>
+                  <input
+                    value={link.label || ''}
+                    onChange={e => {
+                      const columns = [...(f.footerColumns || [])]
+                      columns[colIndex].links[linkIndex] = { ...columns[colIndex].links[linkIndex], label: e.target.value }
+                      s('footerColumns', columns)
+                    }}
+                    placeholder="Label"
+                    style={{ padding:'8px 10px', background:C.input,
+                      border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                      fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  />
+                  <input
+                    value={link.url || ''}
+                    onChange={e => {
+                      const columns = [...(f.footerColumns || [])]
+                      columns[colIndex].links[linkIndex] = { ...columns[colIndex].links[linkIndex], url: e.target.value }
+                      s('footerColumns', columns)
+                    }}
+                    placeholder="URL (e.g., /menu)"
+                    style={{ padding:'8px 10px', background:C.input,
+                      border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                      fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  />
+                  <button
+                    onClick={() => {
+                      const columns = [...(f.footerColumns || [])]
+                      columns[colIndex].links.splice(linkIndex, 1)
+                      s('footerColumns', columns)
+                    }}
+                    style={{ padding:'6px 10px', background:C.card, color:'#e74c3c',
+                      border:`1px solid ${C.border}`, borderRadius:6, fontSize:11, cursor:'pointer' }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const columns = [...(f.footerColumns || [])]
+                  if (!columns[colIndex].links) columns[colIndex].links = []
+                  columns[colIndex].links.push({ label: '', url: '' })
+                  s('footerColumns', columns)
+                }}
+                style={{ padding:'8px 12px', background:C.hover, border:`1px solid ${C.border}`,
+                  borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'center' }}
+              >
+                + Add Link
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {(f.footerColumns || []).length === 0 && (
+          <div style={{ padding:20, textAlign:'center', color:C.t3, fontSize:13 }}>
+            No footer columns yet. Click "Add Column" to create one.
+          </div>
+        )}
       </div>
 
       {/* Save */}

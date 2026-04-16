@@ -16,7 +16,8 @@ export default function ImageUpload({
   value, 
   onChange, 
   aspect = 1,
-  accept = 'image/*'
+  accept = 'image/*',
+  displayDimensions = null // { width, height } in pixels
 }) {
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -114,6 +115,43 @@ export default function ImageUpload({
             <img src={preview || value} alt={label} 
               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'cover' }} />
           </div>
+          
+          {/* Display dimensions preview */}
+          {displayDimensions && (
+            <div style={{ 
+              background: C.panel, 
+              border: `1px solid ${C.border2}`,
+              borderRadius: 8, 
+              padding: 16, 
+              marginBottom: 12 
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', marginBottom: 8 }}>
+                Preview at Display Size ({displayDimensions.width}x{displayDimensions.height}px)
+              </div>
+              <div style={{ 
+                width: displayDimensions.width, 
+                height: displayDimensions.height, 
+                background: C.card,
+                borderRadius: 4, 
+                overflow: 'hidden',
+                margin: '0 auto',
+                maxWidth: '100%',
+                aspectRatio: displayDimensions.width / displayDimensions.height
+              }}>
+                <img src={preview || value} alt={`${label} preview`}
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    objectFit: 'cover',
+                    display: 'block'
+                  }} />
+              </div>
+              <div style={{ fontSize: 10, color: C.t2, marginTop: 8, textAlign: 'center' }}>
+                This is how the image will appear in the preview site
+              </div>
+            </div>
+          )}
+          
           <div style={{ fontSize: 11, color: C.cyan, fontFamily: 'monospace' }}>
             {value.split('/').pop() || 'Image ready'}
           </div>

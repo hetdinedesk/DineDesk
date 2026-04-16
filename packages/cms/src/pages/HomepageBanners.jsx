@@ -224,6 +224,7 @@ export default function HomepageBanners({ clientId }) {
                   label="Banner Image"
                   value={modal.imageUrl}
                   onChange={(url) => setModal({ ...modal, imageUrl: url })}
+                  displayDimensions={{ width: 1920, height: 600 }}
                 />
               </div>
 

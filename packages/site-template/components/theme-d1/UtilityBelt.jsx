@@ -1,6 +1,8 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useCMS } from '../../contexts/CMSContext';
+import { withSiteParam, getSiteId } from '../../lib/links';
 
 // Clean SVG icons matching footer style
 const Phone = ({ size = 14, className = "" }) => (
@@ -64,6 +66,8 @@ const SocialIcon = ({ platform, size = 16 }) => {
 };
 
 export const UtilityBelt = ({ isDark }) => {
+  const router = useRouter();
+  const siteId = getSiteId(router);
   const { 
     locations, 
     siteConfig, 
@@ -167,9 +171,16 @@ export const UtilityBelt = ({ isDark }) => {
 
       case 'reviews':
         // Check if reviews are enabled globally and in header
-        if (siteConfig?.features?.showReviews && siteConfig?.reviews?.enableHeader && 
-            siteConfig?.googleReviews?.placeId && siteConfig?.googleReviews?.averageRating) {
-          const { averageRating, totalReviews } = siteConfig.googleReviews;
+        const reviewsConfig = siteConfig?.reviews || {};
+        const googleReviewsConfig = siteConfig?.googleReviews || {};
+        const googleReviews = reviewsConfig?.googleReviews || [];
+        const hasGoogleReviews = googleReviews.length > 0;
+        const hasValidPlaceId = googleReviewsConfig?.placeId && googleReviewsConfig?.placeId.trim() !== '';
+        
+        if (reviewsConfig?.enableHeader !== false && hasValidPlaceId && (hasGoogleReviews || googleReviewsConfig?.averageRating)) {
+          const averageRating = googleReviewsConfig?.averageRating || reviewsConfig?.averageRating || (hasGoogleReviews ? googleReviews.reduce((acc, r) => acc + r.stars, 0) / googleReviews.length : 4.5);
+          const totalReviews = googleReviewsConfig?.totalReviews || reviewsConfig?.totalReviews || googleReviews.length;
+          
           return (
             <div key={key} className="flex items-center space-x-1 text-xs font-medium">
               <Google size={14} />
@@ -179,27 +190,14 @@ export const UtilityBelt = ({ isDark }) => {
                   <Star key={i} size={10} fill={i < Math.floor(averageRating) ? 'currentColor' : 'none'} />
                 ))}
               </div>
-              {totalReviews && (
+              {totalReviews > 0 && (
                 <span className="hidden xs:inline text-gray-300">({totalReviews})</span>
               )}
             </div>
           );
         }
         
-        // Fallback to regular reviews
-        if (!reviews || reviews.length === 0) return null;
-        const avgRating = reviews.reduce((acc, rev) => acc + rev.rating, 0) / reviews.length;
-        
-        return (
-          <div key={key} className="flex items-center space-x-1 text-xs font-medium">
-            <div className="flex items-center text-yellow-400">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} size={12} fill={i < Math.floor(avgRating) ? 'currentColor' : 'none'} />
-              ))}
-            </div>
-            <span className="hidden xs:inline">{avgRating.toFixed(1)} Google Reviews</span>
-          </div>
-        );
+        return null;
 
       case 'header-ctas':
         const activeCtas = (headerCtas || []).filter(cta => cta.active);
@@ -230,7 +228,7 @@ export const UtilityBelt = ({ isDark }) => {
                     </a>
                   ) : (
                     <Link 
-                      href={cta.value || '#'} 
+                      href={withSiteParam(cta.value || '#', siteId)} 
                       className={`text-xs font-bold transition-all whitespace-nowrap ${style}`}
                     >
                       {cta.label}

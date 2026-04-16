@@ -292,11 +292,35 @@ export default function CheckoutPage({ data }) {
     <CMSProvider data={data}>
       <Head>
         <title>Checkout - {siteName}</title>
+        <style>{`
+          @media (max-width: 768px) {
+            .checkout-grid {
+              grid-template-columns: 1fr !important;
+            }
+            .checkout-sticky {
+              position: static !important;
+            }
+            .checkout-sticky > div {
+              position: static !important;
+            }
+            .checkout-step {
+              padding: 16px !important;
+            }
+            .checkout-input {
+              padding: 12px !important;
+              font-size: 16px !important;
+            }
+            .checkout-btn {
+              padding: 14px 20px !important;
+              font-size: 15px !important;
+            }
+          }
+        `}</style>
       </Head>
       <Header />
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px' }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>Checkout</h1>
-        <p style={{ color: '#666', marginBottom: 32 }}>Complete your order</p>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 40px' }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Checkout</h1>
+        <p style={{ color: '#666', marginBottom: 24 }}>Complete your order</p>
 
         {error && (
           <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 16, marginBottom: 24, color: '#991b1b' }}>
@@ -304,11 +328,11 @@ export default function CheckoutPage({ data }) {
           </div>
         )}
 
-        <div style={{ display: 'grid', gap: 32, gridTemplateColumns: '1fr 340px' }}>
+        <div className="checkout-grid" style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr 340px' }}>
           {/* Left Column - Form Steps */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Step 1: Customer Info */}
-            <div style={{ background: 'white', borderRadius: 12, border: step === 1 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
+            <div className="checkout-step" style={{ background: 'white', borderRadius: 12, border: step === 1 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
               <button 
                 onClick={() => setStep(1)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, marginBottom: step === 1 ? 20 : 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
@@ -376,7 +400,7 @@ export default function CheckoutPage({ data }) {
             </div>
 
             {/* Step 2: Pickup Info */}
-            <div style={{ background: 'white', borderRadius: 12, border: step === 2 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
+            <div className="checkout-step" style={{ background: 'white', borderRadius: 12, border: step === 2 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
               <button 
                 onClick={() => step >= 2 && setStep(2)}
                 disabled={step < 2}
@@ -519,7 +543,7 @@ export default function CheckoutPage({ data }) {
             </div>
 
             {/* Step 3: Payment */}
-            <div style={{ background: 'white', borderRadius: 12, border: step === 3 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
+            <div className="checkout-step" style={{ background: 'white', borderRadius: 12, border: step === 3 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
               <button 
                 onClick={() => step >= 3 && setStep(3)}
                 disabled={step < 3}
@@ -643,7 +667,7 @@ export default function CheckoutPage({ data }) {
           </div>
 
           {/* Right Column - Order Summary */}
-          <div style={{ position: 'sticky', top: 24 }}>
+          <div className="checkout-sticky" style={{ position: 'sticky', top: 24 }}>
             <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
               <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ShoppingCart size={20} />

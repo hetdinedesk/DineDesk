@@ -6,9 +6,12 @@ import { Footer } from '../../components/theme-d1/Footer';
 import { FeaturedItemsSection } from '../../components/theme-d1/sections/FeaturedItemsSection';
 import { ReviewsSection } from '../../components/theme-d1/sections/ReviewsSection';
 import PromoTilesSection from '../../components/theme-d1/sections/PromoTilesSection';
+import { FloatingReviewWidget } from '../../components/theme-d1/FloatingReviewWidget';
 import { replaceShortcodes } from '../../lib/shortcodes';
 import { ChevronLeft, ChevronRight, Clock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { withSiteParam, getSiteId } from '../../lib/links';
 
 function HomePageContent() {
   const { 
@@ -136,12 +139,15 @@ function HomePageContent() {
         })}
       </main>
       <Footer />
+      <FloatingReviewWidget />
     </div>
   );
 }
 
 // Banner Carousel Component - Connected to CMS Banners
 function BannerCarousel({ banners, shortcodes }) {
+  const router = useRouter();
+  const siteId = getSiteId(router);
   const [current, setCurrent] = React.useState(0);
   
   // Filter only active homepage banners (location='home')
@@ -237,7 +243,7 @@ function BannerCarousel({ banners, shortcodes }) {
                 </a>
               ) : (
                 <Link
-                  href={bannerUrl}
+                  href={withSiteParam(bannerUrl, siteId)}
                   className="inline-flex items-center justify-center bg-[var(--color-primary)] text-white px-8 py-4 rounded-lg text-lg font-medium hover:bg-opacity-90 transition-all group shadow-lg"
                 >
                   {replaceShortcodes(banner.buttonText, shortcodes)}
@@ -290,6 +296,9 @@ function BannerCarousel({ banners, shortcodes }) {
 
 // Welcome Section Component
 function WelcomeSection({ title, subtitle, content, image, ctaText, ctaUrl, isExternal, shortcodes }) {
+  const router = useRouter();
+  const siteId = getSiteId(router);
+
   // Only render if there's actual content
   if (!title && !content && !image) {
     return null;
@@ -345,7 +354,7 @@ function WelcomeSection({ title, subtitle, content, image, ctaText, ctaUrl, isEx
             )}
             {ctaText && ctaUrl && (
               <Link
-                href={ctaUrl}
+                href={isExternal ? ctaUrl : withSiteParam(ctaUrl, siteId)}
                 target={isExternal ? '_blank' : '_self'}
                 rel={isExternal ? 'noopener noreferrer' : undefined}
                 className="inline-flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 transition-all transform hover:scale-105 group"

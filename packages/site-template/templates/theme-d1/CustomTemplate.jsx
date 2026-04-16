@@ -12,9 +12,25 @@ function MapEmbed({ location, provider = 'google' }) {
   // Google Maps embed (free, no API key required for basic embed)
   if (provider === 'google') {
     const encodedAddress = encodeURIComponent(fullAddress);
+    // Use Google Maps embed API with coordinates if available, otherwise use address
+    if (coordinates?.latitude && coordinates?.longitude) {
+      return (
+        <iframe
+          src={`https://maps.google.com/maps?q=${coordinates?.latitude},${coordinates?.longitude}&hl=en&z=16&output=embed`}
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          title={`Map of ${location.name || 'location'}`}
+        />
+      );
+    }
+    // Fallback to address-based embed
     return (
       <iframe
-        src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d5000!2d${coordinates?.longitude || 0}!3d${coordinates?.latitude || 0}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzfCsDQ4JzAwLjAiUyAxNDXCsDAwJzAwLjAiRQ!5e0!3m2!1sen!2sau!4v1600000000000!5m2!1sen!2sau&q=${encodedAddress}`}
+        src={`https://maps.google.com/maps?q=${encodedAddress}&hl=en&z=16&output=embed`}
         width="100%"
         height="100%"
         style={{ border: 0 }}
@@ -286,14 +302,15 @@ export default function CustomTemplate({ data, page, banner }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Main Content Area */}
-        <div className={`grid gap-12 ${showEnquiryForm ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 max-w-3xl mx-auto'}`}>
+        <div className={`grid gap-12 ${showEnquiryForm ? 'grid-cols-1 lg:grid-cols-2 items-start' : 'grid-cols-1 max-w-3xl mx-auto'}`}>
           {/* Content Column - Only shows CMS content, no auto location info */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
+            className="flex flex-col"
           >
             <div
-              className="prose prose-lg max-w-none text-gray-700"
+              className="prose prose-lg max-w-none text-gray-700 flex-1"
               dangerouslySetInnerHTML={{ __html: content }}
             />
           </motion.div>
@@ -303,7 +320,7 @@ export default function CustomTemplate({ data, page, banner }) {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-white rounded-lg shadow-xl p-8 h-fit"
+              className="bg-white rounded-lg shadow-xl p-8 flex flex-col"
             >
               <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-6">
                 Send Us a Message

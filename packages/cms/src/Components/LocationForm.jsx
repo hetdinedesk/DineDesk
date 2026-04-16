@@ -455,6 +455,7 @@ export default function LocationForm({
             onChange={v => setImageField('exteriorImages', v)}
             aspect={16/9}
             maxImages={8}
+            displayDimensions={{ width: 800, height: 450 }}
           />
           {pendingImages.exteriorImages.length > 0 && (
             <div style={{

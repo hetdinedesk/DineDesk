@@ -17,7 +17,8 @@ export default function MultipleImageUpload({
   onChange, 
   aspect = 16/9,
   accept = 'image/*',
-  maxImages = 10
+  maxImages = 10,
+  displayDimensions = null // { width, height } in pixels
 }) {
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -318,6 +319,42 @@ export default function MultipleImageUpload({
           textAlign: 'center'
         }}>
           Drag images to reorder • First image will be primary exterior photo
+        </div>
+      )}
+
+      {/* Display dimensions preview */}
+      {displayDimensions && value.length > 0 && (
+        <div style={{ 
+          marginTop: 20,
+          background: C.panel, 
+          border: `1px solid ${C.border2}`,
+          borderRadius: 8, 
+          padding: 16 
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', marginBottom: 12 }}>
+            Preview at Display Size ({displayDimensions.width}x{displayDimensions.height}px)
+          </div>
+          <div style={{ 
+            width: displayDimensions.width, 
+            height: displayDimensions.height, 
+            background: C.card,
+            borderRadius: 4, 
+            overflow: 'hidden',
+            margin: '0 auto',
+            maxWidth: '100%',
+            aspectRatio: displayDimensions.width / displayDimensions.height
+          }}>
+            <img src={previews[value[0]] || value[0]} alt="Primary exterior photo preview"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                display: 'block'
+              }} />
+          </div>
+          <div style={{ fontSize: 10, color: C.t2, marginTop: 8, textAlign: 'center' }}>
+            This is how the primary exterior photo will appear in the preview site
+          </div>
         </div>
       )}
     </div>

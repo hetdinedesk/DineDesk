@@ -520,17 +520,23 @@ const exportData = {
     overallScore:   googlePlaceData?.rating || cfg?.reviews?.overallScore || 4.5,
     googleCount:    googlePlaceData?.totalReviews || cfg?.reviews?.googleCount || 25,
     googleScore:    googlePlaceData?.rating || cfg?.reviews?.googleScore || 4.5,
-    // Only provide reviews if they were fetched from Google or manually configured
-    googleReviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || []),
     // Google reviews configuration for frontend
+    googleReviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || []),
     placeId: cfg?.reviews?.googlePlaceId || null,
     averageRating: googlePlaceData?.rating || cfg?.reviews?.averageRating || 4.5,
     totalReviews: googlePlaceData?.totalReviews || cfg?.reviews?.totalReviews || 25,
     showFloatingWidget: cfg?.reviews?.enableFloating !== false,
     showReviewCta: cfg?.reviews?.showReviewCta !== false,
     reviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || []),
+    // Display settings
+    enableHeader: cfg?.reviews?.enableHeader !== false,
+    enableFooter: cfg?.reviews?.enableFooter !== false,
+    enableFloating: cfg?.reviews?.enableFloating !== false,
     // Carousel content options - only show if reviews section is active and enabled
     showReviewsCarousel: reviewsSection && reviewsContent.showGoogleReviews !== false,
+    carouselHeading: cfg?.reviews?.carouselHeading || '',
+    carouselSubHeading: cfg?.reviews?.carouselSubHeading || '',
+    carouselContent: cfg?.reviews?.carouselContent || '',
     alternateStyles: cfg?.reviews?.alternateStyles === true
   }
 }

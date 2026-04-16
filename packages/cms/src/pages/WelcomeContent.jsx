@@ -183,6 +183,7 @@ export default function WelcomeContent({ clientId }) {
             clientId={clientId}
             value={formData.imageUrl}
             onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+            displayDimensions={{ width: 1200, height: 600 }}
           />
         </div>
 

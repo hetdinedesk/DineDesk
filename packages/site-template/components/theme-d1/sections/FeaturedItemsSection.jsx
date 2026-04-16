@@ -1,10 +1,14 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../../contexts/CMSContext';
+import { withSiteParam, getSiteId } from '../../../lib/links';
 
 export const FeaturedItemsSection = ({ title, subtitle, items }) => {
   const { menuItems } = useCMS();
+  const router = useRouter();
+  const siteId = getSiteId(router);
 
   // Use passed items or fetch from CMS
   const featuredItems = items || menuItems?.filter((item) => item.isFeatured && item.isAvailable).slice(0, 6) || [];
@@ -84,7 +88,7 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
           className="text-center mt-12"
         >
           <Link
-            href="/menu"
+            href={withSiteParam('/menu', siteId)}
             className="inline-block bg-[var(--color-primary)] text-white px-8 py-3 rounded-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
           >
             View Full Menu

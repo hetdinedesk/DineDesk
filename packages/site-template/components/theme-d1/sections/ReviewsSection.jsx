@@ -9,22 +9,22 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
   const { reviews, siteConfig, shortcodes } = useCMS();
 
   // CMS configuration - check if reviews carousel should be shown
-  // The CMS uses 'showGoogleReviews' in the section content
-  const hasValidPlaceId = siteConfig?.reviews?.placeId && siteConfig?.reviews?.placeId.trim() !== '';
+  const reviewsConfig = siteConfig?.reviews || {};
+  const googleReviewsConfig = siteConfig?.googleReviews || {};
+  const hasValidPlaceId = googleReviewsConfig?.placeId && googleReviewsConfig?.placeId.trim() !== '';
   // Reviews are in siteConfig.reviews.googleReviews or siteConfig.reviews.reviews
-  const googleReviews = siteConfig?.reviews?.googleReviews || [];
+  const googleReviews = reviewsConfig?.googleReviews || [];
   const hasReviews = reviews.length > 0 || googleReviews.length > 0;
   // Check both the section content flag AND the siteConfig reviews setting
-  const showReviewsCarousel = (content?.showGoogleReviews !== false) && hasValidPlaceId && hasReviews;
+  const showReviewsCarousel = (content?.showGoogleReviews !== false || reviewsConfig?.showReviewsCarousel !== false) && hasValidPlaceId && hasReviews;
   // Use site config CTA first, then fallback to section content CTA
-  const ctaConfig = siteConfig?.reviews?.ctas?.[0] || content?.cta || null;
-  
+  const ctaConfig = reviewsConfig?.ctas?.[0] || content?.cta || null;
   
   // For reviews section, prioritize site config over section title to match CMS behavior  
-  const displayTitle = siteConfig?.reviews?.carouselHeading || title || content?.heading || content?.carouselHeading;
+  const displayTitle = reviewsConfig?.carouselHeading || title || content?.heading || content?.carouselHeading;
   
   // Process site config subtitle through shortcodes
-  const siteConfigSubtitle = siteConfig?.reviews?.carouselSubHeading || '';
+  const siteConfigSubtitle = reviewsConfig?.carouselSubHeading || '';
   const processedSiteConfigSubtitle = replaceShortcodes(siteConfigSubtitle, shortcodes);
   
   const displaySubtitle = processedSiteConfigSubtitle || subtitle || content?.subheading || content?.carouselSubHeading || content?.subtitle;
@@ -38,7 +38,7 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
   // Get all reviews - both CMS reviews and Google reviews for carousel
   const cmsReviews = reviews.filter((review) => review.isActive);
   // Google reviews are in siteConfig.reviews.googleReviews or siteConfig.reviews.reviews
-  const googleReviewsData = siteConfig?.reviews?.googleReviews || siteConfig?.reviews?.reviews || [];
+  const googleReviewsData = googleReviews || reviewsConfig?.reviews || [];
   
   // Combine both types of reviews
   const allReviews = [

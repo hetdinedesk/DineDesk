@@ -331,6 +331,7 @@ export default function Specials({ clientId }) {
                 clientId={clientId}
                 value={specialForm.imageUrl}
                 onChange={(url) => setSpecialForm({ ...specialForm, imageUrl: url })}
+                displayDimensions={{ width: 600, height: 400 }}
               />
             </div>
             
@@ -343,6 +344,7 @@ export default function Specials({ clientId }) {
                 clientId={clientId}
                 value={specialForm.bannerImage}
                 onChange={(url) => setSpecialForm({ ...specialForm, bannerImage: url })}
+                displayDimensions={{ width: 1200, height: 400 }}
               />
             </div>
             
