@@ -16,7 +16,7 @@ import DashboardSection from './pages/DashboardSection'
 import HomepageBanners from './pages/HomepageBanners'
 import { C } from './theme'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
 const queryClient = new QueryClient({
   defaultOptions: {

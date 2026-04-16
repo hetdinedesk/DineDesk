@@ -250,16 +250,33 @@ async function provisionSSL(siteId, domain) {
   await netlify.post(`/sites/${siteId}/domains/${domain}/dns`)
 }
 
+// Delete a Netlify site
+async function deleteSite(siteId) {
+  await netlify.delete(`/sites/${siteId}`)
+}
+
 // Link a Netlify site to the site-template GitHub repo.
 // Requires SITE_TEMPLATE_REPO env var (e.g. "owner/dinedesk").
 // The Netlify account must have GitHub OAuth already authorized.
 async function linkRepoToSite(siteId, branchOverride = null) {
   const repoPath = process.env.SITE_TEMPLATE_REPO
-  const branch   = branchOverride || process.env.SITE_TEMPLATE_REPO_BRANCH || 'master'
+  const branch   = branchOverride || process.env.SITE_TEMPLATE_REPO_BRANCH || 'main'
   const baseDir  = process.env.SITE_TEMPLATE_BASE_DIR    || 'packages/site-template'
 
   if (!repoPath) {
     throw new Error('SITE_TEMPLATE_REPO is not set. Add it to your .env (e.g. SITE_TEMPLATE_REPO=owner/dinedesk).')
+  }
+
+  console.log(`🔗 Linking repo: ${repoPath}, branch: ${branch}, baseDir: ${baseDir}`)
+
+  // Preserve existing env vars before updating repo config (Netlify UI resets them on relink)
+  let existingEnv = {}
+  try {
+    const siteRes = await netlify.get(`/sites/${siteId}`)
+    existingEnv = siteRes.data?.build_settings?.env || {}
+    console.log(`📦 Preserving ${Object.keys(existingEnv).length} existing env vars`)
+  } catch (err) {
+    console.warn('⚠️  Could not fetch existing env vars:', err.message)
   }
 
   const res = await netlify.patch(`/sites/${siteId}`, {
@@ -273,6 +290,19 @@ async function linkRepoToSite(siteId, branchOverride = null) {
       allowed_branches: [branch],
     }
   })
+
+  // Restore env vars after repo update
+  if (Object.keys(existingEnv).length > 0) {
+    try {
+      await netlify.patch(`/sites/${siteId}`, {
+        build_settings: { env: existingEnv }
+      })
+      console.log('✅ Environment variables restored after repo link')
+    } catch (err) {
+      console.warn('⚠️  Could not restore env vars after repo link:', err.message)
+    }
+  }
+
   return res.data
 }
 
@@ -288,5 +318,6 @@ module.exports = {
   linkRepoToSite,
   addDomain,
   setPrimaryDomain,
-  provisionSSL
+  provisionSSL,
+  deleteSite
 }

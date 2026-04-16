@@ -217,14 +217,14 @@ const StandardHeader = (props) => {
       <UtilityBelt isDark={isDark} />
       <header className={`transition-all duration-300 ${headerBg}`} style={{ color: headerTextColor }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex items-center justify-between min-h-20">
             {/* Logo and Name - Always links to Home */}
             <Link href={withSiteParam('/') || '/'} className="flex items-center space-x-3 group">
               {displayLogo ? (
                 <img 
                   src={displayLogo} 
                   alt={restaurant?.name || 'Restaurant'} 
-                  className="h-10 w-auto object-contain transition-all duration-300 group-hover:scale-105"
+                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-32"
                 />
               ) : (
                 <div className="h-10 w-10 bg-gray-300 rounded flex items-center justify-center text-gray-600 font-bold">
@@ -413,7 +413,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
       <UtilityBelt />
       <header className={`transition-all duration-300 ${headerBg}`} style={{ color: headerTextColor }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex items-center justify-between min-h-20">
             {/* Desktop Left Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
               {leftNav.map((item) => (
@@ -427,7 +427,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
                 <img
                   src={displayLogo}
                   alt={restaurant?.name || 'Restaurant'}
-                  className="h-12 w-auto object-contain transition-all duration-300 group-hover:scale-105"
+                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-32"
                 />
               )}
               <span
@@ -616,14 +616,14 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
       <UtilityBelt />
       <header className={`transition-all duration-300 ${headerBg}`} style={{ color: headerTextColor }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex items-center justify-between min-h-20">
             {/* Logo and Name */}
             <Link href={withSiteParam('/') || '/'} className="flex items-center space-x-3 group">
               {displayLogo && (
                 <img
                   src={displayLogo}
                   alt={restaurant?.name || 'Restaurant'}
-                  className="h-10 w-auto object-contain transition-all duration-300 group-hover:scale-105"
+                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-32"
                 />
               )}
               <span

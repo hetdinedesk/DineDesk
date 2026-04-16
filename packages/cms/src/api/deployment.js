@@ -15,3 +15,7 @@ export const createNetlifySite = (clientId) =>
 // Get live deploy status directly from Netlify
 export const getNetlifyDeploys = (clientId) =>
   api.get(`/clients/${clientId}/netlify/deploys`).then(r => r.data)
+
+// Delete Netlify site
+export const deleteNetlifySite = (clientId) =>
+  api.delete(`/clients/${clientId}/netlify`).then(r => r.data)

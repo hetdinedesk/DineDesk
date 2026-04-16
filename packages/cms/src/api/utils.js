@@ -1,4 +1,4 @@
-export const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+export const API = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
 export async function apiFetch(path, method = 'GET', body = null, tokenKey = 'dd_token') {
   const token = localStorage.getItem(tokenKey)
