@@ -1,11 +1,15 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../../contexts/CMSContext';
 import { Clock, Tag } from 'lucide-react';
+import { withSiteParam, getSiteId } from '../../../lib/links';
 
 export const SpecialsSection = ({ title, subtitle }) => {
   const { specials } = useCMS();
+  const router = useRouter();
+  const siteId = getSiteId(router);
 
   const activeSpecials = specials.filter((special) => {
     if (!special.isActive) return false;
@@ -107,7 +111,7 @@ export const SpecialsSection = ({ title, subtitle }) => {
           className="text-center mt-12"
         >
           <Link
-            href="/specials"
+            href={withSiteParam('/specials', siteId)}
             className="inline-block bg-[var(--color-secondary)] text-white px-8 py-3 rounded-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
           >
             View All Specials

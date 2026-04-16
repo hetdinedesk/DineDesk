@@ -372,6 +372,9 @@ function WelcomeSection({ title, subtitle, content, image, ctaText, ctaUrl, isEx
 
 // Home Specials Section
 function HomeSpecialsSection({ specials, title, subtitle }) {
+  const router = useRouter();
+  const siteId = getSiteId(router);
+
   return (
     <section className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -448,7 +451,7 @@ function HomeSpecialsSection({ specials, title, subtitle }) {
 
         <div className="text-center mt-12">
           <Link
-            href="/specials"
+            href={withSiteParam('/specials', siteId)}
             className="inline-block bg-[var(--color-secondary)] text-white px-8 py-3 rounded-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
           >
             View All Specials
