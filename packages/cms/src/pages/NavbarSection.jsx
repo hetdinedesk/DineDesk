@@ -1172,7 +1172,7 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     if (!link) return
 
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_CMS_API_URL}/clients/${clientId}/footer-links/${linkId}`, {
+      await fetch(`${import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'}/clients/${clientId}/footer-links/${linkId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ footerSectionId: sectionId })
@@ -1188,7 +1188,7 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
 
   const handleDeleteUnassignedLink = (linkId) => {
     if (!window.confirm('Delete this unassigned footer link?')) return
-    fetch(`${process.env.NEXT_PUBLIC_CMS_API_URL}/clients/${clientId}/footer-links/${linkId}`, {
+    fetch(`${import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'}/clients/${clientId}/footer-links/${linkId}`, {
       method: 'DELETE'
     }).then(() => {
       setUnassignedLinks(unassignedLinks.filter(l => l.id !== linkId))
