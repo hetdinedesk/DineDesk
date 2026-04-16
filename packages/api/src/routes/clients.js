@@ -361,12 +361,15 @@ const placeId = cfg?.reviews?.googlePlaceId
 
 // Check if reviews section is active and enabled in CMS
   const reviewsSection = homeSections.find(section => section.type === 'reviews' && section.isActive)
+  console.log('[REVIEWS] reviewsSection found:', !!reviewsSection, 'isActive:', reviewsSection?.isActive)
   let reviewsContent = {}
   if (reviewsSection) {
     try {
       reviewsContent = typeof reviewsSection.content === 'string' ? JSON.parse(reviewsSection.content) : reviewsSection.content || {}
+      console.log('[REVIEWS] reviewsContent:', reviewsContent)
     } catch (e) {
       reviewsContent = {}
+      console.log('[REVIEWS] Error parsing reviewsContent:', e.message)
     }
   }
   
@@ -389,11 +392,14 @@ const placeId = cfg?.reviews?.googlePlaceId
 
   if (shouldFetchGoogleReviews) {
   try {
+    console.log('[GOOGLE API] Fetching reviews for place ID:', placeId)
     const gRes = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,reviews&key=${process.env.GOOGLE_PLACES_API_KEY}`
     )
     const gData = await gRes.json()
+    console.log('[GOOGLE API] Response status:', gData.status, 'error:', gData.error_message)
     if (gData.result) {
+      console.log('[GOOGLE API] Place name:', gData.result.name, 'Rating:', gData.result.rating, 'Total reviews:', gData.result.user_ratings_total)
       googlePlaceData = {
         rating:       gData.result.rating,
         totalReviews: gData.result.user_ratings_total,
@@ -411,6 +417,7 @@ const placeId = cfg?.reviews?.googlePlaceId
           source: 'Google',
           photo:  r.profile_photo_url,
         }))
+      console.log('[GOOGLE API] Fetched', googleReviews.length, 'reviews after filtering')
       // If we have very few reviews after filtering, supplement with sample reviews to ensure variety
       finalReviews = googleReviews;
       if (finalReviews.length < 5 && cfg?.reviews?.showSampleReviews !== false) {
@@ -541,11 +548,11 @@ const exportData = {
   }
 }
 
-    // Cache the response
-    setCachedExport(id, exportData)
+  // Cache the response
+  setCachedExport(id, exportData)
 
-    res.json(exportData)
-  } catch (err) {
+  res.json(exportData)
+} catch (err) {
     console.error('Export error:', err.message)
     res.status(500).json({ error: err.message })
   }
