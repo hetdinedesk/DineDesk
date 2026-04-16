@@ -2029,6 +2029,7 @@ router.put('/:id/config', async (req, res) => {
     }
 
     console.log('[CONFIG SAVE] Upserting with version:', updateData.version)
+    console.log('[CONFIG SAVE] Colours being saved:', JSON.stringify(updateData.colours, null, 2))
 
     const config = await prisma.siteConfig.upsert({
       where:  { clientId },
@@ -2037,6 +2038,7 @@ router.put('/:id/config', async (req, res) => {
     })
 
     console.log('[CONFIG SAVE] Successfully saved config')
+    console.log('[CONFIG SAVE] Saved colours:', JSON.stringify(config.colours, null, 2))
 
     // Clear export cache for this client
     exportCache.delete(clientId)
@@ -2695,6 +2697,39 @@ router.put('/:id/netlify/env', async (req, res) => {
   } catch (err) {
     console.error('❌ PUT env vars error:', err.message)
     res.status(500).json({ error: 'Failed to update env vars', details: err.message })
+  }
+})
+
+// POST restore env vars after manual repo linking in Netlify UI
+// This restores the required env vars (NEXT_PUBLIC_SITE_ID, SITE_TEMPLATE, NEXT_PUBLIC_CMS_API_URL)
+router.post('/:id/netlify/restore-env', async (req, res) => {
+  try {
+    const config = await prisma.siteConfig.findUnique({ where: { clientId: req.params.id } })
+    const siteId = config?.netlify?.siteId
+    if (!siteId) return res.status(400).json({ error: 'No Netlify site configured' })
+
+    const client = await prisma.client.findUnique({ where: { id: req.params.id } })
+    if (!client) return res.status(404).json({ error: 'Client not found' })
+
+    const template = config?.template || 'dinedesk'
+    const apiUrl = req.body.apiUrl || process.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
+
+    console.log('🔄 Restoring env vars after manual repo link...')
+    await netlifyService.setEnvVars(siteId, {
+      NEXT_PUBLIC_SITE_ID: client.id,
+      SITE_TEMPLATE: template,
+      NEXT_PUBLIC_CMS_API_URL: apiUrl,
+    })
+
+    log({
+      action: 'NETLIFY_ENV_RESTORED', entity: 'Deployment',
+      userId: req.user.id, userName: req.user.name, clientId: req.params.id
+    })
+
+    res.json({ success: true, message: 'Environment variables restored successfully' })
+  } catch (err) {
+    console.error('❌ restore-env error:', err.message)
+    res.status(500).json({ error: 'Failed to restore env vars', details: err.message })
   }
 })
 

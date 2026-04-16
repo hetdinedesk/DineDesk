@@ -17,6 +17,8 @@ const coloursSchema = z.object({
   ctaBg: colourHex.optional(),
   ctaText: colourHex.optional(),
   accentBg: colourHex.optional(),
+  utilityBeltBg: colourHex.optional(),
+  utilityBeltText: colourHex.optional(),
 }).optional()
 
 const optionalUrl = z.string().url().optional().nullable().or(z.literal(''))

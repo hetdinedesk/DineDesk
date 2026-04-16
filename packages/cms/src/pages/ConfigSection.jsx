@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getConfig, saveConfig } from '../api/config'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { deployClient, getDeploys, createNetlifySite, getNetlifyDeploys } from '../api/deployment'
+import { deployClient, getDeploys, createNetlifySite, getNetlifyDeploys, deleteNetlifySite } from '../api/deployment'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
@@ -14,7 +14,7 @@ import { Settings, Palette, Code, FileText, Layout, Share2, Star, Calendar, BarC
 import { C } from '../theme'
 import OnlineOrderingSection from './OnlineOrderingSection'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
 // Sidebar groups — Clean 3-layer structure:
 // General (Site identity) | Design (Visual layer) | Deploy (Publishing)
@@ -1238,18 +1238,71 @@ function AnalyticsConfig({ clientId, config, setHasUnsavedChanges }) {
 }
 
 // ── Branding Upload Field ────────────────────────────────────
-function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange }) {
+function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange, enableResize = false }) {
   const [uploading, setUploading] = useState(false)
   const [dragging,  setDragging]  = useState(false)
   const [error,     setError]     = useState('')
   const [progress,  setProgress]  = useState(0)
+  const [resizeWidth, setResizeWidth] = useState('')
+  const [resizeHeight, setResizeHeight] = useState('')
+
+  const resizeImage = (file, width, height) => {
+    return new Promise((resolve, reject) => {
+      console.log('Starting resize:', { originalSize: file.size, width, height })
+      const img = new window.Image()
+      img.onload = () => {
+        console.log('Image loaded:', { originalWidth: img.width, originalHeight: img.height })
+        const canvas = document.createElement('canvas')
+        canvas.width = parseInt(width)
+        canvas.height = parseInt(height)
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            console.error('Failed to create blob from canvas')
+            reject(new Error('Failed to resize image'))
+            return
+          }
+          const resizedFile = new File([blob], file.name, { type: file.type })
+          console.log('Resize complete:', { originalSize: file.size, newSize: resizedFile.size })
+          resolve(resizedFile)
+        }, file.type)
+      }
+      img.onerror = (err) => {
+        console.error('Failed to load image:', err)
+        reject(err)
+      }
+      img.src = URL.createObjectURL(file)
+    })
+  }
 
   const upload = async (file) => {
     if (!file) return
     setUploading(true); setError(''); setProgress(0)
+
+    console.log('Upload started:', { fileName: file.name, fileSize: file.size, type: file.type })
+
+    // Resize image if dimensions provided
+    let finalFile = file
+    if (resizeWidth && resizeHeight) {
+      console.log('Resize dimensions provided:', { resizeWidth, resizeHeight })
+      try {
+        setProgress(10)
+        finalFile = await resizeImage(file, resizeWidth, resizeHeight)
+        console.log('Resize successful, new file size:', finalFile.size)
+        setProgress(20)
+      } catch (err) {
+        console.error('Resize failed:', err)
+        setError('Failed to resize image')
+        setUploading(false)
+        return
+      }
+    } else {
+      console.log('No resize dimensions provided, using original file')
+    }
     
     // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    if (finalFile.size > 5 * 1024 * 1024) {
       setError('File too large — max 5MB')
       setUploading(false)
       return
@@ -1257,14 +1310,14 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
     
     // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml']
-    if (!validTypes.includes(file.type)) {
+    if (!validTypes.includes(finalFile.type)) {
       setError('Invalid file type — use PNG, JPG, WEBP, or SVG')
       setUploading(false)
       return
     }
     
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', finalFile)
     
     try {
       setProgress(30)
@@ -1353,6 +1406,51 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange 
               fontFamily:'inherit', flexShrink:0 }}>
             Remove
           </button>
+        </div>
+      )}
+
+      {/* Resize options */}
+      {enableResize && (
+        <div style={{ padding:'14px 18px', borderBottom:`1px solid ${C.border}`,
+          display:'flex', gap:12, alignItems:'flex-end' }}>
+          <div style={{ flex:1 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.06em',
+              display:'block', marginBottom:5 }}>Resize Width (px)</label>
+            <input
+              type="number"
+              value={resizeWidth}
+              onChange={e => setResizeWidth(e.target.value)}
+              placeholder="e.g. 200"
+              style={{ width:'100%', padding:'9px 11px', background:C.input,
+                border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+            />
+          </div>
+          <div style={{ flex:1 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+              textTransform:'uppercase', letterSpacing:'0.06em',
+              display:'block', marginBottom:5 }}>Resize Height (px)</label>
+            <input
+              type="number"
+              value={resizeHeight}
+              onChange={e => setResizeHeight(e.target.value)}
+              placeholder="e.g. 200"
+              style={{ width:'100%', padding:'9px 11px', background:C.input,
+                border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+                fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+            />
+          </div>
+          {(resizeWidth || resizeHeight) && (
+            <button
+              onClick={() => { setResizeWidth(''); setResizeHeight('') }}
+              style={{ padding:'9px 14px', background:'transparent',
+                border:'1px solid #EF444440', borderRadius:7,
+                color:'#EF4444', fontSize:12, cursor:'pointer',
+                fontFamily:'inherit' }}>
+              Clear
+            </button>
+          )}
         </div>
       )}
 
@@ -1504,6 +1602,7 @@ function BrandingConfig({ clientId, config, setHasUnsavedChanges }) {
           hint="Used on light-coloured headers. Dark version of the logo."
           value={form.logoLight || ''}
           onChange={v => set('logoLight', v)}
+          enableResize={true}
         />
 
         <BrandUpload
@@ -1512,6 +1611,7 @@ function BrandingConfig({ clientId, config, setHasUnsavedChanges }) {
           hint="Used on dark-coloured headers. White or light version of the logo."
           value={form.logoDark || ''}
           onChange={v => set('logoDark', v)}
+          enableResize={true}
         />
       </div>
 
@@ -1866,8 +1966,9 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
       const c     = config.colours
       const theme = THEMES.find(t => t.key === (c.theme || 'theme-v1')) || THEMES[0]
       setSelected(c.theme || 'theme-v1')
-      setColours({ ...theme.defaults, ...c })
-      savedColoursRef.current = c
+      const mergedColours = { ...theme.defaults, ...c }
+      setColours(mergedColours)
+      savedColoursRef.current = mergedColours
       savedSelectedRef.current = c.theme || 'theme-v1'
       setHasUnsavedChanges(false)
     }
@@ -1881,11 +1982,16 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
   }, [selected, colours, setHasUnsavedChanges])
 
   const mutation = useMutation({
-    mutationFn: () => saveConfig(clientId, {
-      colours: { ...colours, theme: selected }
-    }),
-    onSuccess: () => {
+    mutationFn: () => {
+      const data = { colours: { ...colours, theme: selected } }
+      console.log('[FRONTEND] Saving colours:', JSON.stringify(data.colours, null, 2))
+      return saveConfig(clientId, data)
+    },
+    onSuccess: (response) => {
+      console.log('[FRONTEND] Save response colours:', JSON.stringify(response.colours, null, 2))
       qc.invalidateQueries(['config', clientId])
+      savedColoursRef.current = colours
+      savedSelectedRef.current = selected
       setHasUnsavedChanges(false)
           }
   })
@@ -2112,10 +2218,8 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
                 <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                   {group.fields.map(({ key, label }) => {
                     // Check if this field should be disabled
-                    const isUtilityBeltField = group.section === 'Utility Belt'
                     const isNavigationField = group.section === 'Navigation'
-                    const isDisabled = (isUtilityBeltField && !isUtilityBeltEnabled) || 
-                                     (isNavigationField && !hasSeparateNav)
+                    const isDisabled = isNavigationField && !hasSeparateNav
                     
                     return (
                       <div key={key} style={{ 
@@ -2184,11 +2288,7 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
                         />
                         <span style={{ fontSize:13, color: isDisabled ? C.t3 : C.t1 }}>
                           {label}
-                          {isDisabled && (
-                            isUtilityBeltField ? ' (Utility Belt Disabled)' : 
-                            isNavigationField ? ' (Combined with Header)' : 
-                            ' (Disabled)'
-                          )}
+                          {isDisabled && ' (Combined with Header)'}
                         </span>
                         <div style={{ 
                           width:28, 
@@ -4276,6 +4376,9 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
   // Rollback
   const [rollingBack, setRollingBack] = useState(null) // deployId being rolled back
 
+  // Delete site
+  const [deletingSite, setDeletingSite] = useState(false)
+
   useEffect(() => { 
     if (config.netlify) {
       setForm(config.netlify)
@@ -4581,6 +4684,27 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
     }
   }
 
+  const handleDeleteSite = async () => {
+    if (!confirm('Are you sure you want to delete this Netlify site? This action cannot be undone.')) {
+      return
+    }
+    setDeletingSite(true)
+    try {
+      await deleteNetlifySite(clientId)
+      // Clear the form and reset state
+      setForm({})
+      setBuildStatus(null)
+      setBuildStartTime(null)
+      setCreateMsg('')
+      qc.invalidateQueries(['config', clientId])
+      alert('Netlify site deleted successfully')
+    } catch (err) {
+      alert('Failed to delete Netlify site: ' + err.message)
+    } finally {
+      setDeletingSite(false)
+    }
+  }
+
   useEffect(() => { if (tab === 'env') loadEnvVars() }, [tab])
 
   const loadSetupStatus = async () => {
@@ -4875,6 +4999,13 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
                       boxShadow:'0 4px 16px rgba(34,197,94,0.3)',
                       opacity: (rebuilding || buildStatus === 'building') ? 0.6 : 1 }}>
                     {rebuilding ? 'Starting...' : 'Build & Deploy'}
+                  </button>
+                  <button onClick={handleDeleteSite} disabled={deletingSite}
+                    style={{ padding:'8px 14px', background:'#EF4444', border:'none',
+                      borderRadius:6, color:'#fff', fontWeight:600, fontSize:12,
+                      cursor: deletingSite ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+                      opacity: deletingSite ? 0.6 : 1 }}>
+                    {deletingSite ? 'Deleting...' : 'Delete Site'}
                   </button>
                 </div>
               </div>
