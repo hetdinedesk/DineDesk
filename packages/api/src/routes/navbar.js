@@ -331,4 +331,35 @@ router.delete('/footer-links/:linkId', async (req, res) => {
   }
 })
 
+/**
+ * PUT — update a footer link (assign to section or unassign)
+ */
+router.put('/footer-links/:linkId', async (req, res) => {
+  try {
+    const clientId = getClientId(req)
+    const linkId = req.params.linkId
+    const { footerSectionId } = req.body
+
+    const link = await prisma.footerLink.findUnique({
+      where: { id: linkId }
+    })
+
+    if (!link || link.clientId !== clientId) {
+      return res.status(404).json({ error: 'Footer link not found' })
+    }
+
+    const updated = await prisma.footerLink.update({
+      where: { id: linkId },
+      data: {
+        footerSectionId: footerSectionId || null
+      }
+    })
+
+    res.json(updated)
+  } catch (err) {
+    console.error('Update footer link error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router

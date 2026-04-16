@@ -1167,25 +1167,23 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     setLinkModal(null)
   }
 
-  const handleAssignLink = (linkId, sectionId) => {
+  const handleAssignLink = async (linkId, sectionId) => {
     const link = unassignedLinks.find(l => l.id === linkId)
     if (!link) return
 
-    const next = sections.map(s => {
-      if (s.id !== sectionId) return s
-      return {
-        ...s,
-        links: [...(s.links || []), {
-          id: link.id,
-          label: link.label,
-          pageId: link.pageId,
-          externalUrl: link.externalUrl
-        }]
-      }
-    })
-    persist(next)
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_CMS_API_URL}/clients/${clientId}/footer-links/${linkId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ footerSectionId: sectionId })
+      })
 
-    setUnassignedLinks(unassignedLinks.filter(l => l.id !== linkId))
+      // Reload data to get updated state
+      qc.invalidateQueries({ queryKey: ['navbar', clientId] })
+    } catch (err) {
+      console.error('Failed to assign link:', err)
+      alert('Failed to assign link. Please try again.')
+    }
   }
 
   const handleDeleteUnassignedLink = (linkId) => {
