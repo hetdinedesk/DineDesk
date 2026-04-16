@@ -80,11 +80,9 @@ export default function Specials({ clientId }) {
     description: '',
     price: '',
     imageUrl: '',
-    bannerImage: '',
     startDate: '',
     endDate: '',
-    isActive: true,
-    showInNav: false
+    isActive: true
   })
   const [editingId, setEditingId] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -151,8 +149,8 @@ export default function Specials({ clientId }) {
       setShowForm(false)
       setEditingId(null)
       setSpecialForm({
-        title: '', description: '', price: '', imageUrl: '', bannerImage: '',
-        startDate: '', endDate: '', isActive: true, showInNav: false
+        title: '', description: '', price: '', imageUrl: '',
+        startDate: '', endDate: '', isActive: true
       })
     }
   })
@@ -181,17 +179,14 @@ export default function Specials({ clientId }) {
   }
   
   const handleEdit = (special) => {
-    setEditingId(special.id)
     setSpecialForm({
       title: special.title || '',
       description: special.description || '',
       price: special.price ? String(special.price) : '',
       imageUrl: special.imageUrl || '',
-      bannerImage: special.bannerImage || '',
       startDate: special.startDate ? special.startDate.split('T')[0] : '',
       endDate: special.endDate ? special.endDate.split('T')[0] : '',
-      isActive: special.isActive !== false,
-      showInNav: special.showInNav || false
+      isActive: special.isActive !== false
     })
     setShowForm(true)
   }
@@ -334,20 +329,7 @@ export default function Specials({ clientId }) {
                 displayDimensions={{ width: 600, height: 400 }}
               />
             </div>
-            
-            <div style={{ marginBottom: 16 }}>
-              <label style={{
-                display: 'block', fontSize: 11, fontWeight: 700, color: C.t3,
-                textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8
-              }}>Banner Image (for specials page)</label>
-              <ImageUpload
-                clientId={clientId}
-                value={specialForm.bannerImage}
-                onChange={(url) => setSpecialForm({ ...specialForm, bannerImage: url })}
-                displayDimensions={{ width: 1200, height: 400 }}
-              />
-            </div>
-            
+
             <InputField
               label="Start Date"
               value={specialForm.startDate}
@@ -361,15 +343,7 @@ export default function Specials({ clientId }) {
               onChange={(e) => setSpecialForm({ ...specialForm, endDate: e.target.value })}
               type="date"
             />
-            
-            <div style={{ marginTop: 12 }}>
-              <ToggleSwitch
-                checked={specialForm.showInNav}
-                onChange={() => setSpecialForm({ ...specialForm, showInNav: !specialForm.showInNav })}
-                label="Show in navigation"
-              />
-            </div>
-            
+
             <div style={{ marginTop: 20, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => { setShowForm(false); setEditingId(null) }}
