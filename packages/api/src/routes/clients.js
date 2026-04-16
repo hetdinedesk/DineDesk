@@ -1587,7 +1587,7 @@ router.post('/:id/pages', async (req, res) => {
         })
         // Automatically create a footer link for the new page
         const maxFooterLink = await tx.footerLink.aggregate({
-          where: { footerSection: null },
+          where: { footerSectionId: null },
           _max: { sortOrder: true }
         })
         await tx.footerLink.create({
@@ -1612,7 +1612,7 @@ router.post('/:id/pages', async (req, res) => {
       })
       // Automatically create a footer link for the new page
       const maxFooterLink = await tx.footerLink.aggregate({
-        where: { footerSection: null },
+        where: { footerSectionId: null },
         _max: { sortOrder: true }
       })
       await tx.footerLink.create({

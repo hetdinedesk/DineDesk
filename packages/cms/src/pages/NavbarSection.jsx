@@ -1112,9 +1112,13 @@ function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLin
 
 function FooterSectionsPanel ({ clientId, data, qc }) {
   const [sections, setSections] = useState(data?.footerSections || [])
+  const [unassignedLinks, setUnassignedLinks] = useState(data?.unassignedFooterLinks || [])
   const [linkModal, setLinkModal] = useState(null)
 
-  useEffect(() => { setSections(data?.footerSections || []) }, [data?.footerSections])
+  useEffect(() => {
+    setSections(data?.footerSections || [])
+    setUnassignedLinks(data?.unassignedFooterLinks || [])
+  }, [data?.footerSections, data?.unassignedFooterLinks])
 
   const saveFt = useMutation({
     mutationFn: (next) => saveNavbarApi(clientId, { footerSections: serializeFooterSections(next) }),
@@ -1163,6 +1167,37 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     setLinkModal(null)
   }
 
+  const handleAssignLink = (linkId, sectionId) => {
+    const link = unassignedLinks.find(l => l.id === linkId)
+    if (!link) return
+
+    const next = sections.map(s => {
+      if (s.id !== sectionId) return s
+      return {
+        ...s,
+        links: [...(s.links || []), {
+          id: link.id,
+          label: link.label,
+          pageId: link.pageId,
+          externalUrl: link.externalUrl
+        }]
+      }
+    })
+    persist(next)
+
+    setUnassignedLinks(unassignedLinks.filter(l => l.id !== linkId))
+  }
+
+  const handleDeleteUnassignedLink = (linkId) => {
+    if (!window.confirm('Delete this unassigned footer link?')) return
+    fetch(`${process.env.NEXT_PUBLIC_CMS_API_URL}/clients/${clientId}/footer-links/${linkId}`, {
+      method: 'DELETE'
+    }).then(() => {
+      setUnassignedLinks(unassignedLinks.filter(l => l.id !== linkId))
+      qc.invalidateQueries({ queryKey: ['navbar', clientId] })
+    })
+  }
+
   return (
     <div>
       <SectionHeader title="Footer columns" Icon={PanelBottom} onAdd={() => { const id = `temp-${Date.now()}`; persist([...sections, { id, title: 'New Column', isActive: true, links: [] }]) }} addLabel="Add column" />
@@ -1170,10 +1205,49 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
         Drag columns to reorder. Toggle to show/hide in the footer. Drag links within a column to reorder them.
       </p>
 
-      {sections.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: C.t3, border: `1px dashed ${C.border}`, borderRadius: 12 }}>
-          No footer columns yet — click <strong style={{ color: C.acc }}>Add column</strong> to get started.
+      {unassignedLinks && unassignedLinks.length > 0 && (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+            Unassigned Footer Links
+          </div>
+          <p style={{ fontSize: 12, color: C.t2, marginBottom: 12 }}>
+            These links were automatically created when pages were added. Assign them to a column below or delete them.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {unassignedLinks.map(link => (
+              <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: C.panel, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: C.t0 }}>{link.label}</div>
+                  <div style={{ fontSize: 11, color: C.t2 }}>
+                    {link.page ? pages.find(p => p.id === link.pageId)?.title || 'Linked page' : link.externalUrl || 'No URL'}
+                  </div>
+                </div>
+                <select
+                  value=""
+                  onChange={(e) => { if (e.target.value) handleAssignLink(link.id, e.target.value) }}
+                  style={{ padding: 6, background: C.input, border: `1px solid ${C.border}`, borderRadius: 6, color: C.t0, fontSize: 12 }}
+                >
+                  <option value="">Assign to column...</option>
+                  {sections.map(s => <option key={s.id} value={s.id}>{s.title || 'Untitled'}</option>)}
+                </select>
+                <button
+                  onClick={() => handleDeleteUnassignedLink(link.id)}
+                  style={{ ...btnDanger, padding: '4px 8px', fontSize: 11 }}
+                  title="Delete"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
+      )}
+
+      {!sections || sections.length === 0 ? (
+        <EmptyState
+          message="No footer columns yet"
+          hint="Add a column to start organizing your footer links"
+        />
       ) : (
         <DndContext collisionDetection={closestCenter} onDragEnd={onDragEndSections}>
           <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>

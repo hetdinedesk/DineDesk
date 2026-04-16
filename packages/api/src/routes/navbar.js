@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
   try {
     const clientId = getClientId(req)
 
-    const [navFlat, pages, footerSections, locations, banners] = await Promise.all([
+    const [navFlat, pages, footerSections, unassignedFooterLinks, locations, banners] = await Promise.all([
       prisma.navigationItem.findMany({
         where: { clientId },
         orderBy: [{ sortOrder: 'asc' }],
@@ -60,6 +60,11 @@ router.get('/', async (req, res) => {
         include: {
           links: { orderBy: { sortOrder: 'asc' }, include: { page: true } }
         }
+      }),
+      prisma.footerLink.findMany({
+        where: { clientId, footerSectionId: null },
+        orderBy: { sortOrder: 'asc' },
+        include: { page: true }
       }),
       prisma.location.findMany({
         where: { clientId, isActive: true },
@@ -77,6 +82,7 @@ router.get('/', async (req, res) => {
       headerSections,
       pages,
       footerSections,
+      unassignedFooterLinks,
       locations,
       banners
     })
@@ -201,9 +207,9 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
  * Replace footer sections (full replace)
  */
 async function replaceFooterSections (tx, clientId, footerSections) {
-  // Delete all existing footer links and sections
+  // Delete only footer links that are assigned to sections, preserve unassigned links
   await tx.footerLink.deleteMany({
-    where: { footerSection: { clientId } }
+    where: { footerSectionId: { not: null }, footerSection: { clientId } }
   })
   await tx.footerSection.deleteMany({ where: { clientId } })
 
@@ -294,6 +300,33 @@ router.get('/tree', async (req, res) => {
     const tree = buildNavTree(items)
     res.json(tree)
   } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * DELETE — delete a footer link
+ */
+router.delete('/footer-links/:linkId', async (req, res) => {
+  try {
+    const clientId = getClientId(req)
+    const linkId = req.params.linkId
+
+    const link = await prisma.footerLink.findUnique({
+      where: { id: linkId }
+    })
+
+    if (!link || link.clientId !== clientId) {
+      return res.status(404).json({ error: 'Footer link not found' })
+    }
+
+    await prisma.footerLink.delete({
+      where: { id: linkId }
+    })
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('Delete footer link error:', err)
     res.status(500).json({ error: err.message })
   }
 })
