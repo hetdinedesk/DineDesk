@@ -359,34 +359,27 @@ let finalReviews = []
 let googlePlaceData = null
 const placeId = cfg?.reviews?.googlePlaceId
 
-// Check if reviews section is active and enabled in CMS
-  const reviewsSection = homeSections.find(section => section.type === 'reviews' && section.isActive)
-  console.log('[REVIEWS] reviewsSection found:', !!reviewsSection, 'isActive:', reviewsSection?.isActive)
-  let reviewsContent = {}
-  if (reviewsSection) {
-    try {
-      reviewsContent = typeof reviewsSection.content === 'string' ? JSON.parse(reviewsSection.content) : reviewsSection.content || {}
-      console.log('[REVIEWS] reviewsContent:', reviewsContent)
-    } catch (e) {
-      reviewsContent = {}
-      console.log('[REVIEWS] Error parsing reviewsContent:', e.message)
-    }
-  }
-  
-  // Validate place ID format (Google Place IDs should start with "ChI" and be 27+ characters long)
+// Use Config settings for reviews visibility - not homeSections
+const reviewsConfig = cfg?.reviews || {}
+console.log('[REVIEWS] Config settings:', {
+  placeId: placeId,
+  enableHeader: reviewsConfig.enableHeader,
+  enableFooter: reviewsConfig.enableFooter,
+  enableFloating: reviewsConfig.enableFloating,
+  showReviewsCarousel: reviewsConfig.showReviewsCarousel
+})
+
+// Validate place ID format (Google Place IDs should start with "ChI" and be 27+ characters long)
   const isValidPlaceId = (placeId) => {
     if (!placeId || typeof placeId !== 'string') return false;
     // Google Place IDs typically start with "ChI" and are at least 27 characters
     return placeId.startsWith('ChI') && placeId.length >= 27;
   }
-  
+
   // Only fetch Google reviews if:
-  // 1. Reviews section is active and enabled
-  // 2. Place ID is configured and valid
-  // 3. Google Reviews are enabled in the section
-  const shouldFetchGoogleReviews = reviewsSection && 
-                                reviewsContent.showGoogleReviews !== false && 
-                                placeId && 
+  // 1. Place ID is configured and valid
+  // 2. Google Reviews are enabled in config
+  const shouldFetchGoogleReviews = placeId &&
                                 isValidPlaceId(placeId) &&
                                 process.env.GOOGLE_PLACES_API_KEY
 
@@ -539,8 +532,8 @@ const exportData = {
     enableHeader: cfg?.reviews?.enableHeader !== false,
     enableFooter: cfg?.reviews?.enableFooter !== false,
     enableFloating: cfg?.reviews?.enableFloating !== false,
-    // Carousel content options - only show if reviews section is active and enabled
-    showReviewsCarousel: reviewsSection && reviewsContent.showGoogleReviews !== false,
+    // Carousel content options - use Config settings for visibility
+    showReviewsCarousel: reviewsConfig.showReviewsCarousel === true,
     carouselHeading: cfg?.reviews?.carouselHeading || '',
     carouselSubHeading: cfg?.reviews?.carouselSubHeading || '',
     carouselContent: cfg?.reviews?.carouselContent || '',
@@ -2079,6 +2072,11 @@ router.put('/:id/config', async (req, res) => {
 
     // Clear export cache for this client
     exportCache.delete(clientId)
+
+    // Also clear cache if reviews config changed
+    if (config.reviews && (config.reviews.googlePlaceId || config.reviews.showReviewsCarousel || config.reviews.enableHeader || config.reviews.enableFooter || config.reviews.enableFloating)) {
+      exportCache.delete(clientId)
+    }
 
     res.json(config)
   } catch (err) {
