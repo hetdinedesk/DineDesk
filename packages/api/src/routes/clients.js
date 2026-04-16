@@ -120,7 +120,21 @@ router.get('/:id/export', async (req, res) => {
               showInFooter: true,
               address: true,
               phone: true,
-              formEmail: true
+              formEmail: true,
+              exteriorImages: true,
+              exteriorImage: true,
+              galleryImages: true,
+              lat: true,
+              lng: true,
+              suburb: true,
+              city: true,
+              state: true,
+              postcode: true,
+              country: true,
+              hours: true,
+              deliveryOptions: true,
+              servicesAvailable: true,
+              alternateStyling: true
             }
           }
         }
@@ -1720,6 +1734,7 @@ router.post('/:id/promo-tiles', async (req, res) => {
     const tile = await prisma.promoTile.create({
       data: { ...req.body, clientId: req.params.id }
     })
+    exportCache.delete(req.params.id)
     res.json(tile)
   } catch (err) {
     console.error('Create promo tile error:', err.message)
@@ -1733,6 +1748,7 @@ router.put('/:id/promo-tiles/:tileId', async (req, res) => {
       where: { id: req.params.tileId },
       data: req.body
     })
+    exportCache.delete(req.params.id)
     res.json(tile)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1742,6 +1758,7 @@ router.put('/:id/promo-tiles/:tileId', async (req, res) => {
 router.delete('/:id/promo-tiles/:tileId', async (req, res) => {
   try {
     await prisma.promoTile.delete({ where: { id: req.params.tileId } })
+    exportCache.delete(req.params.id)
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1767,6 +1784,7 @@ router.put('/:id/promo-config', async (req, res) => {
       create: { ...req.body, clientId: req.params.id },
       update: req.body
     })
+    exportCache.delete(req.params.id)
     res.json(config)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1792,6 +1810,7 @@ router.put('/:id/featured-config', async (req, res) => {
       create: { ...req.body, clientId: req.params.id },
       update: req.body
     })
+    exportCache.delete(req.params.id)
     res.json(config)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1817,6 +1836,7 @@ router.put('/:id/welcome-content', async (req, res) => {
       create: { ...req.body, clientId: req.params.id },
       update: req.body
     })
+    exportCache.delete(req.params.id)
     res.json(content)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1849,6 +1869,7 @@ router.put('/:id/homepage-layout', async (req, res) => {
       create: { ...req.body, clientId: req.params.id },
       update: req.body
     })
+    exportCache.delete(req.params.id)
     res.json(layout)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1873,6 +1894,7 @@ router.post('/:id/custom-text-blocks', async (req, res) => {
     const block = await prisma.customTextBlock.create({
       data: { ...req.body, clientId: req.params.id }
     })
+    exportCache.delete(req.params.id)
     res.json(block)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1885,6 +1907,7 @@ router.put('/:id/custom-text-blocks/:blockId', async (req, res) => {
       where: { id: req.params.blockId },
       data: req.body
     })
+    exportCache.delete(req.params.id)
     res.json(block)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1896,6 +1919,7 @@ router.delete('/:id/custom-text-blocks/:blockId', async (req, res) => {
     await prisma.customTextBlock.delete({
       where: { id: req.params.blockId }
     })
+    exportCache.delete(req.params.id)
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1977,6 +2001,7 @@ router.put('/:id/specials-config', async (req, res) => {
       update: req.body
     })
     console.log('[SPECIALS CONFIG SAVE] Successfully saved:', config)
+    exportCache.delete(req.params.id)
     res.json(config)
   } catch (err) {
     console.error('[SPECIALS CONFIG SAVE] Error:', err.message)
