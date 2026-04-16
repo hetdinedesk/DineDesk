@@ -132,7 +132,6 @@ router.get('/:id/export', async (req, res) => {
               postcode: true,
               country: true,
               hours: true,
-              deliveryOptions: true,
               servicesAvailable: true,
               alternateStyling: true
             }
