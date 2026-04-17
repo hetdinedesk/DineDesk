@@ -5664,26 +5664,31 @@ function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges }) {
   }, [loyaltyConfig, rewards, setHasUnsavedChanges])
 
   // Fetch current loyalty config
-  useEffect(() => {
-    fetch(`${API_URL}/clients/${clientId}/loyalty/config`, {
-      headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.enabled !== undefined) {
-          setLoyaltyConfig({
-            enabled: data.enabled,
-            pointsPerDollar: data.pointsPerDollar || 1
-          })
-          setRewards(data.rewards || [])
-          savedConfigRef.current = {
-            enabled: data.enabled,
-            pointsPerDollar: data.pointsPerDollar || 1
-          }
-          savedRewardsRef.current = data.rewards || []
-        }
+  const fetchLoyaltyConfig = async () => {
+    try {
+      const res = await fetch(`${API_URL}/clients/${clientId}/loyalty/config`, {
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
       })
-      .catch(() => {})
+      const data = await res.json()
+      if (data.enabled !== undefined) {
+        setLoyaltyConfig({
+          enabled: data.enabled,
+          pointsPerDollar: data.pointsPerDollar || 1
+        })
+        setRewards(data.rewards || [])
+        savedConfigRef.current = {
+          enabled: data.enabled,
+          pointsPerDollar: data.pointsPerDollar || 1
+        }
+        savedRewardsRef.current = data.rewards || []
+      }
+    } catch (err) {
+      console.error('Failed to fetch loyalty config:', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchLoyaltyConfig()
   }, [clientId])
 
   const handleSave = async () => {
@@ -5761,6 +5766,7 @@ function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges }) {
       savedRewardsRef.current = rewards.map(r => ({ ...r, isNew: false, isModified: false }))
       setHasUnsavedChanges(false)
       qc.invalidateQueries(['config', clientId])
+      await fetchLoyaltyConfig()
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
