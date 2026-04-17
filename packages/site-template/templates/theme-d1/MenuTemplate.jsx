@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Check } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 
 // Image URLs
@@ -22,6 +22,7 @@ export default function MenuPage({ data, page, banner }) {
   const { addItem, isEnabled: orderingEnabled } = useCart();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [addedItems, setAddedItems] = useState({});
 
   const menuPage = (contentPages || []).find(p => p.slug === 'menu' || p.pageType === 'menu');
   const pageTitle = replaceShortcodes(menuPage?.title || 'Our Menu', shortcodes);
@@ -50,6 +51,19 @@ export default function MenuPage({ data, page, banner }) {
     const imageKeys = Object.keys(IMAGES);
     const hash = (item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
     return IMAGES[imageKeys[Math.abs(hash) % imageKeys.length]];
+  };
+
+  const handleAddItem = (item) => {
+    addItem({
+      id: item.id,
+      name: replaceShortcodes(item.name || '', shortcodes),
+      price: item.price,
+      image: getItemImage(item),
+    });
+    setAddedItems({ ...addedItems, [item.id]: true });
+    setTimeout(() => {
+      setAddedItems(prev => ({ ...prev, [item.id]: false }));
+    }, 2000);
   };
 
   return (
@@ -246,17 +260,21 @@ export default function MenuPage({ data, page, banner }) {
                             )}
                             {orderingEnabled && (
                               <button
-                                onClick={() => addItem({
-                                  id: item.id,
-                                  name,
-                                  price: item.price,
-                                  image: getItemImage(item),
-                                })}
+                                onClick={() => handleAddItem(item)}
                                 className="inline-flex items-center justify-center text-sm font-medium text-white h-8 rounded-md gap-1.5 px-3 transition-colors hover:opacity-90"
-                                style={{ background: 'var(--color-primary)' }}
+                                style={{ background: addedItems[item.id] ? '#10B981' : 'var(--color-primary)' }}
                               >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Add
+                                {addedItems[item.id] ? (
+                                  <>
+                                    <Check className="w-4 h-4 mr-1" />
+                                    Added
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Add
+                                  </>
+                                )}
                               </button>
                             )}
                           </div>

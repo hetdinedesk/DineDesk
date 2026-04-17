@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Clock, Tag, Calendar, Plus } from 'lucide-react';
+import { Clock, Tag, Calendar, Plus, Check } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 
 const SPECIAL_IMAGE = 'https://images.unsplash.com/photo-1759283084358-0565ea8e2885?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aW5lJTIwcGFpcmluZyUyMGRpbm5lcnxlbnwxfHx8fDE3NzQ4NDc3ODh8MA&ixlib=rb-4.1.0&q=80&w=1080';
@@ -11,6 +11,7 @@ const SPECIAL_IMAGE_2 = 'https://images.unsplash.com/photo-1755811248324-3c9b7c8
 export default function SpecialsPage({ data, page, banner }) {
   const { specials, shortcodes, contentPages, ordering } = useCMS();
   const { addItem, isEnabled: orderingEnabled } = useCart();
+  const [addedItems, setAddedItems] = useState({});
 
   const specialsPage = (contentPages || []).find(p => p.slug === 'specials' || p.pageType === 'specials');
   const pageTitle = replaceShortcodes(specialsPage?.title || 'Current Specials', shortcodes);
@@ -25,6 +26,20 @@ export default function SpecialsPage({ data, page, banner }) {
     const beforeEnd = !validUntil || now <= validUntil;
     return afterStart && beforeEnd;
   });
+
+  const handleAddItem = (special) => {
+    addItem({
+      id: special.id,
+      name: replaceShortcodes(special.title || '', shortcodes),
+      price: special.price || 0,
+      image: special.image || SPECIAL_IMAGE,
+      category: 'Special'
+    });
+    setAddedItems({ ...addedItems, [special.id]: true });
+    setTimeout(() => {
+      setAddedItems(prev => ({ ...prev, [special.id]: false }));
+    }, 2000);
+  };
 
   const upcomingSpecials = specials.filter((special) => {
     if (!special.isActive) return false;
@@ -166,18 +181,24 @@ export default function SpecialsPage({ data, page, banner }) {
                         
                         {orderingEnabled && special.price && (
                           <button
-                            onClick={() => addItem({
-                              id: special.id,
-                              name: title,
-                              price: special.price,
-                              image: special.image || (index % 2 === 0 ? SPECIAL_IMAGE : SPECIAL_IMAGE_2),
-                              description: description,
-                              category: 'Special'
-                            })}
-                            className="bg-white text-[var(--color-primary)] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors flex items-center space-x-2"
+                            onClick={() => handleAddItem(special)}
+                            className="px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition-colors flex items-center space-x-2"
+                            style={{
+                              background: addedItems[special.id] ? '#10B981' : 'white',
+                              color: addedItems[special.id] ? 'white' : 'var(--color-primary)'
+                            }}
                           >
-                            <Plus size={18} />
-                            <span className="hidden sm:inline">Add to Cart</span>
+                            {addedItems[special.id] ? (
+                              <>
+                                <Check size={18} />
+                                <span className="hidden sm:inline">Added</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus size={18} />
+                                <span className="hidden sm:inline">Add to Cart</span>
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
