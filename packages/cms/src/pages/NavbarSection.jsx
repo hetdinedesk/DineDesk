@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { DndContext, closestCenter } from '@dnd-kit/core'
+import { DndContext, closestCenter, useDroppable } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useEditor, EditorContent } from '@tiptap/react'
