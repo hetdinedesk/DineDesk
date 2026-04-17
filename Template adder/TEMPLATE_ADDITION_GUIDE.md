@@ -16,7 +16,10 @@ This guide explains everything you need to know to add a new template, connect i
 9. [Theme & Color System](#theme--color-system)
 10. [Shortcodes](#shortcodes)
 11. [Available Components](#available-components)
-12. [Common Patterns](#common-patterns)
+12. [Loyalty System Integration](#loyalty-system-integration)
+13. [Cart & Ordering Integration](#cart--ordering-integration)
+14. [Checkout Integration](#checkout-integration)
+15. [Common Patterns](#common-patterns)
 
 ---
 
@@ -180,7 +183,18 @@ The API export returns the following data structure:
   
   // Payment
   paymentGateway: { provider, isActive, testMode, ... },
-  
+
+  // Loyalty Program
+  loyaltyConfig: {
+    enabled: boolean,
+    pointsPerDollar: number,
+    rewards: [{
+      id, name, description, pointsRequired,
+      discountValue, discountType: 'fixed' | 'percentage',
+      isActive
+    }]
+  },
+
   // Site type
   siteType: 'restaurant' | 'cafe' | 'food-truck' | ...
 }
@@ -787,6 +801,437 @@ Shadcn/ui components in `components/theme-d1/ui/`:
 
 ---
 
+## Loyalty System Integration
+
+### What is the Loyalty System?
+
+The loyalty system allows restaurants to reward customers for repeat purchases. Customers earn points on orders and can redeem them for discounts.
+
+### Loyalty Data Structure
+
+```javascript
+{
+  loyaltyConfig: {
+    enabled: boolean,
+    pointsPerDollar: number,
+    rewards: [{
+      id: string,
+      name: string,
+      description: string,
+      pointsRequired: number,
+      discountValue: number,
+      discountType: 'fixed' | 'percentage',
+      isActive: boolean
+    }]
+  }
+}
+```
+
+### LoyaltyContext
+
+The LoyaltyContext provides loyalty functionality to components:
+
+```jsx
+import { LoyaltyProvider, useLoyalty } from '../../contexts/LoyaltyContext';
+
+// Wrap your app or template
+<LoyaltyProvider clientId={clientId} loyaltyConfig={loyaltyConfig}>
+  <YourTemplate />
+</LoyaltyProvider>
+
+// Use the hook in components
+function MyComponent() {
+  const {
+    customer,              // Current customer data
+    loyaltyConfig,         // Loyalty configuration
+    lookupCustomer,        // Lookup customer by phone
+    upsertCustomer,        // Create or update customer
+    redeemReward,          // Redeem a reward
+    canRedeemReward,       // Check if customer can redeem reward
+    getPointsToNextReward, // Get points needed for next reward
+    isLoyaltyEnabled       // Is loyalty enabled
+  } = useLoyalty();
+}
+```
+
+### Loyalty Banner Section
+
+A pre-built section for displaying loyalty information on the homepage:
+
+```jsx
+import { LoyaltyProvider, useLoyalty } from '../../contexts/LoyaltyContext';
+import LoyaltyBannerSection from '../../components/theme-d1/sections/LoyaltyBannerSection';
+
+function HomePageContent() {
+  const { loyaltyConfig, isLoyaltyEnabled } = useLoyalty();
+
+  if (!isLoyaltyEnabled || !loyaltyConfig?.rewards?.length) {
+    return null;
+  }
+
+  return <LoyaltyBannerSection />;
+}
+```
+
+**Features:**
+- Shows points per dollar
+- Displays first available reward
+- "Start Earning" CTA button
+- Gradient background design
+
+### Loyalty in Menu/Specials Templates
+
+When adding items to cart, customers earn points:
+
+```jsx
+import { useCart } from '../../contexts/CartContext';
+
+function MenuItem({ item }) {
+  const { addItem, isEnabled } = useCart();
+
+  const handleAddItem = () => {
+    addItem({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image
+    });
+    // Points are automatically calculated in checkout
+  };
+
+  return (
+    <button onClick={handleAddItem}>
+      Add to Cart
+    </button>
+  );
+}
+```
+
+### Loyalty in Checkout
+
+The checkout page includes full loyalty integration:
+
+```jsx
+import { LoyaltyProvider, useLoyalty } from '../../contexts/LoyaltyContext';
+
+function CheckoutContentWrapper() {
+  const {
+    customer,
+    loyaltyConfig,
+    lookupCustomer,
+    upsertCustomer,
+    redeemReward,
+    canRedeemReward,
+    isLoyaltyEnabled
+  } = useLoyalty();
+
+  // Lookup customer when phone changes
+  useEffect(() => {
+    if (customerInfo.phone && isLoyaltyEnabled) {
+      lookupCustomer(customerInfo.phone);
+    }
+  }, [customerInfo.phone, isLoyaltyEnabled, lookupCustomer]);
+
+  // Display customer points
+  {isLoyaltyEnabled && customer && (
+    <div>
+      <Star />
+      Welcome back! You have {customer.points} points
+    </div>
+  )}
+
+  // Redeem rewards
+  {isLoyaltyEnabled && customer && loyaltyConfig?.rewards?.length > 0 && (
+    <div>
+      {loyaltyConfig.rewards.map(reward => {
+        const canRedeem = canRedeemReward(reward);
+        return (
+          <button
+            onClick={async () => {
+              const result = await redeemReward(reward.id);
+              if (result) {
+                setRedeemedReward(reward);
+              }
+            }}
+            disabled={!canRedeem}
+          >
+            {reward.name} - {reward.pointsRequired} points
+          </button>
+        );
+      })}
+    </div>
+  )}
+}
+```
+
+### Loyalty Component Location
+
+- **Context**: `contexts/LoyaltyContext.jsx`
+- **Banner Section**: `components/theme-d1/sections/LoyaltyBannerSection.jsx`
+
+---
+
+## Cart & Ordering Integration
+
+### What is the Cart System?
+
+The cart system allows customers to add items to a shopping cart and proceed to checkout.
+
+### CartContext
+
+The CartContext provides cart functionality:
+
+```jsx
+import { useCart } from '../../contexts/CartContext';
+
+function MyComponent() {
+  const {
+    items,           // Cart items array
+    totalItems,      // Total number of items
+    subtotal,        // Subtotal before tax
+    taxAmount,       // Tax amount
+    taxRate,         // Tax rate
+    taxLabel,        // Tax label (e.g., "GST")
+    total,           // Total including tax
+    addItem,         // Add item to cart
+    removeItem,      // Remove item from cart
+    updateQuantity,  // Update item quantity
+    clearCart,       // Clear entire cart
+    ordering,        // Ordering configuration
+    isEnabled        // Is ordering enabled
+  } = useCart();
+}
+```
+
+### Adding Items to Cart with Tick-Mark Confirmation
+
+Best practice: Show visual feedback when items are added:
+
+```jsx
+import { useState } from 'react';
+import { useCart } from '../../contexts/CartContext';
+import { Plus, Check } from 'lucide-react';
+
+function MenuItem({ item }) {
+  const { addItem, isEnabled } = useCart();
+  const [addedItems, setAddedItems] = useState({});
+
+  const handleAddItem = (item) => {
+    addItem({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image
+    });
+    setAddedItems({ ...addedItems, [item.id]: true });
+    setTimeout(() => {
+      setAddedItems(prev => ({ ...prev, [item.id]: false }));
+    }, 2000);
+  };
+
+  return (
+    <button
+      onClick={() => handleAddItem(item)}
+      style={{
+        background: addedItems[item.id] ? '#10B981' : 'var(--color-primary)'
+      }}
+    >
+      {addedItems[item.id] ? (
+        <>
+          <Check />
+          Added
+        </>
+      ) : (
+        <>
+          <Plus />
+          Add
+        </>
+      )}
+    </button>
+  );
+}
+```
+
+### Cart Drawer Component
+
+The cart drawer displays cart contents and checkout button:
+
+```jsx
+import { CartDrawer } from '../../components/theme-d1/CartDrawer';
+
+// In your template
+<CartDrawer />
+```
+
+**Features:**
+- Slide-in drawer from right
+- Item list with quantities
+- Remove items
+- Update quantities
+- Subtotal, tax, total display
+- Checkout button
+- Close button
+
+### Cart Icon in Header
+
+The Header component automatically includes a cart icon when ordering is enabled:
+
+```jsx
+import { Header } from '../../components/theme-d1/Header';
+
+// Cart icon appears automatically if ordering is enabled
+<Header />
+```
+
+### Ordering Configuration
+
+```javascript
+{
+  ordering: {
+    enabled: boolean,
+    acceptingOrders: boolean,
+    requirePhone: boolean,
+    requireEmail: boolean,
+    estimatedPrepTime: string,
+    deliveryFee: number,
+    orderTypes: ['pickup', 'delivery', 'dine-in']
+  }
+}
+```
+
+### Cart Component Location
+
+- **Context**: `contexts/CartContext.jsx`
+- **Drawer**: `components/theme-d1/CartDrawer.jsx`
+
+---
+
+## Checkout Integration
+
+### What is the Checkout Page?
+
+The checkout page allows customers to complete their orders by providing contact information, pickup/delivery details, and payment information.
+
+### Checkout Page Structure
+
+```jsx
+// packages/site-template/pages/checkout.js
+export default function CheckoutPage({ data }) {
+  return (
+    <LoyaltyProvider clientId={clientId} loyaltyConfig={loyaltyConfig}>
+      <CheckoutContentWrapper data={data} />
+    </LoyaltyProvider>
+  );
+}
+```
+
+### Checkout Steps
+
+1. **Customer Information** - Name, email, phone, special instructions
+2. **Pickup/Delivery Information** - Order type, pickup time, location
+3. **Payment** - Stripe or cash payment
+
+### Checkout Data Flow
+
+```jsx
+function CheckoutContent() {
+  const {
+    customer,
+    loyaltyConfig,
+    lookupCustomer,
+    upsertCustomer,
+    redeemReward,
+    canRedeemReward,
+    isLoyaltyEnabled
+  } = useLoyalty();
+
+  // Lookup customer when phone is entered
+  useEffect(() => {
+    if (customerInfo.phone && isLoyaltyEnabled) {
+      lookupCustomer(customerInfo.phone);
+    }
+  }, [customerInfo.phone, isLoyaltyEnabled, lookupCustomer]);
+
+  // Place order
+  const handlePlaceOrder = async () => {
+    // Ensure customer exists in loyalty system
+    let loyaltyCustomerId = null;
+    if (isLoyaltyEnabled && customerInfo.phone) {
+      const createdCustomer = await upsertCustomer(
+        customerInfo.phone,
+        customerInfo.name,
+        customerInfo.email
+      );
+      loyaltyCustomerId = createdCustomer?.id;
+    }
+
+    const orderData = {
+      items,
+      subtotal,
+      taxAmount,
+      total: totalWithDiscount,
+      customerName: customerInfo.name,
+      customerEmail: customerInfo.email,
+      customerPhone: customerInfo.phone,
+      orderType,
+      pickupTime: pickupType === 'scheduled' ? scheduledTime : null,
+      paymentMethod,
+      loyaltyCustomerId,
+      pointsUsed: redeemedReward ? redeemedReward.pointsRequired : 0,
+      rewardUsed: redeemedReward ? { id: redeemedReward.id, name: redeemedReward.name, discountValue: redeemedReward.discountValue } : null
+    };
+
+    // Create order
+    await fetch(`${CMS_API_URL}/clients/${clientId}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    });
+  };
+}
+```
+
+### Stripe Integration
+
+The checkout supports Stripe payments:
+
+```jsx
+import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
+
+function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: {
+        card: elements.getElement(CardElement),
+      }
+    });
+
+    if (error) {
+      onError(error.message);
+    } else {
+      onSuccess(paymentIntent);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <CardElement />
+      <button type="submit">Pay Now</button>
+    </form>
+  );
+}
+```
+
+### Checkout Component Location
+
+- **Page**: `pages/checkout.js`
+
+---
+
 ## Common Patterns
 
 ### Pattern 1: Using CMS Data in Template
@@ -900,11 +1345,16 @@ function MenuPage() {
 | `components/theme-d1/Header.jsx` | Navigation header |
 | `components/theme-d1/Footer.jsx` | Footer component |
 | `components/theme-d1/UtilityBelt.jsx` | Top utility bar |
+| `components/theme-d1/CartDrawer.jsx` | Shopping cart drawer |
+| `components/theme-d1/sections/LoyaltyBannerSection.jsx` | Loyalty banner section |
 | `contexts/CMSContext.jsx` | CMS data provider |
+| `contexts/CartContext.jsx` | Shopping cart context |
+| `contexts/LoyaltyContext.jsx` | Loyalty system context |
 | `lib/api.js` | API client |
 | `lib/theme.js` | Theme CSS builder |
 | `lib/shortcodes.js` | Shortcode replacement |
 | `pages/index.js` | Template mapping |
+| `pages/checkout.js` | Checkout page |
 
 ### Key Hooks
 
@@ -912,11 +1362,12 @@ function MenuPage() {
 |------|---------|
 | `useCMS()` | Access CMS data |
 | `useCart()` | Access shopping cart |
+| `useLoyalty()` | Access loyalty system |
 
 ### Key Data Accessors
 
 ```javascript
-const { 
+const {
   restaurant,      // Basic restaurant info
   locations,       // All locations
   menuCategories,  // Menu categories
@@ -927,6 +1378,8 @@ const {
   siteConfig,      // Site configuration
   reviews,         // Reviews data
   booking,         // Booking config
+  ordering,        // Ordering configuration
+  loyaltyConfig,   // Loyalty program config
   shortcodes,      // Shortcode values
   rawData          // Raw API data
 } = useCMS();

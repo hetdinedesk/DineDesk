@@ -610,10 +610,12 @@ import { motion } from 'framer-motion';
 - Remove from cart functionality
 - Quantity adjustment
 - Checkout flow
+- Tick-mark confirmation when adding items (green checkmark for 2 seconds)
+- Loyalty program integration (if enabled)
 
 **Data Requirements:**
 ```javascript
-const { ordering } = useCMS();
+const { ordering, loyaltyConfig } = useCMS();
 const { addItem, removeItem, updateQuantity, totalItems, isEnabled } = useCart();
 
 if (isEnabled) {
@@ -621,26 +623,125 @@ if (isEnabled) {
 }
 ```
 
-**Usage:**
+**Usage with Tick-Mark Confirmation:**
 ```jsx
+import { useState } from 'react';
 import { useCart } from '../../contexts/CartContext';
+import { Plus, Check } from 'lucide-react';
 
 function MenuItem({ item }) {
   const { addItem, isEnabled } = useCart();
+  const [addedItems, setAddedItems] = useState({});
+
+  const handleAddItem = (item) => {
+    addItem({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image
+    });
+    setAddedItems({ ...addedItems, [item.id]: true });
+    setTimeout(() => {
+      setAddedItems(prev => ({ ...prev, [item.id]: false }));
+    }, 2000);
+  };
 
   return (
     <div>
       <h3>{item.name}</h3>
       <p>${item.price}</p>
       {isEnabled && (
-        <button onClick={() => addItem(item)}>
-          Add to Cart
+        <button
+          onClick={() => handleAddItem(item)}
+          style={{
+            background: addedItems[item.id] ? '#10B981' : 'var(--color-primary)'
+          }}
+        >
+          {addedItems[item.id] ? (
+            <>
+              <Check />
+              Added
+            </>
+          ) : (
+            <>
+              <Plus />
+              Add
+            </>
+          )}
         </button>
       )}
     </div>
   );
 }
 ```
+
+**Loyalty Integration:**
+```jsx
+import { LoyaltyProvider, useLoyalty } from '../../contexts/LoyaltyContext';
+
+// Wrap your checkout page
+<LoyaltyProvider clientId={clientId} loyaltyConfig={loyaltyConfig}>
+  <CheckoutPage />
+</LoyaltyProvider>
+
+// Use loyalty in components
+function CheckoutPage() {
+  const {
+    customer,
+    loyaltyConfig,
+    lookupCustomer,
+    upsertCustomer,
+    redeemReward,
+    canRedeemReward,
+    isLoyaltyEnabled
+  } = useLoyalty();
+
+  // Lookup customer when phone changes
+  useEffect(() => {
+    if (customerInfo.phone && isLoyaltyEnabled) {
+      lookupCustomer(customerInfo.phone);
+    }
+  }, [customerInfo.phone, isLoyaltyEnabled, lookupCustomer]);
+
+  // Display customer points
+  {isLoyaltyEnabled && customer && (
+    <div>
+      Welcome back! You have {customer.points} points
+    </div>
+  )}
+
+  // Redeem rewards
+  {isLoyaltyEnabled && customer && loyaltyConfig?.rewards?.length > 0 && (
+    <div>
+      {loyaltyConfig.rewards.map(reward => {
+        const canRedeem = canRedeemReward(reward);
+        return (
+          <button
+            onClick={async () => {
+              const result = await redeemReward(reward.id);
+              if (result) {
+                setRedeemedReward(reward);
+              }
+            }}
+            disabled={!canRedeem}
+          >
+            {reward.name} - {reward.pointsRequired} points
+          </button>
+        );
+      })}
+    </div>
+  )}
+}
+```
+
+**Checkout Page Requirements:**
+- Customer information form (name, email, phone, special instructions)
+- Pickup/delivery selection (order type, pickup time, location)
+- Payment method selection (Stripe or cash)
+- Loyalty customer lookup (phone-based)
+- Loyalty reward redemption (if enabled)
+- Stripe payment integration (if Stripe is payment provider)
+- Order creation with loyalty data (customerId, pointsUsed, rewardUsed)
 
 ---
 

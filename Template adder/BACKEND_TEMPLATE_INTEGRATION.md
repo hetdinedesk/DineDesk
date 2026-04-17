@@ -455,7 +455,25 @@ Returns all client data needed by frontend templates in a single JSON response. 
     testPublishableKey: string,
     livePublishableKey: string
   },
-  
+
+  // ═══════════════════════════════════════════════════════════════
+  // LOYALTY PROGRAM
+  // ═══════════════════════════════════════════════════════════════
+  loyaltyConfig: {
+    id: string,
+    enabled: boolean,
+    pointsPerDollar: number,
+    rewards: [{
+      id: string,
+      name: string,
+      description: string,
+      pointsRequired: number,
+      discountValue: number,
+      discountType: 'fixed' | 'percentage',
+      isActive: boolean
+    }]
+  },
+
   // ═══════════════════════════════════════════════════════════════
   // REVIEWS
   // ═══════════════════════════════════════════════════════════════
@@ -542,6 +560,9 @@ model Client {
   customTextBlocks CustomTextBlock[]
   paymentGateway PaymentGateway?
   legalDocs   LegalDoc[]
+  customers   Customer[]
+  loyaltyConfig LoyaltyConfig?
+  rewards     Reward[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -642,7 +663,7 @@ model Config {
   id          String   @id @default(cuid())
   clientId    String   @unique
   client      Client   @relation(fields: [clientId], references: [id])
-  
+
   settings    Json?
   shortcodes  Json?
   colours     Json?
@@ -655,9 +676,72 @@ model Config {
   social      Json?
   ordering    Json?
   reviews     Json?
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+```
+
+### LoyaltyConfig Model
+
+```prisma
+model LoyaltyConfig {
+  id              String   @id @default(cuid())
+  clientId        String   @unique
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enabled         Boolean  @default(false)
+  pointsPerDollar Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  rewards         Reward[]
+
+  @@index([clientId])
+}
+```
+
+### Reward Model
+
+```prisma
+model Reward {
+  id              String       @id @default(cuid())
+  clientId        String
+  client          Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  loyaltyConfig   LoyaltyConfig @relation(fields: [loyaltyConfigId], references: [id], onDelete: Cascade)
+  loyaltyConfigId String
+  name            String
+  description     String?
+  pointsRequired  Int
+  discountValue   Float
+  discountType    String       @default("fixed") // "fixed" or "percentage"
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([clientId])
+  @@index([loyaltyConfigId])
+}
+```
+
+### Customer Model
+
+```prisma
+model Customer {
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  phone         String
+  name          String?
+  email         String?
+  points        Int      @default(0)
+  totalOrders   Int      @default(0)
+  totalSpent    Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  orders        Order[]
+
+  @@unique([clientId, phone])
+  @@index([clientId])
+  @@index([phone])
 }
 ```
 
