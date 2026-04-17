@@ -5690,7 +5690,7 @@ function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges }) {
     setLoading(true)
     setError(null)
     try {
-      // Save config
+      // Save config to loyalty API
       await fetch(`${API_URL}/clients/${clientId}/loyalty/config`, {
         method: 'POST',
         headers: {
@@ -5745,6 +5745,17 @@ function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges }) {
           })
         }
       }
+
+      // Save to main config object for persistence across sections
+      await saveConfig(clientId, { loyaltyConfig, rewards: rewards.map(r => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        pointsRequired: r.pointsRequired,
+        discountValue: r.discountValue,
+        discountType: r.discountType,
+        isActive: r.isActive
+      })) })
 
       savedConfigRef.current = { ...loyaltyConfig }
       savedRewardsRef.current = rewards.map(r => ({ ...r, isNew: false, isModified: false }))
