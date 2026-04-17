@@ -10,9 +10,8 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
-import { Settings, Palette, Code, FileText, Layout, Share2, Star, Calendar, BarChart3, Globe, ShoppingCart, CreditCard, Bell, Store } from 'lucide-react'
+import { Settings, Palette, Code, FileText, Layout, Share2, Star, Calendar, BarChart3, Globe, ShoppingCart, CreditCard, Bell, Store, Gift } from 'lucide-react'
 import { C } from '../theme'
-import OnlineOrderingSection from './OnlineOrderingSection'
 
 const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
@@ -25,17 +24,15 @@ const SIDEBAR = [
     { key:'shortcodes',     label:'Shortcodes', Icon: Code },
     { key:'site-notes',     label:'Notes', Icon: FileText },
   ]},
-  { group:'Online Ordering', Icon: ShoppingCart, items:[
-    { key:'ordering-config', label:'General', Icon: Store },
-    { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
-    { key:'notifications', label:'Notifications', Icon: Bell },
-  ]},
   { group:'Design', Icon: Layout, items:[
     { key:'themes',         label:'Theme', Icon: Palette },
     { key:'header-config',  label:'Header', Icon: Layout },
     { key:'social-links',   label:'Social Links', Icon: Share2 },
     { key:'reviews',        label:'Reviews', Icon: Star },
     { key:'booking',        label:'Booking', Icon: Calendar },
+  ]},
+  { group:'Loyalty', Icon: Gift, items:[
+    { key:'loyalty',        label:'Loyalty Program', Icon: Gift },
   ]},
   { group:'Deploy', Icon: Globe, items:[
     { key:'analytics',      label:'Analytics', Icon: BarChart3 },
@@ -157,10 +154,8 @@ export default function ConfigSection({ clientId }) {
         case 'reviews':        return <ReviewsConfig   {...common} />
         case 'footer':         return <FooterConfig    {...common} />
         case 'booking':        return <BookingConfig   {...common} />
+        case 'loyalty':        return <LoyaltyConfigUI {...common} />
         case 'netlify':        return <NetlifyConfig   {...common} client={client} />
-        case 'ordering-config': return <OnlineOrderingSection clientId={clientId} subsection='ordering-config' />
-        case 'payment-settings': return <OnlineOrderingSection clientId={clientId} subsection='payment-settings' />
-        case 'notifications': return <OnlineOrderingSection clientId={clientId} subsection='notifications' />
         default: return <div style={{color:C.t3}}>Coming soon.</div>
       }
     } catch (err) {
@@ -4202,7 +4197,6 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
 
   const tabs = [
     { key:'booking',  label:'Table Booking'  },
-    { key:'ordering', label:'Online Ordering' },
     { key:'display',  label:'Display Options' },
   ]
 
@@ -4397,70 +4391,6 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
                     'e.g. bookings@restaurant.com',
                     { hint: 'Where booking notifications are sent' })}
                 </div>
-              </div>
-            )}
-          </div>
-
-          <SaveRow/>
-        </div>
-      )}
-
-      {/* ── Online Ordering ── */}
-      {tab === 'ordering' && (
-        <div>
-          <div style={{ background:C.card, border:`1px solid ${C.border}`,
-            borderRadius:12, padding:20, marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-              Ordering Platforms
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              {inp('Uber Eats URL', 'uberEatsUrl',
-                'https://www.ubereats.com/...',
-                { mono:true, hint:'Your restaurant\'s Uber Eats page' })}
-              {inp('DoorDash URL', 'doorDashUrl',
-                'https://www.doordash.com/...',
-                { mono:true, hint:'Your restaurant\'s DoorDash page' })}
-              {inp('Menulog URL', 'menulogUrl',
-                'https://www.menulog.com.au/...',
-                { mono:true, hint:'Your restaurant\'s Menulog page' })}
-              {inp('Custom Order URL', 'orderUrl',
-                'https://order.yourrestaurant.com.au',
-                { mono:true, hint:'Your own ordering system — overrides platform links if set' })}
-              {inp('Order Button Label', 'orderLabel', 'e.g. Order Online',
-                { hint:'Text shown on the Order Online button' })}
-            </div>
-          </div>
-
-          {/* Pickup / Delivery toggle */}
-          <div style={{ background:C.card, border:`1px solid ${C.border}`,
-            borderRadius:12, padding:20, marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-              Service Types
-            </div>
-            {toggle('Pickup Available',  'pickupEnabled',
-              'Customers can order for pickup')}
-            {toggle('Delivery Available', 'deliveryEnabled',
-              'Customers can order for delivery')}
-            {toggle('Dine-in Ordering',  'dineInEnabled',
-              'Customers can order from table via QR code')}
-
-            {f.pickupEnabled && (
-              <div style={{ marginTop:14 }}>
-                {inp('Estimated Pickup Time', 'pickupTime',
-                  'e.g. 15-20 minutes',
-                  { hint:'Shown to customer after ordering' })}
-              </div>
-            )}
-            {f.deliveryEnabled && (
-              <div style={{ marginTop:14,
-                display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-                {inp('Minimum Order ($)', 'minOrder', 'e.g. 30')}
-                {inp('Delivery Fee ($)',  'deliveryFee', 'e.g. 5')}
-                {inp('Estimated Delivery Time', 'deliveryTime', 'e.g. 30-45 minutes')}
-                {inp('Free Delivery Over ($)', 'freeDeliveryOver',
-                  'e.g. 60', { hint:'Leave blank to always charge delivery fee' })}
               </div>
             )}
           </div>
@@ -5703,5 +5633,371 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
   )
 }
 
+// ── Loyalty Configuration ───────────────────────────────────────────────
+function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges }) {
+  const qc = useQueryClient()
+  const [loyaltyConfig, setLoyaltyConfig] = useState(config.loyaltyConfig || {
+    enabled: false,
+    pointsPerDollar: 1
+  })
+  const [rewards, setRewards] = useState(config.rewards || [])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(false)
+  const savedConfigRef = useRef(config.loyaltyConfig || { enabled: false, pointsPerDollar: 1 })
+  const savedRewardsRef = useRef(config.rewards || [])
+
+  useEffect(() => {
+    setLoyaltyConfig(config.loyaltyConfig || { enabled: false, pointsPerDollar: 1 })
+    setRewards(config.rewards || [])
+    savedConfigRef.current = config.loyaltyConfig || { enabled: false, pointsPerDollar: 1 }
+    savedRewardsRef.current = config.rewards || []
+    setHasUnsavedChanges(false)
+  }, [config, setHasUnsavedChanges])
+
+  // Track unsaved changes
+  useEffect(() => {
+    const hasChanges = 
+      JSON.stringify(loyaltyConfig) !== JSON.stringify(savedConfigRef.current) ||
+      JSON.stringify(rewards) !== JSON.stringify(savedRewardsRef.current)
+    setHasUnsavedChanges(hasChanges)
+  }, [loyaltyConfig, rewards, setHasUnsavedChanges])
+
+  // Fetch current loyalty config
+  useEffect(() => {
+    fetch(`${API_URL}/clients/${clientId}/loyalty/config`, {
+      headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.enabled !== undefined) {
+          setLoyaltyConfig({
+            enabled: data.enabled,
+            pointsPerDollar: data.pointsPerDollar || 1
+          })
+          setRewards(data.rewards || [])
+          savedConfigRef.current = {
+            enabled: data.enabled,
+            pointsPerDollar: data.pointsPerDollar || 1
+          }
+          savedRewardsRef.current = data.rewards || []
+        }
+      })
+      .catch(() => {})
+  }, [clientId])
+
+  const handleSave = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // Save config
+      await fetch(`${API_URL}/clients/${clientId}/loyalty/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + localStorage.getItem('dd_token')
+        },
+        body: JSON.stringify(loyaltyConfig)
+      })
+
+      // Save rewards
+      for (const reward of rewards) {
+        if (reward.isNew) {
+          await fetch(`${API_URL}/clients/${clientId}/rewards`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ' + localStorage.getItem('dd_token')
+            },
+            body: JSON.stringify({
+              name: reward.name,
+              description: reward.description,
+              pointsRequired: reward.pointsRequired,
+              discountValue: reward.discountValue,
+              discountType: reward.discountType
+            })
+          })
+        } else if (reward.isModified) {
+          await fetch(`${API_URL}/clients/${clientId}/rewards/${reward.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ' + localStorage.getItem('dd_token')
+            },
+            body: JSON.stringify({
+              name: reward.name,
+              description: reward.description,
+              pointsRequired: reward.pointsRequired,
+              discountValue: reward.discountValue,
+              discountType: reward.discountType,
+              isActive: reward.isActive
+            })
+          })
+        }
+      }
+
+      // Handle deleted rewards
+      for (const reward of savedRewardsRef.current) {
+        if (!rewards.find(r => r.id === reward.id)) {
+          await fetch(`${API_URL}/clients/${clientId}/rewards/${reward.id}`, {
+            method: 'DELETE',
+            headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
+          })
+        }
+      }
+
+      savedConfigRef.current = { ...loyaltyConfig }
+      savedRewardsRef.current = rewards.map(r => ({ ...r, isNew: false, isModified: false }))
+      setHasUnsavedChanges(false)
+      qc.invalidateQueries(['config', clientId])
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err) {
+      console.error('Save failed:', err)
+      setError(err.message || 'Failed to save loyalty configuration')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addReward = () => {
+    setRewards([...rewards, {
+      id: `new-${Date.now()}`,
+      name: '',
+      description: '',
+      pointsRequired: 100,
+      discountValue: 10,
+      discountType: 'fixed',
+      isActive: true,
+      isNew: true,
+      isModified: false
+    }])
+  }
+
+  const updateReward = (id, field, value) => {
+    setRewards(rewards.map(r => 
+      r.id === id ? { ...r, [field]: value, isModified: !r.isNew } : r
+    ))
+  }
+
+  const deleteReward = (id) => {
+    setRewards(rewards.filter(r => r.id !== id))
+  }
+
+  return (
+    <div>
+      <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
+        Loyalty Program
+      </h2>
+      <p style={{ margin:'0 0 24px', fontSize:13, color:C.t3 }}>
+        Configure your customer loyalty rewards program. Customers earn points on orders and redeem them for discounts.
+      </p>
+
+      {/* Loyalty Settings */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Program Settings
+        </div>
+        
+        <div style={{ marginBottom:16 }}>
+          <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+            textTransform:'uppercase', letterSpacing:'0.06em',
+            display:'block', marginBottom:5 }}>Enable Loyalty Program</label>
+          <button
+            onClick={() => setLoyaltyConfig({ ...loyaltyConfig, enabled: !loyaltyConfig.enabled })}
+            style={{ padding:'9px 20px', borderRadius:8, fontSize:13,
+              fontWeight:700, cursor:'pointer', fontFamily:'inherit',
+              border:`2px solid ${loyaltyConfig.enabled ? C.green : C.border}`,
+              background: loyaltyConfig.enabled ? '#052010' : 'transparent',
+              color: loyaltyConfig.enabled ? C.green : C.t3 }}>
+            {loyaltyConfig.enabled ? '✅ Enabled' : '🚫 Disabled'}
+          </button>
+        </div>
+
+        <div>
+          <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+            textTransform:'uppercase', letterSpacing:'0.06em',
+            display:'block', marginBottom:5 }}>Points Per Dollar</label>
+          <input
+            type="number"
+            value={loyaltyConfig.pointsPerDollar}
+            onChange={e => setLoyaltyConfig({ ...loyaltyConfig, pointsPerDollar: parseInt(e.target.value) || 1 })}
+            min="1"
+            style={{ width:'100%', padding:'9px 11px', background:C.input,
+              border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
+              fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+          />
+          <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>
+            How many points customers earn for every $1 spent
+          </div>
+        </div>
+      </div>
+
+      {/* Rewards */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+            textTransform:'uppercase', letterSpacing:'0.08em' }}>
+            Rewards
+          </div>
+          <button
+            onClick={addReward}
+            style={{ padding:'6px 14px', background:C.acc, border:'none',
+              borderRadius:6, color:'#fff', fontSize:12, fontWeight:700,
+              cursor:'pointer', fontFamily:'inherit' }}>
+            + Add Reward
+          </button>
+        </div>
+
+        {rewards.length === 0 ? (
+          <div style={{ padding:'20px', textAlign:'center', color:C.t3, fontSize:13 }}>
+            No rewards configured yet. Click "Add Reward" to create your first reward.
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {rewards.map((reward, index) => (
+              <div key={reward.id} style={{ 
+                padding:16, background:C.input, borderRadius:8,
+                border:`1px solid ${C.border}`
+              }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.t0 }}>
+                    Reward #{index + 1}
+                  </div>
+                  <button
+                    onClick={() => deleteReward(reward.id)}
+                    style={{ padding:'4px 8px', background:'transparent',
+                      border:'1px solid #EF444440', borderRadius:4,
+                      color:'#EF4444', fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                    Delete
+                  </button>
+                </div>
+                
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                      textTransform:'uppercase', letterSpacing:'0.06em',
+                      display:'block', marginBottom:5 }}>Reward Name</label>
+                    <input
+                      value={reward.name}
+                      onChange={e => updateReward(reward.id, 'name', e.target.value)}
+                      placeholder="e.g., Free Coffee"
+                      style={{ width:'100%', padding:'8px 10px', background:C.card,
+                        border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                        fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                      textTransform:'uppercase', letterSpacing:'0.06em',
+                      display:'block', marginBottom:5 }}>Points Required</label>
+                    <input
+                      type="number"
+                      value={reward.pointsRequired}
+                      onChange={e => updateReward(reward.id, 'pointsRequired', parseInt(e.target.value) || 0)}
+                      min="1"
+                      style={{ width:'100%', padding:'8px 10px', background:C.card,
+                        border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                        fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.06em',
+                    display:'block', marginBottom:5 }}>Description (optional)</label>
+                  <input
+                    value={reward.description}
+                    onChange={e => updateReward(reward.id, 'description', e.target.value)}
+                    placeholder="e.g., Get a free coffee with your next order"
+                    style={{ width:'100%', padding:'8px 10px', background:C.card,
+                      border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                      fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                      textTransform:'uppercase', letterSpacing:'0.06em',
+                      display:'block', marginBottom:5 }}>Discount Type</label>
+                    <select
+                      value={reward.discountType}
+                      onChange={e => updateReward(reward.id, 'discountType', e.target.value)}
+                      style={{ width:'100%', padding:'8px 10px', background:C.card,
+                        border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                        fontSize:12, fontFamily:'inherit', outline:'none' }}>
+                      <option value="fixed">Fixed Amount ($)</option>
+                      <option value="percentage">Percentage (%)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                      textTransform:'uppercase', letterSpacing:'0.06em',
+                      display:'block', marginBottom:5 }}>
+                      {reward.discountType === 'fixed' ? 'Discount Value ($)' : 'Discount Value (%)'}
+                    </label>
+                    <input
+                      type="number"
+                      value={reward.discountValue}
+                      onChange={e => updateReward(reward.id, 'discountValue', parseFloat(e.target.value) || 0)}
+                      min="0"
+                      step={reward.discountType === 'percentage' ? 1 : 0.01}
+                      style={{ width:'100%', padding:'8px 10px', background:C.card,
+                        border:`1px solid ${C.border}`, borderRadius:6, color:C.t0,
+                        fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                      textTransform:'uppercase', letterSpacing:'0.06em',
+                      display:'block', marginBottom:5 }}>Status</label>
+                    <button
+                      onClick={() => updateReward(reward.id, 'isActive', !reward.isActive)}
+                      style={{ width:'100%', padding:'8px 10px', borderRadius:6, fontSize:12,
+                        fontWeight:700, cursor:'pointer', fontFamily:'inherit',
+                        border:`1px solid ${reward.isActive ? C.green : C.border}`,
+                        background: reward.isActive ? '#052010' : 'transparent',
+                        color: reward.isActive ? C.green : C.t3 }}>
+                      {reward.isActive ? '✅ Active' : '🚫 Inactive'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Save Button */}
+      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+        <button
+          onClick={handleSave}
+          disabled={loading}
+          style={{ padding:'10px 28px', background: loading ? C.card : C.acc,
+            border:'none', borderRadius:8, color:'#fff', fontWeight:700,
+            fontSize:14, cursor: loading ? 'not-allowed' : 'pointer',
+            fontFamily:'inherit', boxShadow: loading ? 'none' : `0 4px 16px ${C.acc}50` }}>
+          {loading ? 'Saving…' : 'Save Changes'}
+        </button>
+        {success && (
+          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved!</span>
+        )}
+        {error && (
+          <span style={{ fontSize:13, color:'#EF4444' }}>
+            ⚠️ {error}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 

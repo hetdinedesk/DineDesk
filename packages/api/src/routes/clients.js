@@ -2855,6 +2855,5 @@ router.use('/:id/homepage',   require('./homepage'))
 router.use('/:id/alerts',     require('./alerts'))
 router.use('/:id/legal',      require('./legal'))
 router.use('/:id/analytics',  require('./analytics'))
-router.use('/:id/loyalty',    require('./loyalty'))
 
 module.exports = router

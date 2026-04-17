@@ -3,10 +3,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { getSiteData, CMS_API_URL } from '../lib/api'
 import { CMSProvider } from '../contexts/CMSContext'
+import { LoyaltyProvider } from '../contexts/LoyaltyContext'
 import { Header } from '../components/theme-d1/Header'
 import { Footer } from '../components/theme-d1/Footer'
 import { useCart } from '../contexts/CartContext'
-import { ShoppingCart, CreditCard, DollarSign, Clock, User, Phone, Mail, Calendar, Check, X, Loader2 } from 'lucide-react'
+import { ShoppingCart, CreditCard, DollarSign, Clock, User, Phone, Mail, Calendar, Check, X, Loader2, Gift, Star } from 'lucide-react'
 import { loadStripe } from '@stripe/stripe-js'
 import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js'
 
@@ -147,28 +148,37 @@ export default function CheckoutPage({ data }) {
   // Payment
   const [paymentMethod, setPaymentMethod] = useState('cash') // stripe | cash
 
+  const clientId = data?.client?.id
+
+  // Loyalty state
+  const [showLoyaltyInfo, setShowLoyaltyInfo] = useState(false)
+  const [redeemedReward, setRedeemedReward] = useState(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
+
   if (totalItems === 0) {
     return (
-      <CMSProvider data={data}>
-        <Head>
-          <title>Checkout - Your Cart is Empty</title>
-        </Head>
-        <Header />
-        <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ textAlign: 'center' }}>
-            <ShoppingCart size={64} style={{ color: '#ccc', margin: '0 auto 16px' }} />
-            <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Your cart is empty</h1>
-            <p style={{ color: '#666', marginBottom: 24 }}>Add items from the menu to proceed to checkout</p>
-            <button
-              onClick={() => router.push(`/?site=${router.query.site}`)}
-              style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
-            >
-              Browse Menu
-            </button>
+      <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
+        <CMSProvider data={data}>
+          <Head>
+            <title>Checkout - Your Cart is Empty</title>
+          </Head>
+          <Header />
+          <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div style={{ textAlign: 'center' }}>
+              <ShoppingCart size={64} style={{ color: '#ccc', margin: '0 auto 16px' }} />
+              <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Your cart is empty</h1>
+              <p style={{ color: '#666', marginBottom: 24 }}>Add items from the menu to proceed to checkout</p>
+              <button
+                onClick={() => router.push(`/?site=${router.query.site}`)}
+                style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+              >
+                Browse Menu
+              </button>
+            </div>
           </div>
-        </div>
-        <Footer />
-      </CMSProvider>
+          <Footer />
+        </CMSProvider>
+      </LoyaltyProvider>
     )
   }
 
@@ -184,11 +194,18 @@ export default function CheckoutPage({ data }) {
         throw new Error('Client ID not found')
       }
 
+      // Ensure customer exists in loyalty system
+      let loyaltyCustomerId = null
+      if (isLoyaltyEnabled && customerInfo.phone) {
+        const createdCustomer = await upsertCustomer(customerInfo.phone, customerInfo.name, customerInfo.email)
+        loyaltyCustomerId = createdCustomer?.id
+      }
+
       const orderData = {
         items,
         subtotal,
         taxAmount,
-        total,
+        total: totalWithDiscount,
         currency: paymentGateway.currency || 'AUD',
         customerName: customerInfo.name,
         customerEmail: customerInfo.email,
@@ -198,7 +215,10 @@ export default function CheckoutPage({ data }) {
         paymentMethod,
         note: customerInfo.note,
         deliveryFee: orderType === 'delivery' ? (ordering?.deliveryFee || 0) : 0,
-        locationId: selectedLocation || null
+        locationId: selectedLocation || null,
+        loyaltyCustomerId,
+        pointsUsed: redeemedReward ? redeemedReward.pointsRequired : 0,
+        rewardUsed: redeemedReward ? { id: redeemedReward.id, name: redeemedReward.name, discountValue: redeemedReward.discountValue } : null
       }
 
       // For Stripe, create order first then PaymentIntent
@@ -217,13 +237,13 @@ export default function CheckoutPage({ data }) {
         const result = await response.json()
         setOrderId(result.order.id)
 
-        // Create PaymentIntent
+        // Create PaymentIntent with discounted amount
         const paymentResponse = await fetch(`${CMS_API_URL}/clients/${clientId}/payments/create-intent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             orderId: result.orderId,
-            amount: total,
+            amount: totalWithDiscount,
             currency: paymentGateway.currency || 'AUD'
           })
         })
@@ -287,6 +307,85 @@ export default function CheckoutPage({ data }) {
   }
 
   const siteName = data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''
+
+  return (
+    <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
+      <CheckoutContentWrapper data={data} siteName={siteName} router={router} />
+    </LoyaltyProvider>
+  )
+}
+
+function CheckoutContentWrapper({ data, siteName, router }) {
+  const { customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled } = useLoyalty()
+  return <CheckoutContent data={data} siteName={siteName} router={router} customer={customer} loyaltyConfig={loyaltyConfig} lookupCustomer={lookupCustomer} upsertCustomer={upsertCustomer} redeemReward={redeemReward} canRedeemReward={canRedeemReward} getPointsToNextReward={getPointsToNextReward} isLoyaltyEnabled={isLoyaltyEnabled} />
+}
+
+function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled }) {
+  const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
+  const paymentGateway = data?.paymentGateway || {}
+
+  const [step, setStep] = useState(1) // 1: Info, 2: Pickup, 3: Payment
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [clientSecret, setClientSecret] = useState(null)
+  const [orderId, setOrderId] = useState(null)
+  const [stripePromise, setStripePromise] = useState(null)
+
+  // Initialize Stripe with publishable key
+  useEffect(() => {
+    if (paymentGateway?.isActive && paymentGateway?.provider === 'stripe') {
+      const publishableKey = paymentGateway.testMode 
+        ? paymentGateway.testPublishableKey 
+        : paymentGateway.livePublishableKey
+      
+      if (publishableKey) {
+        setStripePromise(loadStripe(publishableKey))
+      }
+    }
+  }, [paymentGateway])
+
+  // Customer info
+  const [customerInfo, setCustomerInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    note: ''
+  })
+
+  // Pickup info
+  const [pickupType, setPickupType] = useState('asap') // asap | scheduled
+  const [scheduledTime, setScheduledTime] = useState('')
+  const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine-in
+  const [selectedLocation, setSelectedLocation] = useState('')
+
+  // Auto-select first location if only one active location exists
+  useEffect(() => {
+    const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
+    if (activeLocations.length === 1) {
+      setSelectedLocation(activeLocations[0].id)
+    }
+  }, [data?.locations])
+
+  // Payment
+  const [paymentMethod, setPaymentMethod] = useState('cash') // stripe | cash
+
+  // Loyalty state
+  const [showLoyaltyInfo, setShowLoyaltyInfo] = useState(false)
+  const [redeemedReward, setRedeemedReward] = useState(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
+
+  // Lookup customer when phone changes
+  useEffect(() => {
+    if (customerInfo.phone && isLoyaltyEnabled) {
+      const timer = setTimeout(() => {
+        lookupCustomer(customerInfo.phone)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [customerInfo.phone, isLoyaltyEnabled, lookupCustomer])
+
+  // Calculate total with discount
+  const totalWithDiscount = total - discountAmount
 
   return (
     <CMSProvider data={data}>
@@ -376,6 +475,22 @@ export default function CheckoutPage({ data }) {
                       style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
                       placeholder="Your phone number"
                     />
+                    {/* Loyalty info display */}
+                    {isLoyaltyEnabled && customer && (
+                      <div style={{ marginTop: 12, padding: 12, background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <Star size={16} style={{ color: '#059669' }} />
+                          <span style={{ fontSize: 14, fontWeight: 600, color: '#059669' }}>
+                            Welcome back! You have {customer.points} points
+                          </span>
+                        </div>
+                        {getPointsToNextReward() && (
+                          <p style={{ fontSize: 12, color: '#047857', margin: 0 }}>
+                            Only {getPointsToNextReward().pointsNeeded} more points for {getPointsToNextReward().reward.name}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -387,6 +502,90 @@ export default function CheckoutPage({ data }) {
                       placeholder="Any special requests or dietary requirements..."
                     />
                   </div>
+
+                  {/* Rewards Redemption Section */}
+                  {isLoyaltyEnabled && customer && loyaltyConfig?.rewards?.length > 0 && (
+                    <div style={{ marginTop: 8, padding: 16, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <Gift size={18} style={{ color: '#d97706' }} />
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#92400e' }}>Rewards Available</span>
+                      </div>
+                      {redeemedReward ? (
+                        <div style={{ padding: 12, background: '#d1fae5', border: '1px solid #10b981', borderRadius: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: '#065f46' }}>
+                              {redeemedReward.name} applied
+                            </span>
+                            <button
+                              onClick={() => {
+                                setRedeemedReward(null)
+                                setDiscountAmount(0)
+                              }}
+                              style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <div style={{ fontSize: 13, color: '#047857', marginTop: 4 }}>
+                            -${redeemedReward.discountValue.toFixed(2)} discount
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {loyaltyConfig.rewards.map(reward => {
+                            const canRedeem = canRedeemReward(reward)
+                            return (
+                              <button
+                                key={reward.id}
+                                onClick={async () => {
+                                  const result = await redeemReward(reward.id)
+                                  if (result) {
+                                    setRedeemedReward(reward)
+                                    setDiscountAmount(reward.discountType === 'percentage' 
+                                      ? total * (reward.discountValue / 100)
+                                      : reward.discountValue
+                                    )
+                                  }
+                                }}
+                                disabled={!canRedeem}
+                                style={{
+                                  padding: 12,
+                                  border: canRedeem ? '2px solid #f59e0b' : '1px solid #d1d5db',
+                                  borderRadius: 6,
+                                  background: canRedeem ? '#fffbeb' : '#f3f4f6',
+                                  cursor: canRedeem ? 'pointer' : 'not-allowed',
+                                  opacity: canRedeem ? 1 : 0.6,
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: canRedeem ? '#92400e' : '#6b7280' }}>
+                                      {reward.name}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: canRedeem ? '#b45309' : '#9ca3af' }}>
+                                      {reward.pointsRequired} points
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 14, fontWeight: 700, color: canRedeem ? '#059669' : '#9ca3af' }}>
+                                    {reward.discountType === 'percentage' 
+                                      ? `${reward.discountValue}% OFF`
+                                      : `$${reward.discountValue.toFixed(2)} OFF`
+                                    }
+                                  </div>
+                                </div>
+                                {!canRedeem && (
+                                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                                    Need {reward.pointsRequired - customer.points} more points
+                                  </div>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <button
                     onClick={() => setStep(2)}
@@ -703,9 +902,15 @@ export default function CheckoutPage({ data }) {
                     <span>${ordering.deliveryFee.toFixed(2)}</span>
                   </div>
                 )}
+                {discountAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
+                    <span style={{ color: '#059669' }}>Loyalty Discount</span>
+                    <span style={{ color: '#059669' }}>-${discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 700, marginTop: 12 }}>
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>${totalWithDiscount.toFixed(2)}</span>
                 </div>
               </div>
             </div>

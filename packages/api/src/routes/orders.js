@@ -33,7 +33,10 @@ router.post('/', async (req, res) => {
       paymentMethod = 'cash',
       note,
       deliveryFee = 0,
-      locationId
+      locationId,
+      loyaltyCustomerId,
+      pointsUsed = 0,
+      rewardUsed = null
     } = req.body
 
     // Validate required fields
@@ -103,10 +106,82 @@ router.post('/', async (req, res) => {
 
     const orderNumber = await getNextOrderNumber(clientId)
 
+    // Loyalty: Check if loyalty is enabled and process points
+    let loyaltyConfig = null
+    let customer = null
+    let pointsEarned = 0
+
+    try {
+      loyaltyConfig = await prisma.loyaltyConfig.findUnique({
+        where: { clientId }
+      })
+
+      if (loyaltyConfig && loyaltyConfig.enabled) {
+        // If loyaltyCustomerId is provided, use it directly
+        if (loyaltyCustomerId) {
+          customer = await prisma.customer.findUnique({
+            where: { id: loyaltyCustomerId }
+          })
+        } else {
+          // Otherwise, find or create customer by phone
+          const normalizedPhone = customerPhone.replace(/[\s\-()]/g, '')
+
+          customer = await prisma.customer.findUnique({
+            where: {
+              clientId_phone: {
+                clientId,
+                phone: normalizedPhone
+              }
+            }
+          })
+
+          if (!customer) {
+            customer = await prisma.customer.create({
+              data: {
+                clientId,
+                phone: normalizedPhone,
+                name: customerName,
+                email: customerEmail,
+                points: 0,
+                totalOrders: 0,
+                totalSpent: 0
+              }
+            })
+          } else {
+            // Update customer info if provided
+            customer = await prisma.customer.update({
+              where: { id: customer.id },
+              data: {
+                name: customerName || customer.name,
+                email: customerEmail || customer.email
+              }
+            })
+          }
+        }
+
+        // Calculate points earned (based on subtotal, not including tax/delivery)
+        pointsEarned = Math.floor(verifiedSubtotal * loyaltyConfig.pointsPerDollar)
+
+        // Update customer points and stats (account for points used)
+        customer = await prisma.customer.update({
+          where: { id: customer.id },
+          data: {
+            points: customer.points + pointsEarned - (pointsUsed || 0),
+            totalOrders: customer.totalOrders + 1,
+            totalSpent: customer.totalSpent + verifiedSubtotal
+          }
+        })
+      }
+    } catch (loyaltyError) {
+      console.error('Loyalty processing error:', loyaltyError)
+      // Continue with order creation even if loyalty fails
+    }
+
     // Create order
     const order = await prisma.order.create({
       data: {
         clientId,
+        customerId: customer?.id || null,
         orderNumber,
         status: 'new',
         items: verifiedItems,
@@ -124,7 +199,10 @@ router.post('/', async (req, res) => {
         note,
         deliveryFee,
         paymentGatewayId: paymentGateway?.id,
-        locationId: locationId || null
+        locationId: locationId || null,
+        pointsEarned,
+        pointsUsed: pointsUsed || 0,
+        rewardUsed: rewardUsed || null
       }
     })
 

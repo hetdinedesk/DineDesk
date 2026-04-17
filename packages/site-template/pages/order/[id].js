@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { getSiteData, CMS_API_URL } from '../../lib/api'
 import { CMSProvider } from '../../contexts/CMSContext'
+import { LoyaltyProvider } from '../../contexts/LoyaltyContext'
 import { Header } from '../../components/theme-d1/Header'
 import { Footer } from '../../components/theme-d1/Footer'
-import { Check, CheckCircle, Clock, Package, XCircle, Loader2, Receipt, Mail, Phone, User, Calendar } from 'lucide-react'
+import { Check, CheckCircle, Clock, Package, XCircle, Loader2, Receipt, Mail, Phone, User, Calendar, Star, Gift } from 'lucide-react'
 
 export async function getServerSideProps({ query }) {
   const { id } = query
@@ -158,6 +159,43 @@ export default function OrderStatusPage({ data, orderId }) {
             })}
           </div>
         </div>
+
+        {/* Loyalty Points Section */}
+        {(order.pointsEarned > 0 || order.pointsUsed > 0) && (
+          <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #d1fae5 100%)', borderRadius: 12, border: '1px solid #f59e0b', padding: 24, marginBottom: 24 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Star size={18} style={{ color: '#d97706' }} />
+              Loyalty Rewards
+            </h3>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {order.pointsEarned > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'white', borderRadius: 8 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Star size={20} style={{ color: '#059669' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#065f46' }}>Points Earned</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#059669' }}>+{order.pointsEarned} points</div>
+                  </div>
+                </div>
+              )}
+              {order.pointsUsed > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'white', borderRadius: 8 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Gift size={20} style={{ color: '#d97706' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#92400e' }}>Points Redeemed</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#d97706' }}>-{order.pointsUsed} points</div>
+                    {order.rewardUsed && (
+                      <div style={{ fontSize: 13, color: '#b45309' }}>{order.rewardUsed.name}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr 1fr' }}>
           {/* Order Details */}

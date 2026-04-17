@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CMSProvider, useCMS } from '../../contexts/CMSContext';
+import { LoyaltyProvider, useLoyalty } from '../../contexts/LoyaltyContext';
 import { Header } from '../../components/theme-d1/Header';
 import { Footer } from '../../components/theme-d1/Footer';
 import { FeaturedItemsSection } from '../../components/theme-d1/sections/FeaturedItemsSection';
@@ -8,7 +9,7 @@ import { ReviewsSection } from '../../components/theme-d1/sections/ReviewsSectio
 import PromoTilesSection from '../../components/theme-d1/sections/PromoTilesSection';
 import { FloatingReviewWidget } from '../../components/theme-d1/FloatingReviewWidget';
 import { replaceShortcodes } from '../../lib/shortcodes';
-import { ChevronLeft, ChevronRight, Clock, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, ArrowRight, Star, Gift } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { withSiteParam, getSiteId } from '../../lib/links';
@@ -93,6 +94,7 @@ function HomePageContent() {
         subtitle={replaceShortcodes(specialsConfig?.subheading || 'Limited time offerings', shortcodes)}
       />
     ),
+    loyalty: () => <LoyaltyBannerSection />,
     reviews: () => <ReviewsSection />,
     custom: (blockId) => {
       const block = customTextBlocks?.find(b => b.id === blockId);
@@ -462,6 +464,63 @@ function HomeSpecialsSection({ specials, title, subtitle }) {
   );
 }
 
+// Loyalty Banner Section
+function LoyaltyBannerSection() {
+  const { loyaltyConfig, isLoyaltyEnabled } = useLoyalty();
+  const router = useRouter();
+  const siteId = getSiteId(router);
+
+  if (!isLoyaltyEnabled || !loyaltyConfig?.rewards?.length) {
+    return null;
+  }
+
+  const firstReward = loyaltyConfig.rewards[0];
+
+  return (
+    <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-amber-50 to-emerald-50">
+      <div className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="bg-white rounded-2xl shadow-xl p-8 md:p-12"
+        >
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-emerald-500 rounded-full flex items-center justify-center">
+                  <Gift className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                  Earn Rewards with Every Order
+                </h2>
+              </div>
+              <p className="text-gray-600 text-lg mb-6">
+                Join our loyalty program and earn {loyaltyConfig.pointsPerDollar} point{loyaltyConfig.pointsPerDollar !== 1 ? 's' : ''} for every dollar spent. Redeem points for exclusive rewards!
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2 bg-amber-100 px-4 py-2 rounded-full">
+                  <Star className="w-5 h-5 text-amber-600" />
+                  <span className="font-semibold text-amber-900">{firstReward.pointsRequired} pts</span>
+                  <span className="text-amber-700">= {firstReward.discountType === 'percentage' ? `${firstReward.discountValue}% OFF` : `$${firstReward.discountValue.toFixed(2)} OFF`}</span>
+                </div>
+              </div>
+            </div>
+            <Link
+              href={withSiteParam('/menu', siteId)}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-emerald-500 text-white px-8 py-4 rounded-xl font-semibold hover:opacity-90 transition-all transform hover:scale-105 shadow-lg"
+            >
+              Start Earning
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 // Helper functions
 function isPromoVisible(promo) {
   const now = new Date();
@@ -482,9 +541,12 @@ function formatDate(dateString) {
 }
 
 export default function ThemeD1HomePage({ data, siteType }) {
+  const clientId = data?.client?.id;
   return (
     <CMSProvider data={data}>
-      <HomePageContent />
+      <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
+        <HomePageContent />
+      </LoyaltyProvider>
     </CMSProvider>
   );
 }
