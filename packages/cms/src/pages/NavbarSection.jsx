@@ -1023,8 +1023,32 @@ function SortableFooterLink ({ link, pages, onUpdate, onRemove }) {
   )
 }
 
+function SortableUnassignedLink ({ link, pages, sections, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: link.id })
+  const target = link.pageId ? (pages.find(p => p.id === link.pageId)?.title || 'page') : (link.externalUrl || '—')
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: C.panel, borderRadius: 8, border: `1px solid ${C.border}` }}>
+      <div {...attributes} {...listeners} style={{ cursor: 'grab', color: C.t3, fontSize: 14, userSelect: 'none', flexShrink: 0 }}>⠿</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, color: C.t0 }}>{link.label}</div>
+        <div style={{ fontSize: 11, color: C.t2 }}>
+          {target}
+        </div>
+      </div>
+      <button
+        onClick={onDelete}
+        style={{ ...btnDanger, padding: '4px 8px', fontSize: 11 }}
+        title="Delete"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  )
+}
+
 function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLink, onRemoveLink, onReorderLinks, onDelete, onUpdateTitle }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id })
+  const { setNodeRef: setDroppableRef } = useDroppable({ id: section.id })
   const [expanded, setExpanded] = useState(true)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(section.title || '')
@@ -1046,7 +1070,7 @@ function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLin
   }
 
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, background: C.panel, border: `1px solid ${isActive ? C.border : C.border2}`, borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}>
+    <div ref={(node) => { setNodeRef(node); setDroppableRef(node); }} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, background: C.panel, border: `1px solid ${isActive ? C.border : C.border2}`, borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: C.card, borderBottom: expanded ? `1px solid ${C.border}` : 'none' }}>
         <div {...attributes} {...listeners} style={{ cursor: 'grab', color: C.t3, fontSize: 15, flexShrink: 0, userSelect: 'none' }}>⠿</div>
         {editingTitle ? (
@@ -1196,6 +1220,32 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     })
   }
 
+  const handleDragEndUnassigned = async (event) => {
+    const { active, over } = event
+    if (!over) return
+
+    const linkId = active.id
+    const sectionId = over.id
+
+    // Check if dropped on a section
+    const section = sections.find(s => s.id === sectionId)
+    if (section) {
+      await handleAssignLink(linkId, sectionId)
+    }
+  }
+
+  const handleDragEndGlobal = (event) => {
+    // Check if this is an unassigned link being dragged
+    const unassignedLink = unassignedLinks.find(l => l.id === event.active.id)
+    if (unassignedLink) {
+      handleDragEndUnassigned(event)
+      return
+    }
+
+    // Otherwise handle section reordering
+    onDragEndSections(event)
+  }
+
   return (
     <div>
       <SectionHeader title="Footer columns" Icon={PanelBottom} onAdd={() => { const id = `temp-${Date.now()}`; persist([...sections, { id, title: 'New Column', isActive: true, links: [] }]) }} addLabel="Add column" />
@@ -1209,35 +1259,21 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
             Unassigned Footer Links
           </div>
           <p style={{ fontSize: 12, color: C.t2, marginBottom: 12 }}>
-            These links were automatically created when pages were added. Assign them to a column below or delete them.
+            These links were automatically created when pages were added. Drag them into a column below or delete them.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {unassignedLinks.map(link => (
-              <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: C.panel, borderRadius: 8, border: `1px solid ${C.border}` }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, color: C.t0 }}>{link.label}</div>
-                  <div style={{ fontSize: 11, color: C.t2 }}>
-                    {link.page ? pages.find(p => p.id === link.pageId)?.title || 'Linked page' : link.externalUrl || 'No URL'}
-                  </div>
-                </div>
-                <select
-                  value=""
-                  onChange={(e) => { if (e.target.value) handleAssignLink(link.id, e.target.value) }}
-                  style={{ padding: 6, background: C.input, border: `1px solid ${C.border}`, borderRadius: 6, color: C.t0, fontSize: 12 }}
-                >
-                  <option value="">Assign to column...</option>
-                  {sections.map(s => <option key={s.id} value={s.id}>{s.title || 'Untitled'}</option>)}
-                </select>
-                <button
-                  onClick={() => handleDeleteUnassignedLink(link.id)}
-                  style={{ ...btnDanger, padding: '4px 8px', fontSize: 11 }}
-                  title="Delete"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
+          <SortableContext items={unassignedLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {unassignedLinks.map(link => (
+                <SortableUnassignedLink
+                  key={link.id}
+                  link={link}
+                  pages={pages}
+                  sections={sections}
+                  onDelete={() => handleDeleteUnassignedLink(link.id)}
+                />
+              ))}
+            </div>
+          </SortableContext>
         </div>
       )}
 
@@ -1247,8 +1283,8 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
           hint="Add a column to start organizing your footer links"
         />
       ) : (
-        <DndContext collisionDetection={closestCenter} onDragEnd={onDragEndSections}>
-          <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEndGlobal}>
+          <SortableContext items={[...sections.map(s => s.id), ...unassignedLinks.map(l => l.id)]} strategy={verticalListSortingStrategy}>
             {sections.map(s => (
               <SortableFooterSection
                 key={s.id}
