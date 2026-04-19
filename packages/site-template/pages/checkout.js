@@ -288,24 +288,6 @@ export default function CheckoutPage({ data }) {
     setError(errorMessage)
   }
 
-  const isStepValid = () => {
-    if (step === 1) {
-      return customerInfo.name && customerInfo.email && customerInfo.phone &&
-             (!ordering?.requirePhone || customerInfo.phone) &&
-             (!ordering?.requireEmail || customerInfo.email)
-    }
-    if (step === 2) {
-      const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
-      const locationRequired = activeLocations.length > 1
-      const locationValid = !locationRequired || selectedLocation
-      return (pickupType === 'asap' || (pickupType === 'scheduled' && scheduledTime)) && locationValid
-    }
-    if (step === 3) {
-      return paymentMethod === 'cash' || (paymentMethod === 'stripe' && paymentGateway.isActive)
-    }
-    return false
-  }
-
   const siteName = data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''
 
   return (
@@ -386,6 +368,24 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
   // Calculate total with discount
   const totalWithDiscount = total - discountAmount
+
+  const isStepValid = () => {
+    if (step === 1) {
+      return customerInfo.name && customerInfo.email && customerInfo.phone &&
+             (!ordering?.requirePhone || customerInfo.phone) &&
+             (!ordering?.requireEmail || customerInfo.email)
+    }
+    if (step === 2) {
+      const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
+      const locationRequired = activeLocations.length > 1
+      const locationValid = !locationRequired || selectedLocation
+      return (pickupType === 'asap' || (pickupType === 'scheduled' && scheduledTime)) && locationValid
+    }
+    if (step === 3) {
+      return paymentMethod === 'cash' || (paymentMethod === 'stripe' && paymentGateway.isActive)
+    }
+    return false
+  }
 
   return (
     <CMSProvider data={data}>
