@@ -38,7 +38,13 @@ export default function TeamPage({ data, page, banner }) {
   }, [teamMembers, teamDepartments]);
 
   const [expandedDept, setExpandedDept] = useState(null);
-  const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [selectedDepartment, setSelectedDepartment] = useState(() => {
+    const depts = Object.values(membersByDepartment.grouped);
+    if (depts.length > 0) {
+      return depts.sort((a, b) => (a.department.sortOrder || 0) - (b.department.sortOrder || 0))[0].department.id;
+    }
+    return null;
+  });
 
   // Get page title and description from page data or default
   const pageTitle = page?.title || 'Meet Our Team';
@@ -115,16 +121,6 @@ export default function TeamPage({ data, page, banner }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="border-b border-gray-200">
             <div className="flex flex-wrap gap-0">
-              <button
-                onClick={() => setSelectedDepartment(null)}
-                className={`px-6 py-3 font-medium transition-all border-b-2 ${
-                  !selectedDepartment
-                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                All Departments
-              </button>
               {Object.values(membersByDepartment.grouped)
                 .sort((a, b) => (a.department.sortOrder || 0) - (b.department.sortOrder || 0))
                 .map(({ department, members }) => (
@@ -153,102 +149,68 @@ export default function TeamPage({ data, page, banner }) {
             <h3 className="text-xl font-semibold text-gray-500">No team members added yet</h3>
             <p className="text-gray-400 mt-2">Check back soon to meet our amazing team!</p>
           </div>
+        ) : selectedDepartment ? (
+          /* Show only selected department */
+          (() => {
+            const selected = membersByDepartment.grouped[selectedDepartment];
+            if (!selected) return null;
+            const { department, members } = selected;
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="flex items-center gap-3 mb-8">
+                  <Building2 size={24} className="text-blue-600" />
+                  <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                    {department.name}
+                  </h2>
+                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    {members.length} member{members.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {members.map((member, memberIndex) => (
+                    <TeamMemberCard key={member.id} member={member} index={memberIndex} />
+                  ))}
+                </div>
+              </motion.div>
+            );
+          })()
         ) : (
-          <>
-            {/* Show all departments when none selected or show selected department */}
-            {!selectedDepartment ? (
-              <>
-                {/* Departments */}
-                {Object.values(membersByDepartment.grouped)
-                  .sort((a, b) => (a.department.sortOrder || 0) - (b.department.sortOrder || 0))
-                  .map(({ department, members }, index) => (
-                  <div key={department.id} className="mb-16">
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5, delay: index * 0.1 }}
-                    >
-                      <div className="flex items-center gap-3 mb-8">
-                        <Building2 size={24} className="text-blue-600" />
-                        <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
-                          {department.name}
-                        </h2>
-                        <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                          {members.length} member{members.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {members.map((member, memberIndex) => (
-                          <TeamMemberCard key={member.id} member={member} index={memberIndex} />
-                        ))}
-                      </div>
-                    </motion.div>
-                  </div>
+          /* Show unassigned members when no department selected */
+          membersByDepartment.unassigned.length > 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="flex items-center gap-3 mb-8">
+                <Users size={24} className="text-gray-600" />
+                <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                  Team Members
+                </h2>
+                <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  {membersByDepartment.unassigned.length} member{membersByDepartment.unassigned.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {membersByDepartment.unassigned.map((member, index) => (
+                  <TeamMemberCard key={member.id} member={member} index={index} />
                 ))}
-
-                {/* Unassigned Members */}
-                {membersByDepartment.unassigned.length > 0 && (
-                  <div className="mb-16">
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      <div className="flex items-center gap-3 mb-8">
-                        <Users size={24} className="text-gray-600" />
-                        <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
-                          Team Members
-                        </h2>
-                        <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                          {membersByDepartment.unassigned.length} member{membersByDepartment.unassigned.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {membersByDepartment.unassigned.map((member, index) => (
-                          <TeamMemberCard key={member.id} member={member} index={index} />
-                        ))}
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Show only selected department */
-              (() => {
-                const selected = membersByDepartment.grouped[selectedDepartment];
-                if (!selected) return null;
-                const { department, members } = selected;
-                return (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <div className="flex items-center gap-3 mb-8">
-                      <Building2 size={24} className="text-blue-600" />
-                      <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
-                        {department.name}
-                      </h2>
-                      <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                        {members.length} member{members.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                      {members.map((member, memberIndex) => (
-                        <TeamMemberCard key={member.id} member={member} index={memberIndex} />
-                      ))}
-                    </div>
-                  </motion.div>
-                );
-              })()
-            )}
-          </>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="text-center py-20">
+              <Users size={48} className="mx-auto text-gray-300 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-500">Select a department to view team members</h3>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -296,9 +258,9 @@ function TeamMemberCard({ member, index }) {
           <h3 className="text-xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
             {member.title}
           </h3>
-          <p className="text-blue-600 font-medium mb-4">
+          <h4 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wide">
             {typeof member.content === 'object' ? member.content?.text || '' : member.content}
-          </p>
+          </h4>
         </div>
       </div>
     </motion.div>
