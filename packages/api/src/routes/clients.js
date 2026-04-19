@@ -275,10 +275,19 @@ router.get('/:id/export', async (req, res) => {
         select: {
           id: true,
           type: true,
+          title: true,
           content: true,
+          imageUrl: true,
+          buttonText: true,
+          buttonUrl: true,
           isActive: true,
           sortOrder: true,
-          departmentId: true
+          departmentId: true,
+          memberDepartments: {
+            select: {
+              departmentId: true
+            }
+          }
         }
       }),
       prisma.promoTile.findMany({
@@ -312,7 +321,12 @@ router.get('/:id/export', async (req, res) => {
           id: true,
           name: true,
           isActive: true,
-          sortOrder: true
+          sortOrder: true,
+          memberDepartments: {
+            select: {
+              homeSectionId: true
+            }
+          }
         }
       }),
       prisma.specialsConfig.findUnique({
