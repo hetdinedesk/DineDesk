@@ -97,7 +97,6 @@ function MenuItemsTab({ clientId }) {
   const qc = useQueryClient()
   const [catFilter, setCatFilter] = useState('All')
   const [search,    setSearch]    = useState('')
-  const [ordered,   setOrdered]   = useState([])
   const [adding,    setAdding]    = useState(false)
   const [newItem,   setNewItem]   = useState({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
   const [formErr, setFormErr] = useState('')
@@ -107,7 +106,6 @@ function MenuItemsTab({ clientId }) {
   // Track unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const initialNewItem = useMemo(() => ({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' }), [])
-
   useEffect(() => {
     const hasChanges = JSON.stringify(newItem) !== JSON.stringify(initialNewItem)
     setHasUnsavedChanges(hasChanges)
@@ -119,12 +117,11 @@ function MenuItemsTab({ clientId }) {
     enabled: !!clientId
   })
 
-  useEffect(() => {
-    setOrdered(items.filter(i =>
+  const ordered = useMemo(() => 
+    items.filter(i =>
       (catFilter==='All' || i.category?.name===catFilter) &&
       i.name.toLowerCase().includes(search.toLowerCase())
-    ))
-  }, [items, catFilter, search, clientId])
+    ), [items, catFilter, search])
 
   const createMut = useMutation({
     mutationFn: async () => {
@@ -170,10 +167,6 @@ function MenuItemsTab({ clientId }) {
     mutationFn: (id) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'DELETE'),
     onSuccess:  () => qc.invalidateQueries(['menu-items', clientId])
   })
-  const toggleAvailability = useMutation({
-    mutationFn: ({ id, isAvailable }) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'PUT', { isAvailable }),
-    onSuccess: () => qc.invalidateQueries(['menu-items', clientId])
-  })
 
   const handleDragEnd = async ({ active, over }) => {
     if (!over || active.id === over.id) return
@@ -182,10 +175,10 @@ function MenuItemsTab({ clientId }) {
       ordered.findIndex(i => i.id === active.id),
       ordered.findIndex(i => i.id === over.id)
     )
-    setOrdered(reordered)
     await apiFetch(`/clients/${clientId}/menu-items/reorder`, 'PUT', {
       items: reordered.map((item, idx) => ({ id: item.id, sortOrder: idx }))
     })
+    qc.invalidateQueries(['menu-items', clientId])
   }
 
   const extractMenuItemsFromImages = async (imageFiles) => {
