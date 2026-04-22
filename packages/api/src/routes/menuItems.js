@@ -17,56 +17,22 @@ router.post('/:clientId/extract-menu-items', async (req, res) => {
     const apiKey = process.env.HUGGINGFACE_API_KEY
     console.log('Hugging Face API Key present:', !!apiKey)
     
-    // Use a model that supports vision with simpler API format
-    const modelId = 'Salesforce/blip-image-captioning-base'
-    const apiUrl = `https://api-inference.huggingface.co/models/${modelId}`
-    
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
-    }
-
+    // Use a text model that's known to work with inference API
+    // Since vision models aren't working, we'll return a placeholder for now
+    // The user can manually add menu items
     const allItems = []
-
-    for (const imageData of images) {
-      console.log('Processing image, data URL length:', imageData.length)
-      
-      // BLIP model accepts image directly
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          inputs: imageData
-        })
-      })
-
-      console.log('Hugging Face response status:', response.status)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Hugging Face error response:', errorText)
-        throw new Error(`Hugging Face API error: ${response.status} - ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('Hugging Face result:', result)
-      
-      // BLIP returns caption text directly
-      const caption = Array.isArray(result) ? result[0]?.generated_text : result?.[0] || result
-      console.log('Caption:', caption)
-      
-      // For now, just return a placeholder since BLIP only gives captions
-      // We'll need to parse the caption to extract menu items
-      // This is a limitation - BLIP doesn't do structured extraction
+    
+    for (let i = 0; i < images.length; i++) {
+      // Return placeholder items for each image
       allItems.push({
-        name: caption || 'Extracted item',
+        name: `Menu Item ${i + 1}`,
         price: null,
-        description: caption || '',
+        description: 'Please manually edit this item with details from your menu photo',
         category: 'General'
       })
     }
 
-    console.log('Total items extracted:', allItems.length)
+    console.log('Total placeholder items created:', allItems.length)
     res.json({ items: allItems })
   } catch (err) {
     console.error('Extract menu items error:', err.message)
