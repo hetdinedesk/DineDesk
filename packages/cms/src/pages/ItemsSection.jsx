@@ -98,6 +98,7 @@ function MenuItemsTab({ clientId }) {
   const [catFilter, setCatFilter] = useState('All')
   const [search,    setSearch]    = useState('')
   const [adding,    setAdding]    = useState(false)
+  const [editingId, setEditingId]  = useState(null)
   const [newItem,   setNewItem]   = useState({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
   const [formErr, setFormErr] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -163,6 +164,44 @@ function MenuItemsTab({ clientId }) {
     onError: (err) => setFormErr(err.message)
   })
 
+  const updateMut = useMutation({
+    mutationFn: async () => {
+      setFormErr('')
+      let categoryId = null
+      if (newItem.categoryName.trim()) {
+        const cats = await apiFetch(`/clients/${clientId}/menu-categories`)
+        const existing = cats.find(c =>
+          c.name.toLowerCase() === newItem.categoryName.trim().toLowerCase()
+        )
+        if (existing) {
+          categoryId = existing.id
+        } else {
+          const created = await apiFetch(`/clients/${clientId}/menu-categories`, 'POST', {
+            name: newItem.categoryName.trim(),
+            sortOrder: 0
+          })
+          categoryId = created.id
+        }
+      }
+      return apiFetch(`/clients/${clientId}/menu-items/${editingId}`, 'PUT', {
+        name:        newItem.name.trim(),
+        description: newItem.description.trim() || null,
+        price:       newItem.price ? parseFloat(newItem.price) : null,
+        imageUrl:    newItem.imageUrl || null,
+        isFeatured:  newItem.isFeatured,
+        ...(categoryId ? { categoryId } : {})
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries(['menu-items', clientId])
+      setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
+      setEditingId(null)
+      setHasUnsavedChanges(false)
+      setFormErr('')
+    },
+    onError: (err) => setFormErr(err.message)
+  })
+
   const deleteMut = useMutation({
     mutationFn: (id) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'DELETE'),
     onSuccess:  () => qc.invalidateQueries(['menu-items', clientId])
@@ -184,6 +223,27 @@ function MenuItemsTab({ clientId }) {
       items: reordered.map((item, idx) => ({ id: item.id, sortOrder: idx }))
     })
     qc.invalidateQueries(['menu-items', clientId])
+  }
+
+  const startEdit = (item) => {
+    setNewItem({
+      name: item.name,
+      price: item.price?.toString() || '',
+      description: item.description || '',
+      categoryName: item.category?.name || '',
+      isFeatured: item.isFeatured || false,
+      imageUrl: item.imageUrl || ''
+    })
+    setEditingId(item.id)
+    setAdding(true)
+    setFormErr('')
+  }
+
+  const cancelEdit = () => {
+    setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
+    setEditingId(null)
+    setAdding(false)
+    setFormErr('')
   }
 
   const saveMenuItemDirectly = async (itemData) => {
@@ -288,7 +348,7 @@ function MenuItemsTab({ clientId }) {
               fontFamily:'inherit', outline:'none', width:160 }}/>
         </div>
         <div style={{ display:'flex', gap:8 }}>
-          <button onClick={() => { setAdding(!adding); setFormErr('') }}
+          <button onClick={() => { setAdding(!adding); setEditingId(null); setFormErr('') }}
             style={{ padding:'8px 16px', background:C.acc, border:'none', borderRadius:7,
               color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
             + Add Menu Item
@@ -381,18 +441,14 @@ function MenuItemsTab({ clientId }) {
             </div>
           )}
           <div style={{ display:'flex', gap:8 }}>
-            <button onClick={() => createMut.mutate()}
-              disabled={!newItem.name || !newItem.price || createMut.isPending}
+            <button onClick={() => editingId ? updateMut.mutate() : createMut.mutate()}
+              disabled={!newItem.name || !newItem.price || createMut.isPending || updateMut.isPending}
               style={{ padding:'9px 18px', background:C.acc, border:'none', borderRadius:7,
                 color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit',
-                opacity: (!newItem.name || !newItem.price || createMut.isPending) ? 0.5 : 1 }}>
-              {createMut.isPending ? 'Saving...' : 'Save Item'}
+                opacity: (!newItem.name || !newItem.price || createMut.isPending || updateMut.isPending) ? 0.5 : 1 }}>
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : (editingId ? 'Update Item' : 'Save Item')}
             </button>
-            <button onClick={() => {
-              setAdding(false)
-              setFormErr('')
-              setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
-            }}
+            <button onClick={cancelEdit}
               style={{ padding:'9px 14px', background:'transparent', border:`1px solid ${C.border}`,
                 borderRadius:7, color:C.t2, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
               Cancel
@@ -433,6 +489,10 @@ function MenuItemsTab({ clientId }) {
                     >
                       <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: item.isAvailable ? 21 : 2, transition: 'left 0.2s' }} />
                     </div>,
+                    <button onClick={() => startEdit(item)}
+                      style={{ padding:'4px 8px', background:'transparent',
+                        border:`1px solid ${C.acc}40`, borderRadius:4,
+                        color:C.acc, fontSize:11, cursor:'pointer', marginRight:4 }} title="Edit">✎</button>
                     <button onClick={() => window.confirm(`Delete "${item.name}"?`) && deleteMut.mutate(item.id)}
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.red}40`, borderRadius:4,
