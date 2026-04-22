@@ -5,42 +5,6 @@ const { log } = require('../lib/activityLog')
 const router = express.Router()
 router.use(authenticateToken)
 
-// Hugging Face API endpoint for menu item extraction
-router.post('/:clientId/extract-menu-items', async (req, res) => {
-  try {
-    const { images } = req.body // Array of base64 image strings with mime types
-    
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({ error: 'No images provided' })
-    }
-
-    const apiKey = process.env.HUGGINGFACE_API_KEY
-    console.log('Hugging Face API Key present:', !!apiKey)
-    
-    // Use a text model that's known to work with inference API
-    // Since vision models aren't working, we'll return a placeholder for now
-    // The user can manually add menu items
-    const allItems = []
-    
-    for (let i = 0; i < images.length; i++) {
-      // Return placeholder items for each image
-      allItems.push({
-        name: `Menu Item ${i + 1}`,
-        price: null,
-        description: 'Please manually edit this item with details from your menu photo',
-        category: 'General'
-      })
-    }
-
-    console.log('Total placeholder items created:', allItems.length)
-    res.json({ items: allItems })
-  } catch (err) {
-    console.error('Extract menu items error:', err.message)
-    console.error('Full error:', err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
 router.get('/:clientId/menu-categories', async (req, res) => {
   try {
     const cats = await prisma.menuCategory.findMany({

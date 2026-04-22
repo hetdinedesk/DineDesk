@@ -167,6 +167,7 @@ function MenuItemsTab({ clientId }) {
     mutationFn: (id) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'DELETE'),
     onSuccess:  () => qc.invalidateQueries(['menu-items', clientId])
   })
+
   const toggleAvailability = useMutation({
     mutationFn: ({ id, isAvailable }) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'PUT', { isAvailable }),
     onSuccess: () => qc.invalidateQueries(['menu-items', clientId])
@@ -183,27 +184,6 @@ function MenuItemsTab({ clientId }) {
       items: reordered.map((item, idx) => ({ id: item.id, sortOrder: idx }))
     })
     qc.invalidateQueries(['menu-items', clientId])
-  }
-
-  const extractMenuItemsFromImages = async (imageFiles) => {
-    const allItems = []
-
-    // Convert all images to base64 with mime type
-    const images = await Promise.all(imageFiles.map(file => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result) // Keep full data URL with mime type
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
-    }))
-
-    setProcessingStatus('Analyzing menu photos with AI...')
-    
-    // Call backend API which handles Hugging Face
-    const result = await apiFetch(`/clients/${clientId}/extract-menu-items`, 'POST', { images })
-    
-    return result.items || []
   }
 
   const saveMenuItemDirectly = async (itemData) => {
@@ -236,40 +216,38 @@ function MenuItemsTab({ clientId }) {
     })
   }
 
-  const handlePhotoUpload = async (e) => {
-    const files = Array.from(e.target.files)
-    if (files.length === 0) return
+  const handleJsonUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
 
     setIsProcessing(true)
     setFormErr('')
     
     try {
-      setProcessingStatus('Analyzing menu photos with AI...')
-      const extractedItems = await extractMenuItemsFromImages(files)
+      setProcessingStatus('Reading JSON file...')
+      const text = await file.text()
+      const items = JSON.parse(text)
       
-      if (extractedItems.length === 0) {
-        setFormErr('No menu items could be extracted from the photos. Please try clearer images.')
-        setIsProcessing(false)
-        setProcessingStatus('')
-        return
+      if (!Array.isArray(items)) {
+        throw new Error('JSON must be an array of menu items')
       }
 
-      setProcessingStatus(`Saving ${extractedItems.length} menu items...`)
+      setProcessingStatus(`Saving ${items.length} menu items...`)
       
-      for (let i = 0; i < extractedItems.length; i++) {
-        setProcessingStatus(`Saving item ${i + 1} of ${extractedItems.length}: ${extractedItems[i].name}`)
+      for (let i = 0; i < items.length; i++) {
+        setProcessingStatus(`Saving item ${i + 1} of ${items.length}: ${items[i].name}`)
         await saveMenuItemDirectly({
-          name: extractedItems[i].name,
-          price: extractedItems[i].price,
-          description: extractedItems[i].description,
-          categoryName: extractedItems[i].category,
-          isFeatured: false,
-          imageUrl: null
+          name: items[i].name,
+          price: items[i].price,
+          description: items[i].description,
+          categoryName: items[i].category,
+          isFeatured: items[i].isFeatured || false,
+          imageUrl: items[i].imageUrl || null
         })
       }
 
       qc.invalidateQueries(['menu-items', clientId])
-      setProcessingStatus(`Successfully added ${extractedItems.length} items!`)
+      setProcessingStatus(`Successfully added ${items.length} items!`)
       
       setTimeout(() => {
         setProcessingStatus('')
@@ -277,8 +255,8 @@ function MenuItemsTab({ clientId }) {
       }, 2000)
       
     } catch (err) {
-      console.error('Photo upload error:', err)
-      setFormErr(err.message || 'Failed to process photos. Please check your API key and try again.')
+      console.error('JSON upload error:', err)
+      setFormErr(err.message || 'Failed to process JSON file. Please check the format.')
       setIsProcessing(false)
       setProcessingStatus('')
     }
@@ -315,21 +293,20 @@ function MenuItemsTab({ clientId }) {
               color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
             + Add Menu Item
           </button>
-          <button onClick={() => document.getElementById('menu-photo-upload').click()}
+          <button onClick={() => document.getElementById('menu-json-upload').click()}
             disabled={isProcessing}
             style={{ padding:'8px 16px', background:C.card, border:`1px solid ${C.border}`, borderRadius:7,
               color:C.t1, fontWeight:700, fontSize:13, cursor:isProcessing ? 'not-allowed' : 'pointer', fontFamily:'inherit',
               display:'flex', alignItems:'center', gap:6, opacity:isProcessing ? 0.5 : 1 }}>
             {isProcessing ? <Loader2 size={14} className="spin" /> : <Upload size={14} />}
-            {isProcessing ? 'Processing...' : 'Upload Menu Photos'}
+            {isProcessing ? 'Processing...' : 'Upload JSON'}
           </button>
           <input
-            id="menu-photo-upload"
+            id="menu-json-upload"
             type="file"
-            accept="image/*"
-            multiple
+            accept=".json"
             style={{ display:'none' }}
-            onChange={handlePhotoUpload}
+            onChange={handleJsonUpload}
           />
         </div>
       </div>
