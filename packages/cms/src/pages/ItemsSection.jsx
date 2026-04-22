@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Utensils, Trash2, Image as ImageIcon } from 'lucide-react'
 import { getMenuItems, deleteMenuItem, reorderMenuItems } from '../api/menuItems'
@@ -104,7 +104,7 @@ function MenuItemsTab({ clientId }) {
 
   // Track unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const initialNewItem = { name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' }
+  const initialNewItem = useMemo(() => ({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' }), [])
 
   useEffect(() => {
     const hasChanges = JSON.stringify(newItem) !== JSON.stringify(initialNewItem)
@@ -299,18 +299,18 @@ function MenuItemsTab({ clientId }) {
       )}
 
       <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10, overflow:'hidden' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse' }}>
-          <thead>
-            <tr style={{ background:C.card }}>
-              {['','Item Name','Category','Price','Featured','Status','Actions'].map((h, i) => (
-                <th key={i} style={{ padding:'9px 14px', textAlign:'left', fontSize:11, fontWeight:700,
-                  color:C.t3, borderBottom:`1px solid ${C.border}`, textTransform:'uppercase',
-                  letterSpacing:'0.05em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={ordered.map(i => i.id)} strategy={verticalListSortingStrategy}>
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={ordered.map(i => i.id)} strategy={verticalListSortingStrategy}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead>
+                <tr style={{ background:C.card }}>
+                  {['','Item Name','Category','Price','Featured','Status','Actions'].map((h, i) => (
+                    <th key={i} style={{ padding:'9px 14px', textAlign:'left', fontSize:11, fontWeight:700,
+                      color:C.t3, borderBottom:`1px solid ${C.border}`, textTransform:'uppercase',
+                      letterSpacing:'0.05em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
                 {ordered.map(item => (
                   <SortableRow key={item.id} id={item.id} cells={[
@@ -343,9 +343,9 @@ function MenuItemsTab({ clientId }) {
                   </td></tr>
                 )}
               </tbody>
-            </SortableContext>
-          </DndContext>
-        </table>
+            </table>
+          </SortableContext>
+        </DndContext>
       </div>
     </>
   )
