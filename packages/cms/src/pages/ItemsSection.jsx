@@ -167,6 +167,10 @@ function MenuItemsTab({ clientId }) {
     mutationFn: (id) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'DELETE'),
     onSuccess:  () => qc.invalidateQueries(['menu-items', clientId])
   })
+  const toggleAvailability = useMutation({
+    mutationFn: ({ id, isAvailable }) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'PUT', { isAvailable }),
+    onSuccess: () => qc.invalidateQueries(['menu-items', clientId])
+  })
 
   const handleDragEnd = async ({ active, over }) => {
     if (!over || active.id === over.id) return
