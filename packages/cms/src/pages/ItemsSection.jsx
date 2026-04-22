@@ -493,17 +493,20 @@ function MenuItemsTab({ clientId }) {
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.acc}40`, borderRadius:4,
                         color:C.acc, fontSize:11, cursor:'pointer', marginRight:4 }} title="Edit">✎</button>
-                    <button onClick={() => window.confirm(`Delete "${item.name}"?`) && deleteMut.mutate(item.id)}
+                    <button onClick={() => { if (window.confirm(`Delete "${item.name}"?`)) deleteMut.mutate(item.id) }}
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.red}40`, borderRadius:4,
-                        color:C.red, fontSize:11, cursor:'pointer' }} title="Delete"><Trash2 size={14} /></button>
+                        color:C.red, fontSize:11, cursor:'pointer' }} title="Delete"><Trash2 size={14} />
+                    </button>
                   ]}/>
                 ))}
                 {ordered.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding:28, textAlign:'center',
-                    color:C.t3, fontSize:13, fontStyle:'italic' }}>
-                    No items yet. Click + Add Menu Item above.
-                  </td></tr>
+                  <tr>
+                    <td colSpan={7} style={{ padding:28, textAlign:'center',
+                      color:C.t3, fontSize:13, fontStyle:'italic' }}>
+                      No items yet. Click + Add Menu Item above.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
