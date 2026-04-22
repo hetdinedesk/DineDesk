@@ -86,6 +86,7 @@ model SiteConfig {
   analytics  Json?
   shortcodes Json?
   homepage   Json?
+  posConfig  Json?
   reviews    Json?
   booking    Json?
   notes      Json?
@@ -120,7 +121,7 @@ model Location {
   exteriorImages     Json?       @default("[]")  // Array of exterior image URLs
   formEmail          String?
   showInFooter       Boolean  @default(false)
-  alternateStyling   Boolean  @default(false)  
+  alternateStyling   Boolean  @default(false)
   galleryImages      Json?    @default("[]")
 
   isPrimary          Boolean  @default(false)
@@ -129,6 +130,7 @@ model Location {
   deliveryZone       Boolean  @default(false)
   menuCategories     String[] @default([])
   servicesAvailable  String[] @default([])
+  orders             Order[]
 
   // Single primary per client enforced in API routes
   @@index([clientId])
@@ -541,6 +543,8 @@ model Order {
   deliveryFee           Float          @default(0)
   paymentGatewayId      String?
   paymentGateway        PaymentGateway? @relation(fields: [paymentGatewayId], references: [id])
+  locationId            String?
+  location              Location?      @relation(fields: [locationId], references: [id])
   pointsEarned          Int            @default(0)
   pointsUsed            Int            @default(0)
   rewardUsed            Json?
@@ -552,6 +556,7 @@ model Order {
   @@index([status])
   @@index([paymentGatewayId])
   @@index([customerId])
+  @@index([locationId])
 }
 
 model LegalDoc {

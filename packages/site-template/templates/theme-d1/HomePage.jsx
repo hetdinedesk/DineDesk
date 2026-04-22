@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CMSProvider, useCMS } from '../../contexts/CMSContext';
-import { LoyaltyProvider, useLoyalty } from '../../contexts/LoyaltyContext';
+import { useCMS } from '../../contexts/CMSContext';
+import { useLoyalty } from '../../contexts/LoyaltyContext';
 import { Header } from '../../components/theme-d1/Header';
 import { Footer } from '../../components/theme-d1/Footer';
 import { FeaturedItemsSection } from '../../components/theme-d1/sections/FeaturedItemsSection';
@@ -541,14 +541,7 @@ function formatDate(dateString) {
 }
 
 export default function ThemeD1HomePage({ data, siteType }) {
-  const clientId = data?.client?.id;
-  return (
-    <CMSProvider data={data}>
-      <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
-        <HomePageContent />
-      </LoyaltyProvider>
-    </CMSProvider>
-  );
+  return <HomePageContent />;
 }
 
 

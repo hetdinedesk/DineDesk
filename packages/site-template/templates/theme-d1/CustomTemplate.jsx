@@ -3,20 +3,65 @@ import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { MapPin, Phone, Mail, Clock, Navigation } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
+import DOMPurify from 'dompurify';
+
+// Clean HTML content - strip complex structures, keep basic text elements
+const cleanPageContent = (html) => {
+  if (!html) return ''
+
+  let cleanHtml = html
+
+  // Remove all div, section, article, etc. tags but keep their content
+  cleanHtml = cleanHtml.replace(/<(div|section|article|aside|header|footer|nav|main|figure|figcaption|span)([^>]*)>([\s\S]*?)<\/\1>/gi, '$3')
+
+  // Remove grid, flex, and layout-related classes
+  cleanHtml = cleanHtml.replace(/\sclass="[^"]*?(grid|flex|col|row|gap|padding|margin|w-|h-|min-|max-|bg-|text-|shadow|rounded|border|transform|opacity)[^"]*"/gi, '')
+
+  // Remove inline styles
+  cleanHtml = cleanHtml.replace(/\sstyle="[^"]*"/gi, '')
+
+  // Remove SVG icons and other non-text elements
+  cleanHtml = cleanHtml.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '')
+
+  // Remove empty paragraphs
+  cleanHtml = cleanHtml.replace(/<p>\s*<\/p>/gi, '')
+  cleanHtml = cleanHtml.replace(/<p><\/p>/gi, '')
+
+  // Clean up extra whitespace
+  cleanHtml = cleanHtml.replace(/\s+/g, ' ')
+
+  // Ensure paragraphs are properly wrapped
+  cleanHtml = cleanHtml.replace(/([^.!?])\n([^<])/g, '$1<p>$2')
+
+  return cleanHtml
+}
+
+// Format time from 24-hour format (e.g., "1100") to readable format (e.g., "11 AM")
+const formatTime = (timeStr) => {
+  if (!timeStr || timeStr.length !== 4) return timeStr
+
+  const hours = parseInt(timeStr.substring(0, 2), 10)
+  const minutes = timeStr.substring(2, 4)
+
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const displayHours = hours % 12 || 12 // Convert 0 to 12 for midnight
+
+  return `${displayHours}:${minutes} ${period}`
+}
 
 // Map component that supports multiple providers
 function MapEmbed({ location, provider = 'google' }) {
-  const { address, coordinates } = location;
+  const { address, lat, lng } = location;
   const fullAddress = `${address.street}, ${address.city}, ${address.state} ${address.zipCode}`;
-  
+
   // Google Maps embed (free, no API key required for basic embed)
   if (provider === 'google') {
     const encodedAddress = encodeURIComponent(fullAddress);
     // Use Google Maps embed API with coordinates if available, otherwise use address
-    if (coordinates?.latitude && coordinates?.longitude) {
+    if (lat && lng) {
       return (
         <iframe
-          src={`https://maps.google.com/maps?q=${coordinates?.latitude},${coordinates?.longitude}&hl=en&z=16&output=embed`}
+          src={`https://maps.google.com/maps?q=${lat},${lng}&hl=en&z=16&output=embed`}
           width="100%"
           height="100%"
           style={{ border: 0 }}
@@ -41,7 +86,7 @@ function MapEmbed({ location, provider = 'google' }) {
       />
     );
   }
-  
+
   // Fallback to static map image + link
   return (
     <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center p-6">
@@ -64,10 +109,10 @@ function MapEmbed({ location, provider = 'google' }) {
 function LocationMapSection({ locations, restaurantName }) {
   const [activeTab, setActiveTab] = useState(0);
   const activeLocation = locations[activeTab];
-  
+
   // Check if we have coordinates for map
-  const hasCoordinates = activeLocation?.coordinates?.latitude && activeLocation?.coordinates?.longitude;
-  
+  const hasCoordinates = activeLocation?.lat && activeLocation?.lng;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -83,8 +128,8 @@ function LocationMapSection({ locations, restaurantName }) {
                 key={loc.id}
                 onClick={() => setActiveTab(idx)}
                 className={`px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === idx 
-                    ? 'text-[var(--color-secondary)] border-b-2 border-[var(--color-secondary)] bg-gray-50' 
+                  activeTab === idx
+                    ? 'text-[var(--color-secondary)] border-b-2 border-[var(--color-secondary)] bg-gray-50'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
@@ -94,7 +139,7 @@ function LocationMapSection({ locations, restaurantName }) {
             ))}
           </div>
         )}
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3">
           {/* Location Info */}
           <div className="p-8 bg-gray-50">
@@ -104,7 +149,7 @@ function LocationMapSection({ locations, restaurantName }) {
             <h3 className="text-2xl font-bold text-[var(--color-primary)] mb-6">
               {restaurantName}
             </h3>
-            
+
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <MapPin className="text-[var(--color-secondary)] flex-shrink-0 mt-1" size={20} />
@@ -113,11 +158,11 @@ function LocationMapSection({ locations, restaurantName }) {
                   {activeLocation.address.city}, {activeLocation.address.state} {activeLocation.address.zipCode}
                 </p>
               </div>
-              
+
               {activeLocation.contact?.phone && (
                 <div className="flex items-center gap-3">
                   <Phone className="text-[var(--color-secondary)] flex-shrink-0" size={20} />
-                  <a 
+                  <a
                     href={`tel:${activeLocation.contact.phone}`}
                     className="text-gray-700 hover:text-[var(--color-secondary)]"
                   >
@@ -125,11 +170,11 @@ function LocationMapSection({ locations, restaurantName }) {
                   </a>
                 </div>
               )}
-              
+
               {activeLocation.contact?.email && (
                 <div className="flex items-center gap-3">
                   <Mail className="text-[var(--color-secondary)] flex-shrink-0" size={20} />
-                  <a 
+                  <a
                     href={`mailto:${activeLocation.contact.email}`}
                     className="text-gray-700 hover:text-[var(--color-secondary)]"
                   >
@@ -148,7 +193,7 @@ function LocationMapSection({ locations, restaurantName }) {
                 <div key={hour.day} className="flex justify-between">
                   <span className="text-gray-600">{hour.day}:</span>
                   <span className="text-gray-800">
-                    {hour.closed ? 'Closed' : `${hour.open} - ${hour.close}`}
+                    {hour.closed ? 'Closed' : `${formatTime(hour.open)} - ${formatTime(hour.close)}`}
                   </span>
                 </div>
               ))}
@@ -302,17 +347,19 @@ export default function CustomTemplate({ data, page, banner }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Main Content Area */}
-        <div className={`grid gap-12 ${showEnquiryForm ? 'grid-cols-1 lg:grid-cols-2 items-start' : 'grid-cols-1 max-w-3xl mx-auto'}`}>
+        <div className={`grid gap-12 ${showEnquiryForm ? 'grid-cols-1 lg:grid-cols-2 items-start' : 'grid-cols-1 max-w-6xl mx-auto'}`}>
           {/* Content Column - Only shows CMS content, no auto location info */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex flex-col"
           >
-            <div
-              className="prose prose-lg max-w-none text-gray-700 flex-1"
-              dangerouslySetInnerHTML={{ __html: content }}
-            />
+            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-10 lg:p-14">
+              <div
+                className="prose prose-lg sm:prose-xl max-w-none text-gray-800 leading-relaxed flex-1"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cleanPageContent(content)) }}
+              />
+            </div>
           </motion.div>
 
           {/* Contact Form - Only if enabled */}

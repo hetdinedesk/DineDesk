@@ -2,9 +2,11 @@ import Head from 'next/head'
 import { getSiteData } from '../lib/api'
 import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
+
+// Theme-specific imports
 import { Header } from '../components/theme-d1/Header'
 import { Footer } from '../components/theme-d1/Footer'
-import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate.jsx'
+import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate'
 
 export async function getServerSideProps({ query }) {
   // Reject literal string "undefined" as invalid site ID
@@ -13,10 +15,13 @@ export async function getServerSideProps({ query }) {
     ? rawSite
     : (process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
-  return { props: { data } }
+
+  const template = data.colours?.theme || process.env.SITE_TEMPLATE || 'theme-d1'
+
+  return { props: { data, template } }
 }
 
-export default function Page({ data }) {
+export default function Page({ data, template }) {
   const pages = data?.pages || []
   const shortcodes = data?.shortcodes || {}
   const settings = data?.settings || {}
@@ -32,7 +37,7 @@ export default function Page({ data }) {
   const ogImage = page?.ogImage || null
 
   // Get banner if selected for this page
-  const banner = page?.bannerId ? (data?.banners || []).find((b) => b.id === page.bannerId) : null
+  const banner = page?.bannerId ? (data?.banners || []).find((b) => String(b.id) === String(page.bannerId)) : null
 
   return (
     <CMSProvider data={data}>

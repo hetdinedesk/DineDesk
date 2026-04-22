@@ -123,22 +123,24 @@ export const UtilityBelt = ({ isDark }) => {
     switch (key) {
       case 'contact-info':
         return (
-          <div key={key} className="flex items-center space-x-4 text-xs font-medium">
+          <div key={key} className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm font-medium">
             {primaryLocation?.phone && (
               <a href={`tel:${primaryLocation.phone}`} className="flex items-center hover:opacity-80 transition-opacity">
-                <Phone size={14} className="mr-1" />
-                <span>{primaryLocation.phone}</span>
+                <Phone size={14} className="mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{primaryLocation.phone}</span>
               </a>
             )}
             {primaryLocation?.address?.street && (
-              <a 
-                href={getDirectionsUrl(primaryLocation)} 
-                target="_blank" 
+              <a
+                href={getDirectionsUrl(primaryLocation)}
+                target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center hover:opacity-80 transition-opacity"
+                className="flex items-center hover:opacity-80 transition-opacity"
               >
-                <MapPin size={14} className="mr-1" />
-                <span>{primaryLocation.address.street}</span>
+                <MapPin size={14} className="mr-1 sm:mr-2" />
+                <span className="hidden md:inline">
+                  {[primaryLocation.address.street, primaryLocation.address.suburb, primaryLocation.address.postcode].filter(Boolean).join(', ')}
+                </span>
               </a>
             )}
           </div>
@@ -147,21 +149,21 @@ export const UtilityBelt = ({ isDark }) => {
       case 'social-links':
         // Check both header utilityItems toggle AND social.showInUtility setting
         if (!isItemEnabled('social-links') || siteConfig?.social?.showInUtility === false) return null;
-        
+
         const activeSocials = Object.entries(siteConfig.social || {})
           .filter(([platform, url]) => url && typeof url === 'string' && platform !== 'showInFooter' && platform !== 'showInUtility');
-        
+
         if (activeSocials.length === 0) return null;
 
         return (
-          <div key={key} className="flex items-center gap-2">
+          <div key={key} className="flex items-center gap-2 sm:gap-3">
             {activeSocials.map(([platform, url]) => (
-              <a 
-                key={platform} 
-                href={url} 
-                target="_blank" 
+              <a
+                key={platform}
+                href={url}
+                target="_blank"
                 rel="noopener noreferrer"
-                className="hover:opacity-80 transition-opacity p-1"
+                className="hover:opacity-80 transition-opacity p-1 sm:p-1.5"
               >
                 <SocialIcon platform={platform} size={14} />
               </a>
@@ -176,13 +178,13 @@ export const UtilityBelt = ({ isDark }) => {
         const googleReviews = reviewsConfig?.googleReviews || [];
         const hasGoogleReviews = googleReviews.length > 0;
         const hasValidPlaceId = googleReviewsConfig?.placeId && googleReviewsConfig?.placeId.trim() !== '';
-        
+
         if (reviewsConfig?.enableHeader !== false && hasValidPlaceId && (hasGoogleReviews || googleReviewsConfig?.averageRating)) {
           const averageRating = googleReviewsConfig?.averageRating || reviewsConfig?.averageRating || (hasGoogleReviews ? googleReviews.reduce((acc, r) => acc + r.stars, 0) / googleReviews.length : 4.5);
           const totalReviews = googleReviewsConfig?.totalReviews || reviewsConfig?.totalReviews || googleReviews.length;
-          
+
           return (
-            <div key={key} className="flex items-center space-x-1 text-xs font-medium">
+            <div key={key} className="flex items-center space-x-1 text-xs sm:text-sm font-medium">
               <Google size={14} />
               <span className="font-bold">{averageRating.toFixed(1)}</span>
               <div className="flex items-center text-yellow-400">
@@ -191,12 +193,12 @@ export const UtilityBelt = ({ isDark }) => {
                 ))}
               </div>
               {totalReviews > 0 && (
-                <span className="hidden xs:inline text-gray-300">({totalReviews})</span>
+                <span className="hidden sm:inline text-gray-300">({totalReviews})</span>
               )}
             </div>
           );
         }
-        
+
         return null;
 
       case 'header-ctas':
@@ -204,32 +206,32 @@ export const UtilityBelt = ({ isDark }) => {
         if (activeCtas.length === 0) return null;
 
         return (
-          <div key={key} className="flex flex-wrap items-center gap-2">
+          <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
             {activeCtas.map(cta => {
               const variantStyles = {
-                primary: isDark ? 'bg-white text-gray-900 px-3 py-1 rounded shadow-sm' : 'bg-white text-[var(--color-primary)] px-3 py-1 rounded shadow-sm',
-                secondary: 'bg-[var(--color-secondary)] text-white px-3 py-1 rounded shadow-sm',
-                outline: 'border border-white text-white px-3 py-1 rounded hover:bg-white hover:text-[var(--color-primary)]',
+                primary: isDark ? 'bg-white text-gray-900 px-3 sm:px-4 py-1 sm:py-1.5 rounded shadow-sm' : 'bg-white text-[var(--color-primary)] px-3 sm:px-4 py-1 sm:py-1.5 rounded shadow-sm',
+                secondary: 'bg-[var(--color-secondary)] text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded shadow-sm',
+                outline: 'border border-white text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded hover:bg-white hover:text-[var(--color-primary)]',
                 text: 'text-white hover:underline px-2 py-1',
               };
-              
+
               const style = variantStyles[cta.variant] || variantStyles.primary;
 
               return (
                 <React.Fragment key={cta.id}>
                   {(cta.value || '').startsWith('http') ? (
-                    <a 
-                      href={cta.value || '#'} 
+                    <a
+                      href={cta.value || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`text-xs font-bold transition-all whitespace-nowrap ${style}`}
+                      className={`text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${style}`}
                     >
                       {cta.label}
                     </a>
                   ) : (
-                    <Link 
-                      href={withSiteParam(cta.value || '#', siteId)} 
-                      className={`text-xs font-bold transition-all whitespace-nowrap ${style}`}
+                    <Link
+                      href={withSiteParam(cta.value || '#', siteId)}
+                      className={`text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${style}`}
                     >
                       {cta.label}
                     </Link>
@@ -246,9 +248,9 @@ export const UtilityBelt = ({ isDark }) => {
   };
 
   return (
-    <div 
+    <div
       className="w-full py-2 px-4 sm:px-6 lg:px-8 z-[60]"
-      style={{ 
+      style={{
         backgroundColor: 'var(--color-utility-belt-bg)',
         color: 'var(--color-utility-belt-text)',
         fontFamily: 'var(--font-heading, inherit)'

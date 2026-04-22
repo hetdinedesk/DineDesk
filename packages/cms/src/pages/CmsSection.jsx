@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { MapPin, Menu, Home, Users, Tag, Settings, Layout, Image, PanelBottom, Megaphone, Wrench, Smartphone, Check, Star, Building2, ShoppingCart, CreditCard, Bell, Store } from 'lucide-react'
+import { MapPin, Menu, Home, Users, Tag, Settings, Layout, Image, PanelBottom, Megaphone, Wrench, Smartphone, Check, Star, Building2, ShoppingCart, CreditCard, Bell, Store, Server } from 'lucide-react'
 import Table from '../Components/Table'
 import NavbarSection from './NavbarSection'
 import TeamSection from './TeamSection'
@@ -44,7 +44,8 @@ const RIGHT = {
   ordering:  [
     { key:'ordering-config', label:'Ordering Config', Icon: Store },
     { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
-    { key:'notifications', label:'Notifications', Icon: Bell }
+    { key:'notifications', label:'Notifications', Icon: Bell },
+    { key:'pos-integration', label:'POS Integration', Icon: Server }
   ],
   settings: [
     { key:'toolbox', label:'Toolbox (Coming Soon)', Icon: Wrench },

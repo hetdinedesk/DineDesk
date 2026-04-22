@@ -43,6 +43,7 @@ function MainApp() {
   const [buildMenu,    setBuildMenu]    = useState(false)
   const [deploying,    setDeploying]    = useState(false)
   const [deployStatus, setDeployStatus] = useState(null) // 'success'|'error'|null
+  const [previewUrl,   setPreviewUrl]   = useState(null)
   const [globalNav,  setGlobalNav]  = useState(() => {
     const user = useAuthStore.getState().user
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
@@ -358,6 +359,8 @@ function MainApp() {
           setDeployStatus={setDeployStatus}
           deploying={deploying}
           navigate={navigate}
+          previewUrl={previewUrl}
+          setPreviewUrl={setPreviewUrl}
         />
       )}
 

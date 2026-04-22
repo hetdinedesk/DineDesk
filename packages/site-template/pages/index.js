@@ -1,12 +1,12 @@
 import { getSiteData } from '../lib/api'
+import { CMSProvider } from '../contexts/CMSContext'
+import { LoyaltyProvider } from '../contexts/LoyaltyContext'
 import ThemeD1Home from '../templates/theme-d1/HomePage'
 
 // Theme → Template mapping
-// All themes currently use ThemeD1 as the new default
-// Future: Each theme can have its own template component
 const TEMPLATES = {
-  // Purpose-built themes (all use theme-d1 for now)
-  'theme-v1':      ThemeD1Home,  // Override old default with new theme
+  // Purpose-built themes
+  'theme-v1':      ThemeD1Home,
   'theme-d1':      ThemeD1Home,
   'food-truck':    ThemeD1Home,
   'cafe':          ThemeD1Home,
@@ -16,7 +16,7 @@ const TEMPLATES = {
   // Legacy theme keys (for backwards compatibility)
   'urban-bistro':  ThemeD1Home,
   'noir-fine-dine': ThemeD1Home,
-  'garden-fresh':  ThemeD1Home,
+  'garden-fresh': ThemeD1Home,
 }
 
 // Detect if running in CMS preview mode (has query.site param)
@@ -56,7 +56,21 @@ export default function HomePage({ data, template, siteType }) {
       : null
   }
   
+  const clientId = data?.client?.id
+  const loyaltyConfig = data?.loyaltyConfig
+
   // Default to theme-d1 if template not found
-  const Template = TEMPLATES[template] || ThemeD1Home
-  return <Template data={enhancedData} siteType={siteType}/>
+  const normalizedTemplate = template?.replace(/\s+/g, '-') || 'theme-d1'
+  const Template = TEMPLATES[normalizedTemplate] || TEMPLATES['theme-d1'] || ThemeD1Home
+  
+  if (!Template) {
+    console.error('Template not found for:', { template, normalizedTemplate, availableTemplates: Object.keys(TEMPLATES) })
+  }
+  return (
+    <CMSProvider data={enhancedData}>
+      <LoyaltyProvider clientId={clientId} loyaltyConfig={loyaltyConfig}>
+        <Template data={enhancedData} siteType={siteType}/>
+      </LoyaltyProvider>
+    </CMSProvider>
+  )
 }

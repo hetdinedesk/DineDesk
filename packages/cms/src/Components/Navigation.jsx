@@ -137,9 +137,35 @@ export function SiteActionBar({
   setDeploying,
   setDeployStatus,
   deploying,
-  navigate
+  navigate,
+  previewUrl,
+  setPreviewUrl
 }) {
   const isMobile = useMediaQuery('(max-width: 768px)')
+  const [hoverTimeout, setHoverTimeout] = React.useState(null)
+
+  // Load preview URL from config on mount
+  React.useEffect(() => {
+    if (activeSite?.id && !previewUrl) {
+      fetch(`${API}/clients/${activeSite.id}/config`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
+        .then(r => r.json())
+        .then(cfg => {
+          if (cfg.netlify?.previewUrl) {
+            setPreviewUrl(cfg.netlify.previewUrl)
+          }
+        })
+        .catch(err => console.error('Failed to load preview URL:', err))
+    }
+  }, [activeSite?.id, previewUrl, setPreviewUrl])
+
+  const handleMouseEnter = () => {
+    if (hoverTimeout) clearTimeout(hoverTimeout)
+    setBuildMenu(true)
+  }
+
+  const handleMouseLeave = () => {
+    setHoverTimeout(setTimeout(() => setBuildMenu(false), 300))
+  }
 
   return (
     <div style={{
@@ -180,12 +206,16 @@ export function SiteActionBar({
             {isMobile ? 'View' : 'Preview'}<span style={{ fontSize: 10, lineHeight: 1 }}>↗</span>
           </button>
 
-          <div style={{ position: 'relative' }} onMouseEnter={() => setBuildMenu(true)} onMouseLeave={() => setBuildMenu(false)}>
+          <div style={{ position: 'relative' }} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
             <button type="button" onClick={async () => {
               setDeploying(true); setDeployStatus(null)
               try {
                 const res = await fetch(`${API}/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
-                const data = await res.json(); setDeployStatus(data.success ? 'success' : 'error')
+                const data = await res.json(); 
+                setDeployStatus(data.success ? 'success' : 'error')
+                if (data.success && data.previewUrl) {
+                  setPreviewUrl(data.previewUrl)
+                }
               } catch { setDeployStatus('error') }
               finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
             }} disabled={deploying}
@@ -194,7 +224,8 @@ export function SiteActionBar({
             </button>
 
             {buildMenu && (
-              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 99, background: '#0E1420', border: `1px solid #1E2D4A`, borderRadius: 10, boxShadow: '0 16px 48px rgba(0,0,0,0.6)', minWidth: 210, overflow: 'hidden', animation: 'fadeIn 0.1s ease' }}>
+              <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
+                style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 99, background: '#0E1420', border: `1px solid #1E2D4A`, borderRadius: 10, boxShadow: '0 16px 48px rgba(0,0,0,0.6)', minWidth: 210, overflow: 'hidden', animation: 'fadeIn 0.1s ease' }}>
                 <div style={{ padding: '8px 14px', fontSize: 10, fontWeight: 700, color: '#445572', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid #1E2D4A' }}>Publish</div>
                 {[
                   {
@@ -203,12 +234,35 @@ export function SiteActionBar({
                       setBuildMenu(false); setDeploying(true); setDeployStatus(null)
                       try {
                         const res = await fetch(`${API}/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
-                        const data = await res.json(); setDeployStatus(data.success ? 'success' : 'error')
+                        const data = await res.json(); 
+                        setDeployStatus(data.success ? 'success' : 'error')
+                        if (data.success && data.previewUrl) {
+                          setPreviewUrl(data.previewUrl)
+                        }
                       } catch { setDeployStatus('error') }
                       finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
                     }
                   },
-                  { label: 'Preview Site', hint: 'Open local preview in new tab', onClick: () => window.open(`http://localhost:3000?site=${activeSite.id}`, '_blank') },
+                  {
+                    label: 'Clear Cache & Build', hint: 'Deploy with cache disabled',
+                    onClick: async () => {
+                      setBuildMenu(false); setDeploying(true); setDeployStatus(null)
+                      try {
+                        const res = await fetch(`${API}/clients/${activeSite.id}/deploy?clearCache=true`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
+                        const data = await res.json(); 
+                        setDeployStatus(data.success ? 'success' : 'error')
+                        if (data.success && data.previewUrl) {
+                          setPreviewUrl(data.previewUrl)
+                        }
+                      } catch { setDeployStatus('error') }
+                      finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
+                    }
+                  },
+                  { 
+                    label: 'Preview Site', 
+                    hint: previewUrl ? 'Open live preview in new tab' : 'Open local preview in new tab', 
+                    onClick: () => window.open(previewUrl || `http://localhost:3000?site=${activeSite.id}`, '_blank')
+                  },
                   {
                     label: 'View Live Site', hint: 'Open published Netlify site',
                     onClick: async () => {

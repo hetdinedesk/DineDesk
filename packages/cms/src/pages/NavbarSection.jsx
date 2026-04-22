@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { DndContext, closestCenter, useDroppable } from '@dnd-kit/core'
+import { DndContext, closestCenter, useDroppable, useDraggable, DragOverlay } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
-import { API } from '../api/utils'
+import { apiFetch } from '../api/utils'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -871,22 +871,19 @@ function BannersPanel ({ clientId, data, qc }) {
   })
 
   const openAdd = () => setModal({
-    title: '', subtitle: '', text: '', imageUrl: '', 
+    title: '', imageUrl: '', 
     widthPx: '', heightPx: '', isActive: true
   })
   const openEdit = (b) => setModal({ 
     ...b, 
     widthPx: b.widthPx ?? '', 
-    heightPx: b.heightPx ?? '',
-    subtitle: b.subtitle || ''
+    heightPx: b.heightPx ?? ''
   })
 
   const save = () => {
-    if (!modal?.title?.trim() && !modal?.text?.trim()) return
+    if (!modal?.title?.trim()) return
     const body = {
       title: modal.title || null,
-      subtitle: modal.subtitle || null,
-      text: modal.text?.trim() || null,
       imageUrl: modal.imageUrl || null,
       location: 'pages', // Force to pages for navigation banners
       widthPx: modal.widthPx === '' || modal.widthPx == null ? null : Number(modal.widthPx),
@@ -947,8 +944,6 @@ function BannersPanel ({ clientId, data, qc }) {
           <>
             {/* Header */}
             <InputField label="Heading (displayed on banner)" value={modal.title} onChange={(e) => setModal({ ...modal, title: e.target.value })} placeholder="Welcome to Our Restaurant" />
-            <InputField label="Subheading" value={modal.subtitle} onChange={(e) => setModal({ ...modal, subtitle: e.target.value })} placeholder="Where tradition meets innovation" />
-            <InputField label="Additional text / caption" value={modal.text} onChange={(e) => setModal({ ...modal, text: e.target.value })} placeholder="Optional extra text" hint="Shown below subheading if needed" />
             
             {/* Image */}
             <div style={{ marginBottom: 16 }}>
@@ -982,14 +977,6 @@ function BannersPanel ({ clientId, data, qc }) {
               </div>
             </div>
 
-            {/* Active Toggle */}
-            <div style={{ padding: 16, background: C.card, borderRadius: 8, marginTop: 20 }}>
-              <ToggleSwitch
-                checked={modal.isActive !== false}
-                onChange={() => setModal({ ...modal, isActive: !modal.isActive })}
-                label="Active (visible on site)"
-              />
-            </div>
           </>
         )}
       </Modal>
@@ -1046,9 +1033,9 @@ function SortableUnassignedLink ({ link, pages, sections, onDelete }) {
   )
 }
 
-function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLink, onRemoveLink, onReorderLinks, onDelete, onUpdateTitle }) {
+function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLink, onRemoveLink, onReorderLinks, onDelete, onUpdateTitle, isDragOver }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id })
-  const { setNodeRef: setDroppableRef } = useDroppable({ id: section.id })
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: section.id })
   const [expanded, setExpanded] = useState(true)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(section.title || '')
@@ -1060,17 +1047,8 @@ function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLin
     setEditingTitle(false)
   }
 
-  const onDragEndLinks = (event) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIdx = links.findIndex(l => l.id === active.id)
-    const newIdx = links.findIndex(l => l.id === over.id)
-    if (oldIdx < 0 || newIdx < 0) return
-    onReorderLinks(section.id, arrayMove(links, oldIdx, newIdx))
-  }
-
   return (
-    <div ref={(node) => { setNodeRef(node); setDroppableRef(node); }} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, background: C.panel, border: `1px solid ${isActive ? C.border : C.border2}`, borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}>
+    <div ref={(node) => { setNodeRef(node); setDroppableRef(node); }} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, background: C.panel, border: isOver ? `2px solid ${C.acc}` : `1px solid ${isActive ? C.border : C.border2}`, borderRadius: 12, marginBottom: 10, overflow: 'hidden', boxShadow: isOver ? `0 0 0 4px ${C.acc}30` : 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: C.card, borderBottom: expanded ? `1px solid ${C.border}` : 'none' }}>
         <div {...attributes} {...listeners} style={{ cursor: 'grab', color: C.t3, fontSize: 15, flexShrink: 0, userSelect: 'none' }}>⠿</div>
         {editingTitle ? (
@@ -1114,19 +1092,17 @@ function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLin
           {links.length === 0 ? (
             <div style={{ fontSize: 12, color: C.t3, padding: '6px 4px', fontStyle: 'italic' }}>No links yet — click "+ Link" to add one.</div>
           ) : (
-            <DndContext collisionDetection={closestCenter} onDragEnd={onDragEndLinks}>
-              <SortableContext items={links.map(l => l.id)} strategy={verticalListSortingStrategy}>
-                {links.map(link => (
-                  <SortableFooterLink
-                    key={link.id}
-                    link={link}
-                    pages={pages}
-                    onUpdate={onEditLink}
-                    onRemove={() => onRemoveLink(section.id, link.id)}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {links.map(link => (
+                <SortableFooterLink
+                  key={link.id}
+                  link={link}
+                  pages={pages}
+                  onUpdate={onEditLink}
+                  onRemove={() => onRemoveLink(section.id, link.id)}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -1138,6 +1114,7 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
   const [sections, setSections] = useState(data?.footerSections || [])
   const [unassignedLinks, setUnassignedLinks] = useState(data?.unassignedFooterLinks || [])
   const [linkModal, setLinkModal] = useState(null)
+  const [activeDragId, setActiveDragId] = useState(null)
 
   useEffect(() => {
     setSections(data?.footerSections || [])
@@ -1196,11 +1173,7 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     if (!link) return
 
     try {
-      await fetch(`${import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'}/clients/${clientId}/navbar/footer-links/${linkId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ footerSectionId: sectionId })
-      })
+      await apiFetch(`/clients/${clientId}/navbar/footer-links/${linkId}`, 'PUT', { footerSectionId: sectionId })
 
       // Reload data to get updated state
       qc.invalidateQueries({ queryKey: ['navbar', clientId] })
@@ -1210,14 +1183,16 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     }
   }
 
-  const handleDeleteUnassignedLink = (linkId) => {
+  const handleDeleteUnassignedLink = async (linkId) => {
     if (!window.confirm('Delete this unassigned footer link?')) return
-    fetch(`${import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'}/clients/${clientId}/navbar/footer-links/${linkId}`, {
-      method: 'DELETE'
-    }).then(() => {
+    try {
+      await apiFetch(`/clients/${clientId}/navbar/footer-links/${linkId}`, 'DELETE')
       setUnassignedLinks(unassignedLinks.filter(l => l.id !== linkId))
       qc.invalidateQueries({ queryKey: ['navbar', clientId] })
-    })
+    } catch (err) {
+      console.error('Failed to delete link:', err)
+      alert('Failed to delete link. Please try again.')
+    }
   }
 
   const handleDragEndUnassigned = async (event) => {
@@ -1234,7 +1209,13 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
     }
   }
 
-  const handleDragEndGlobal = (event) => {
+  const handleDragStart = (event) => {
+    setActiveDragId(event.active.id)
+  }
+
+  const handleDragEnd = (event) => {
+    setActiveDragId(null)
+
     // Check if this is an unassigned link being dragged
     const unassignedLink = unassignedLinks.find(l => l.id === event.active.id)
     if (unassignedLink) {
@@ -1242,66 +1223,152 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
       return
     }
 
+    // Check if this is a link from a section being dragged
+    const allLinks = sections.flatMap(s => (s.links || []).map(l => ({ ...l, sectionId: s.id })))
+    const draggedLink = allLinks.find(l => l.id === event.active.id)
+    if (draggedLink) {
+      const { active, over } = event
+      if (!over) return
+
+      // Check if dropped on another section
+      const targetSection = sections.find(s => s.id === over.id)
+      if (targetSection && draggedLink.sectionId !== targetSection.id) {
+        handleDragEndLinkBetweenSections(event, draggedLink)
+        return
+      }
+
+      // Check if dropped on another link in the same section (reorder within section)
+      const targetLink = allLinks.find(l => l.id === over.id)
+      if (targetLink && draggedLink.sectionId === targetLink.sectionId) {
+        handleDragEndReorderWithinSection(event, draggedLink.sectionId)
+        return
+      }
+
+      return
+    }
+
     // Otherwise handle section reordering
     onDragEndSections(event)
+  }
+
+  const handleDragEndReorderWithinSection = (event, sectionId) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const section = sections.find(s => s.id === sectionId)
+    if (!section) return
+
+    const links = section.links || []
+    const oldIdx = links.findIndex(l => l.id === active.id)
+    const newIdx = links.findIndex(l => l.id === over.id)
+    if (oldIdx < 0 || newIdx < 0) return
+
+    handleReorderLinks(sectionId, arrayMove(links, oldIdx, newIdx))
+  }
+
+  const handleDragEndLinkBetweenSections = async (event, draggedLink) => {
+    const { active, over } = event
+    if (!over) return
+
+    const linkId = active.id
+    const targetSectionId = over.id
+
+    // Find the target section
+    const targetSection = sections.find(s => s.id === targetSectionId)
+    if (!targetSection) return
+
+    // Don't move if it's the same section
+    if (draggedLink.sectionId === targetSectionId) return
+
+    try {
+      // Remove link from old section
+      const updatedSections = sections.map(s => {
+        if (s.id === draggedLink.sectionId) {
+          return { ...s, links: (s.links || []).filter(l => l.id !== linkId) }
+        }
+        if (s.id === targetSectionId) {
+          return { ...s, links: [...(s.links || []), draggedLink] }
+        }
+        return s
+      })
+
+      await apiFetch(`/clients/${clientId}/navbar/footer-links/${linkId}`, 'PUT', { footerSectionId: targetSectionId })
+      qc.invalidateQueries({ queryKey: ['navbar', clientId] })
+    } catch (err) {
+      console.error('Failed to move link:', err)
+      alert('Failed to move link. Please try again.')
+    }
   }
 
   return (
     <div>
       <SectionHeader title="Footer columns" Icon={PanelBottom} onAdd={() => { const id = `temp-${Date.now()}`; persist([...sections, { id, title: 'New Column', isActive: true, links: [] }]) }} addLabel="Add column" />
       <p style={{ fontSize: 13, color: C.t2, marginBottom: 20, lineHeight: 1.5 }}>
-        Drag columns to reorder. Toggle to show/hide in the footer. Drag links within a column to reorder them.
+        Drag columns to reorder. Toggle to show/hide in the footer. Drag links within a column to reorder them. Drag unassigned links into columns to assign them. Drag links between columns to move them.
       </p>
 
-      {unassignedLinks && unassignedLinks.length > 0 && (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Unassigned Footer Links
-          </div>
-          <p style={{ fontSize: 12, color: C.t2, marginBottom: 12 }}>
-            These links were automatically created when pages were added. Drag them into a column below or delete them.
-          </p>
-          <SortableContext items={unassignedLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {unassignedLinks.map(link => (
-                <SortableUnassignedLink
-                  key={link.id}
-                  link={link}
+      <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <SortableContext items={[...sections.map(s => s.id), ...unassignedLinks.map(l => l.id), ...sections.flatMap(s => (s.links || []).map(l => l.id))]} strategy={verticalListSortingStrategy}>
+          {unassignedLinks && unassignedLinks.length > 0 && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                Unassigned Footer Links
+              </div>
+              <p style={{ fontSize: 12, color: C.t2, marginBottom: 12 }}>
+                These links were automatically created when pages were added. Drag them into a column below or delete them.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {unassignedLinks.map(link => (
+                  <SortableUnassignedLink
+                    key={link.id}
+                    link={link}
+                    pages={pages}
+                    sections={sections}
+                    onDelete={() => handleDeleteUnassignedLink(link.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!sections || sections.length === 0 ? (
+            <EmptyState
+              message="No footer columns yet"
+              hint="Add a column to start organizing your footer links"
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {sections.map(s => (
+                <SortableFooterSection
+                  key={s.id}
+                  section={s}
                   pages={pages}
-                  sections={sections}
-                  onDelete={() => handleDeleteUnassignedLink(link.id)}
+                  onToggle={handleToggle}
+                  onAddLink={handleAddLink}
+                  onEditLink={handleEditLink}
+                  onRemoveLink={handleRemoveLink}
+                  onReorderLinks={handleReorderLinks}
+                  onDelete={handleDelete}
+                  onUpdateTitle={handleUpdateTitle}
+                  isDragOver={activeDragId !== null}
                 />
               ))}
             </div>
-          </SortableContext>
-        </div>
-      )}
+          )}
+        </SortableContext>
 
-      {!sections || sections.length === 0 ? (
-        <EmptyState
-          message="No footer columns yet"
-          hint="Add a column to start organizing your footer links"
-        />
-      ) : (
-        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEndGlobal}>
-          <SortableContext items={[...sections.map(s => s.id), ...unassignedLinks.map(l => l.id)]} strategy={verticalListSortingStrategy}>
-            {sections.map(s => (
-              <SortableFooterSection
-                key={s.id}
-                section={s}
-                pages={pages}
-                onToggle={handleToggle}
-                onAddLink={handleAddLink}
-                onEditLink={handleEditLink}
-                onRemoveLink={handleRemoveLink}
-                onReorderLinks={handleReorderLinks}
-                onDelete={handleDelete}
-                onUpdateTitle={handleUpdateTitle}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
-      )}
+        <DragOverlay>
+          {activeDragId ? (
+            <div style={{ padding: 10, background: C.panel, borderRadius: 8, border: `2px solid ${C.acc}`, boxShadow: '0 8px 20px rgba(0,0,0,0.3)', cursor: 'grabbing', minWidth: 200 }}>
+              <div style={{ fontWeight: 600, color: C.t0 }}>
+                {unassignedLinks.find(l => l.id === activeDragId)?.label || 
+                 sections.flatMap(s => s.links || []).find(l => l.id === activeDragId)?.label || 
+                 'Item'}
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Link edit modal */}
       <Modal isOpen={!!linkModal} onClose={() => setLinkModal(null)} title={linkModal?.isNew ? 'Add link' : 'Edit link'} onSave={saveLinkModal}>
@@ -1354,6 +1421,9 @@ function PagesListPanel ({ clientId, data, qc }) {
     queryFn: () => getBanners(clientId),
     staleTime: 30_000
   })
+
+  // Filter for navigation banners only
+  const navBanners = allBanners.filter(b => b.location === 'pages' || b.location === 'both')
 
   const [modal, setModal] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -1698,9 +1768,9 @@ function PagesListPanel ({ clientId, data, qc }) {
                 <p style={{ fontSize: 12, color: C.t2, margin: '0 0 12px' }}>
                   Select a banner from the library. Banners are managed in <strong style={{ color: C.t1 }}>Navigation → Banners</strong>. Without a banner the page header shows as a solid dark primary colour.
                 </p>
-                {allBanners.length === 0 ? (
+                {navBanners.length === 0 ? (
                   <div style={{ padding: '14px 16px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 12, color: C.t3 }}>
-                    No banners yet — add some in Navigation → Banners, then return here to select one.
+                    No navigation banners yet — add some in Navigation → Banners, then return here to select one.
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
@@ -1712,7 +1782,7 @@ function PagesListPanel ({ clientId, data, qc }) {
                       <div style={{ fontSize: 11, color: C.t2 }}>No banner</div>
                       {!modal.bannerId && <div style={{ fontSize: 10, fontWeight: 700, color: C.acc }}>✓ Selected</div>}
                     </div>
-                    {allBanners.map((b) => (
+                    {navBanners.map((b) => (
                       <div
                         key={b.id}
                         onClick={() => setModal((m) => ({ ...m, bannerId: b.id }))}

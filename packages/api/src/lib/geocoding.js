@@ -20,16 +20,18 @@ const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
  */
 async function geocodeAddress(addressParts) {
   const { address, suburb, city, state, postcode, country } = addressParts
-  
+
   // Build full address string
   const parts = [address, suburb, city, state, postcode, country].filter(Boolean)
   const fullAddress = parts.join(', ')
-  
+
   if (!address || !city) {
-    console.log('[Geocoding] Skipping: address and city are required')
+    console.log('[Geocoding] Skipping: address and city are required', { address, city })
     return null
   }
-  
+
+  console.log('[Geocoding] Attempting to geocode:', fullAddress)
+
   try {
     const params = new URLSearchParams({
       format: 'json',
@@ -37,31 +39,31 @@ async function geocodeAddress(addressParts) {
       limit: '1',
       addressdetails: '1'
     })
-    
+
     const url = `${NOMINATIM_URL}?${params.toString()}`
-    
+
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'DineDesk-CMS/1.0'
       },
-      timeout: 5000
+      timeout: 10000 // Increased timeout to 10 seconds
     })
-    
+
     const data = response.data
-    
+
     if (data && data.length > 0) {
       const result = data[0]
-      console.log('[Geocoding] Success:', result.display_name)
+      console.log('[Geocoding] Success:', result.display_name, '→', result.lat, result.lon)
       return {
         lat: result.lat,
         lng: result.lon
       }
     }
-    
+
     console.log('[Geocoding] No results found for:', fullAddress)
     return null
   } catch (err) {
-    console.error('[Geocoding] Error:', err.message)
+    console.error('[Geocoding] Error:', err.message, err.code)
     return null
   }
 }

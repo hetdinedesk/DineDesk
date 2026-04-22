@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail } from 'lucide-react'
+import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle } from 'lucide-react'
 import { getConfig, saveConfig } from '../api/config'
 import { getPayments, savePayments } from '../api/payments'
 import { C } from '../theme'
@@ -92,6 +92,21 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   const [notificationsForm, setNotificationsForm] = useState({ ...defaultNotificationsForm, ...(config.notifications || {}) })
   const notificationsSavedRef = useRef({ ...defaultNotificationsForm, ...(config.notifications || {}) })
 
+  const defaultPOSForm = {
+    posType: 'none',
+    posName: '',
+    apiKey: '',
+    apiSecret: '',
+    locationId: '',
+    webhookUrl: '',
+    fallbackEmail: '',
+    fallbackMethod: 'email',
+    autoConfirm: true
+  }
+
+  const [posForm, setPOSForm] = useState({ ...defaultPOSForm, ...(config.posConfig || {}) })
+  const posSavedRef = useRef({ ...defaultPOSForm, ...(config.posConfig || {}) })
+
   useEffect(() => {
     const newForm = { ...defaultForm, ...(config.ordering || {}) }
     setForm(newForm)
@@ -110,12 +125,19 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
     notificationsSavedRef.current = newNotificationsForm
   }, [config.notifications])
 
+  useEffect(() => {
+    const newPOSForm = { ...defaultPOSForm, ...(config.posConfig || {}) }
+    setPOSForm(newPOSForm)
+    posSavedRef.current = newPOSForm
+  }, [config.posConfig])
+
   const mutation = useMutation({
-    mutationFn: () => saveConfig(clientId, { ordering: form, notifications: notificationsForm }),
+    mutationFn: () => saveConfig(clientId, { ordering: form, notifications: notificationsForm, posConfig: posForm }),
     onSuccess: (data) => {
       qc.setQueryData(['config', clientId], data)
       savedRef.current = { ...form }
       notificationsSavedRef.current = { ...notificationsForm }
+      posSavedRef.current = { ...posForm }
     }
   })
 
@@ -136,6 +158,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
   const updatePayment = (key, val) => setPaymentForm(prev => ({ ...prev, [key]: val }))
   const updateNotifications = (key, val) => setNotificationsForm(prev => ({ ...prev, [key]: val }))
+  const updatePOS = (key, val) => setPOSForm(prev => ({ ...prev, [key]: val }))
 
   const hasChanges = true
   const hasPaymentChanges = true
@@ -146,12 +169,13 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
         <div>
           <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
-            {subsection === 'ordering-config' ? 'Online Ordering' : subsection === 'payment-settings' ? 'Payment Settings' : 'Notifications'}
+            {subsection === 'ordering-config' ? 'Online Ordering' : subsection === 'payment-settings' ? 'Payment Settings' : subsection === 'notifications' ? 'Notifications' : 'POS Integration'}
           </h2>
           <p style={{ margin:0, fontSize:13, color:C.t3 }}>
             {subsection === 'ordering-config' && 'Enable online ordering so customers can add menu items to their cart and place orders directly from your site.'}
             {subsection === 'payment-settings' && 'Configure payment methods and Stripe integration for online orders.'}
             {subsection === 'notifications' && 'Configure email notifications for orders and customer receipts.'}
+            {subsection === 'pos-integration' && 'Configure your POS (Point of Sale) system integration to send orders directly to your kitchen.'}
           </p>
         </div>
       </div>
@@ -568,6 +592,188 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
                 boxShadow: (mutation.isPending || !hasNotificationChanges) ? 'none' : `0 4px 16px ${C.acc}50`
               }}>
               {mutation.isPending ? 'Saving…' : 'Save Notification Settings'}
+            </button>
+            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
+            {mutation.isError && <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Failed</span>}
+          </div>
+        </>
+      )}
+
+      {subsection === 'pos-integration' && (
+        <>
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              <Server size={16} style={{ color:C.acc }} />
+              <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>POS System Selection</span>
+            </div>
+
+            <div style={{ marginBottom:12 }}>
+              <label style={labelStyle}>POS Type</label>
+              <select
+                value={posForm.posType || 'none'}
+                onChange={e => updatePOS('posType', e.target.value)}
+                style={selectStyle}
+              >
+                <option value='none'>No POS Integration (Email/Print only)</option>
+                <option value='api'>🟢 API POS (Square, Lightspeed, Toast)</option>
+                <option value='online-orders'>🔵 Online Orders System (Abacus-style)</option>
+                <option value='email-import'>🟡 Email/Import System</option>
+                <option value='unknown'>🔴 Unknown/Legacy System</option>
+              </select>
+              <p style={hintStyle}>Select your POS type to configure the appropriate integration method</p>
+            </div>
+
+            {posForm.posType !== 'none' && (
+              <div style={{ marginTop:12 }}>
+                <label style={labelStyle}>POS Name (optional)</label>
+                <input
+                  type='text'
+                  value={posForm.posName || ''}
+                  onChange={e => updatePOS('posName', e.target.value)}
+                  style={inputStyle}
+                  placeholder='e.g. Square, Lightspeed, Abacus'
+                />
+              </div>
+            )}
+          </div>
+
+          {posForm.posType === 'api' && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                <Zap size={16} style={{ color:C.acc }} />
+                <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>API Configuration</span>
+              </div>
+
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>API Key</label>
+                <input
+                  type='password'
+                  value={posForm.apiKey || ''}
+                  onChange={e => updatePOS('apiKey', e.target.value)}
+                  style={inputStyle}
+                  placeholder='Your POS API key'
+                />
+              </div>
+
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>API Secret</label>
+                <input
+                  type='password'
+                  value={posForm.apiSecret || ''}
+                  onChange={e => updatePOS('apiSecret', e.target.value)}
+                  style={inputStyle}
+                  placeholder='Your POS API secret'
+                />
+              </div>
+
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>Location ID</label>
+                <input
+                  type='text'
+                  value={posForm.locationId || ''}
+                  onChange={e => updatePOS('locationId', e.target.value)}
+                  style={inputStyle}
+                  placeholder='Your POS location ID'
+                />
+                <p style={hintStyle}>Required for multi-location POS systems</p>
+              </div>
+
+              <ToggleSwitch
+                label='Auto-confirm Orders'
+                checked={posForm.autoConfirm !== false}
+                onChange={() => updatePOS('autoConfirm', !posForm.autoConfirm)}
+              />
+              <p style={{ fontSize:12, color:C.t3, margin:'4px 0 0' }}>
+                Automatically confirm orders when sent to POS. Disable if you want manual confirmation.
+              </p>
+            </div>
+          )}
+
+          {posForm.posType === 'online-orders' && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                <Zap size={16} style={{ color:C.acc }} />
+                <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Online Orders Integration</span>
+              </div>
+
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>Webhook URL</label>
+                <input
+                  type='text'
+                  value={posForm.webhookUrl || ''}
+                  onChange={e => updatePOS('webhookUrl', e.target.value)}
+                  style={inputStyle}
+                  placeholder='https://your-pos.com/api/orders'
+                />
+                <p style={hintStyle}>The endpoint where orders will be sent</p>
+              </div>
+
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>API Key (if required)</label>
+                <input
+                  type='password'
+                  value={posForm.apiKey || ''}
+                  onChange={e => updatePOS('apiKey', e.target.value)}
+                  style={inputStyle}
+                  placeholder='Authentication key for webhook'
+                />
+              </div>
+
+              <ToggleSwitch
+                label='Auto-confirm Orders'
+                checked={posForm.autoConfirm !== false}
+                onChange={() => updatePOS('autoConfirm', !posForm.autoConfirm)}
+              />
+            </div>
+          )}
+
+          {(posForm.posType === 'email-import' || posForm.posType === 'unknown' || posForm.posType === 'none') && (
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                <AlertTriangle size={16} style={{ color:C.acc }} />
+                <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Fallback Configuration</span>
+              </div>
+
+              <p style={{ fontSize:12, color:C.t3, marginBottom:12 }}>
+                Orders will be sent via email and can be printed for the kitchen. Configure your fallback method below.
+              </p>
+
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>Fallback Email</label>
+                <input
+                  type='email'
+                  value={posForm.fallbackEmail || ''}
+                  onChange={e => updatePOS('fallbackEmail', e.target.value)}
+                  style={inputStyle}
+                  placeholder='orders@yourrestaurant.com'
+                />
+                <p style={hintStyle}>Email address to receive order notifications</p>
+              </div>
+
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>Fallback Method</label>
+                <select
+                  value={posForm.fallbackMethod || 'email'}
+                  onChange={e => updatePOS('fallbackMethod', e.target.value)}
+                  style={selectStyle}
+                >
+                  <option value='email'>Email Only</option>
+                  <option value='email-print'>Email + Print to Kitchen</option>
+                  <option value='print'>Print to Kitchen Only</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:20 }}>
+            <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
+              style={{
+                padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
+                border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
+                cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+                boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50`
+              }}>
+              {mutation.isPending ? 'Saving…' : 'Save POS Configuration'}
             </button>
             {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
             {mutation.isError && <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Failed</span>}

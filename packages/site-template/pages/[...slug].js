@@ -2,15 +2,55 @@ import Head from 'next/head'
 import { getSiteData } from '../lib/api'
 import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
+import DOMPurify from 'dompurify'
+
+// Clean HTML content - strip complex structures, keep basic text elements
+const cleanPageContent = (html) => {
+  if (!html) return ''
+  
+  // Create a temporary div to parse HTML
+  const tempDiv = typeof document !== 'undefined' ? document.createElement('div') : { innerText: '' }
+  if (typeof document !== 'undefined') {
+    tempDiv.innerHTML = html
+  }
+  
+  // Extract text content but preserve basic structure
+  // We'll rebuild clean HTML with only allowed elements
+  const allowedTags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'br', 'a']
+  
+  let cleanHtml = html
+  
+  // Remove all div, section, article, etc. tags but keep their content
+  cleanHtml = cleanHtml.replace(/<(div|section|article|aside|header|footer|nav|main|figure|figcaption|span)([^>]*)>([\s\S]*?)<\/\1>/gi, '$3')
+  
+  // Remove grid, flex, and layout-related classes
+  cleanHtml = cleanHtml.replace(/\sclass="[^"]*?(grid|flex|col|row|gap|padding|margin|w-|h-|min-|max-|bg-|text-|shadow|rounded|border|transform|opacity)[^"]*"/gi, '')
+  
+  // Remove inline styles
+  cleanHtml = cleanHtml.replace(/\sstyle="[^"]*"/gi, '')
+  
+  // Remove empty paragraphs
+  cleanHtml = cleanHtml.replace(/<p>\s*<\/p>/gi, '')
+  cleanHtml = cleanHtml.replace(/<p><\/p>/gi, '')
+  
+  // Clean up extra whitespace
+  cleanHtml = cleanHtml.replace(/\s+/g, ' ')
+  
+  // Ensure paragraphs are properly wrapped
+  cleanHtml = cleanHtml.replace(/([^.!?])\n([^<])/g, '$1<p>$2')
+  
+  return cleanHtml
+}
+
+// Theme-specific imports
 import { Header } from '../components/theme-d1/Header'
 import { Footer } from '../components/theme-d1/Footer'
 import { FloatingReviewWidget } from '../components/theme-d1/FloatingReviewWidget'
-import MenuTemplate from '../templates/theme-d1/MenuTemplate.jsx'
-import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate.jsx'
-import TeamTemplate from '../templates/theme-d1/TeamTemplate.jsx'
-import LocationsTemplate from '../templates/theme-d1/LocationsTemplate.jsx'
-import CustomTemplate from '../templates/theme-d1/CustomTemplate.jsx'
-import DOMPurify from 'dompurify'
+import MenuTemplate from '../templates/theme-d1/MenuTemplate'
+import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate'
+import TeamTemplate from '../templates/theme-d1/TeamTemplate'
+import LocationsTemplate from '../templates/theme-d1/LocationsTemplate'
+import CustomTemplate from '../templates/theme-d1/CustomTemplate'
 
 export async function getServerSideProps({ query, params }) {
   const slugParts = Array.isArray(params?.slug) ? params.slug : []
@@ -28,16 +68,19 @@ export async function getServerSideProps({ query, params }) {
     : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
 
+  const template = data.colours?.theme || process.env.SITE_TEMPLATE || 'theme-d1'
+
   return {
     props: {
       data,
       colours: data.colours || null,
-      slug
+      slug,
+      template
     }
   }
 }
 
-export default function DynamicPage({ data, slug }) {
+export default function DynamicPage({ data, slug, template }) {
   const pages = data?.pages || []
   const shortcodes = data?.shortcodes || {}
   const settings = data?.settings || {}
@@ -142,7 +185,7 @@ export default function DynamicPage({ data, slug }) {
   // For custom pages only (not hardcoded types), check for form/map toggles
   const showEnquiryForm = page.showEnquiryForm || false
   const showLocationMap = page.showLocationMap || false
-  
+
   if (!isHardcoded && (showEnquiryForm || showLocationMap)) {
     return (
       <CMSProvider data={data}>
@@ -165,9 +208,9 @@ export default function DynamicPage({ data, slug }) {
 
       <main className="min-h-screen">
         {/* Hero Banner */}
-        <div 
+        <div
           className="relative flex items-center justify-center text-white overflow-hidden"
-          style={{ 
+          style={{
             minHeight: '60vh',
             marginTop: 'calc(var(--header-offset, 5rem) * -1)',
             paddingTop: 'var(--header-offset, 5rem)',
@@ -180,20 +223,20 @@ export default function DynamicPage({ data, slug }) {
               <div className="absolute inset-0 bg-black/55" />
             </>
           )}
-          
+
           {!bannerImg && (
-            <div 
+            <div
               className="absolute inset-0 opacity-10"
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
               }}
             />
           )}
-          
+
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
-            <h1 
+            <h1
               className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6"
-              style={{ 
+              style={{
                 fontFamily: 'var(--font-heading, inherit)',
                 textShadow: '0 4px 20px rgba(0,0,0,0.3)'
               }}
@@ -215,11 +258,13 @@ export default function DynamicPage({ data, slug }) {
         </div>
 
         {/* Page body */}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div
-            className="prose prose-lg max-w-none text-gray-700"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sc(page.content || '')) }}
-          />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-10 lg:p-14">
+            <div
+              className="prose prose-lg sm:prose-xl max-w-none text-gray-800 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cleanPageContent(sc(page.content || ''))) }}
+            />
+          </div>
         </div>
       </main>
       <Footer />

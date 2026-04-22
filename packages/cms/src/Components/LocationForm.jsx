@@ -285,11 +285,15 @@ export default function LocationForm({
     if (!validate()) return
     setSaving(true)
     
-    // Include pending images in the save data
+    // Always include current image state - use pending if changed, otherwise form
+    // Check if pendingImages has been modified (has any keys with values)
+    const hasPendingExterior = 'exteriorImages' in pendingImages
+    const hasPendingGallery = 'galleryImages' in pendingImages
+    
     const saveData = {
       ...form,
-      ...(pendingImages.exteriorImages.length > 0 && { exteriorImages: pendingImages.exteriorImages }),
-      ...(pendingImages.galleryImages.length > 0 && { galleryImages: pendingImages.galleryImages })
+      exteriorImages: hasPendingExterior ? pendingImages.exteriorImages : form.exteriorImages,
+      galleryImages: hasPendingGallery ? pendingImages.galleryImages : form.galleryImages
     }
     
     mutation.mutate(saveData)

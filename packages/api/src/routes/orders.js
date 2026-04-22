@@ -2,6 +2,7 @@ const express = require('express')
 const { prisma } = require('../lib/prisma')
 const { sendOrderConfirmation, sendRestaurantNotification } = require('../lib/email')
 const { authenticateToken } = require('../middleware/auth')
+const OrderRouter = require('../pos-adapters')
 const router = express.Router({ mergeParams: true })
 
 const getClientId = (req) => req.params.clientId || req.params.id
@@ -236,6 +237,51 @@ router.post('/', async (req, res) => {
       sendOrderConfirmation(order, clientName, notificationConfig, clientData, locationData),
       sendRestaurantNotification(order, clientName, notificationConfig, client.email)
     ]).catch(err => console.error('Email notification error:', err))
+
+    // Send order to POS using adapter layer (non-blocking)
+    const posConfig = client.siteConfig?.posConfig || {}
+    if (posConfig.posType && posConfig.posType !== 'none') {
+      const orderRouter = new OrderRouter(posConfig)
+      
+      // Format order for POS
+      const posOrder = {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        restaurantName: client.name,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        items: order.items,
+        subtotal: order.subtotal,
+        tax: order.taxAmount,
+        taxRate: ordering.tax?.rate || 0,
+        total: order.total,
+        deliveryFee: order.deliveryFee || 0,
+        orderType: order.orderType,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        notes: order.note,
+        scheduledFor: order.pickupTime,
+        transactionId: order.paymentGatewayId
+      }
+
+      // Send to POS asynchronously
+      orderRouter.sendOrder(posOrder)
+        .then(result => {
+          console.log('Order sent to POS:', result)
+          // Update order with POS order ID if successful
+          if (result.success && result.posOrderId) {
+            prisma.order.update({
+              where: { id: order.id },
+              data: { posOrderId: result.posOrderId }
+            }).catch(err => console.error('Failed to update order with POS ID:', err))
+          }
+        })
+        .catch(err => {
+          console.error('Failed to send order to POS:', err)
+          // Order is still created, just log the error
+        })
+    }
 
     // If Stripe payment, create PaymentIntent (will be implemented in payments.js)
     let stripeClientSecret = null

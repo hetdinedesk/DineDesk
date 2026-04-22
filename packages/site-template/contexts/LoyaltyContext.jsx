@@ -28,7 +28,7 @@ export const LoyaltyProvider = ({ children, clientId, loyaltyConfig: initialConf
     if (!clientId) return;
     
     try {
-      const response = await fetch(`${CMS_API_URL}/api/clients/${clientId}/loyalty/config`);
+      const response = await fetch(`${CMS_API_URL}/clients/${clientId}/loyalty/config`);
       if (response.ok) {
         const config = await response.json();
         setLoyaltyConfig(config);
@@ -47,7 +47,7 @@ export const LoyaltyProvider = ({ children, clientId, loyaltyConfig: initialConf
 
     try {
       const normalizedPhone = phone.replace(/[\s\-()]/g, '');
-      const response = await fetch(`${CMS_API_URL}/api/loyalty/customers/${normalizedPhone}?clientId=${clientId}`);
+      const response = await fetch(`${CMS_API_URL}/loyalty/customers/${normalizedPhone}?clientId=${clientId}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -77,7 +77,7 @@ export const LoyaltyProvider = ({ children, clientId, loyaltyConfig: initialConf
     setError(null);
 
     try {
-      const response = await fetch(`${CMS_API_URL}/api/loyalty/customers`, {
+      const response = await fetch(`${CMS_API_URL}/loyalty/customers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, phone, name, email })
@@ -106,7 +106,7 @@ export const LoyaltyProvider = ({ children, clientId, loyaltyConfig: initialConf
     setError(null);
 
     try {
-      const response = await fetch(`${CMS_API_URL}/api/loyalty/redeem`, {
+      const response = await fetch(`${CMS_API_URL}/loyalty/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customerId: customer.id, rewardId })

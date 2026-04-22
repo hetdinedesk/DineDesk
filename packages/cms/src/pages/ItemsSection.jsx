@@ -498,7 +498,7 @@ function MenuItemsTab({ clientId }) {
                     <button onClick={() => startEdit(item)}
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.acc}40`, borderRadius:4,
-                        color:C.acc, fontSize:11, cursor:'pointer', marginRight:4 }} title="Edit">✎</button>
+                        color:C.acc, fontSize:11, cursor:'pointer', marginRight:4 }} title="Edit">✎</button>,
                     <button onClick={() => handleDelete(item.id, item.name)}
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.red}40`, borderRadius:4,

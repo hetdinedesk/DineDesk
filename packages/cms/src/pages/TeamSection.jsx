@@ -364,8 +364,8 @@ function TeamMemberModal({ member, departments, clientId, onSave, onClose }) {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', marginBottom: 8 }}>Image</label>
             <ImageUpload
-              imageUrl={form.imageUrl}
-              onUpload={(url) => setForm({ ...form, imageUrl: url })}
+              value={form.imageUrl}
+              onChange={(url) => setForm({ ...form, imageUrl: url })}
               clientId={clientId}
             />
           </div>

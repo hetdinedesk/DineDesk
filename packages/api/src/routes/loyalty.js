@@ -3,7 +3,7 @@ const { prisma } = require('../lib/prisma')
 const { authenticateToken } = require('../middleware/auth')
 const router = express.Router({ mergeParams: true })
 
-const getClientId = (req) => req.params.clientId || req.params.id
+const getClientId = (req) => req.params.id
 
 // GET /api/loyalty/customers/:phone?clientId=xxx - Lookup customer by phone
 router.get('/customers/:phone', async (req, res) => {
@@ -90,8 +90,8 @@ router.post('/customers', async (req, res) => {
   }
 })
 
-// GET /api/clients/:clientId/loyalty/config - Get loyalty config
-router.get('/clients/:clientId/loyalty/config', async (req, res) => {
+// GET /api/clients/:id/loyalty/config - Get loyalty config
+router.get('/config', async (req, res) => {
   try {
     const clientId = getClientId(req)
 
@@ -116,8 +116,8 @@ router.get('/clients/:clientId/loyalty/config', async (req, res) => {
   }
 })
 
-// POST /api/clients/:clientId/loyalty/config - Update loyalty config (auth required)
-router.post('/clients/:clientId/loyalty/config', authenticateToken, async (req, res) => {
+// POST /api/clients/:id/loyalty/config - Update loyalty config (auth required)
+router.post('/config', authenticateToken, async (req, res) => {
   try {
     const clientId = getClientId(req)
     const { enabled, pointsPerDollar } = req.body
@@ -145,8 +145,64 @@ router.post('/clients/:clientId/loyalty/config', authenticateToken, async (req, 
   }
 })
 
-// GET /api/clients/:clientId/rewards - Get rewards
-router.get('/clients/:clientId/rewards', async (req, res) => {
+// Legacy routes for compatibility with current production API
+// GET /api/clients/:clientId/loyalty/config - Get loyalty config (old path)
+router.get('/clients/:clientId/loyalty/config', async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+
+    const config = await prisma.loyaltyConfig.findUnique({
+      where: { clientId },
+      include: {
+        rewards: {
+          where: { isActive: true },
+          orderBy: { pointsRequired: 'asc' }
+        }
+      }
+    })
+
+    if (!config) {
+      return res.json({ enabled: false, pointsPerDollar: 1, rewards: [] })
+    }
+
+    res.json(config)
+  } catch (err) {
+    console.error('Get loyalty config error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/clients/:clientId/loyalty/config - Update loyalty config (old path, auth required)
+router.post('/clients/:clientId/loyalty/config', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+    const { enabled, pointsPerDollar } = req.body
+
+    const config = await prisma.loyaltyConfig.upsert({
+      where: { clientId },
+      update: {
+        enabled: enabled !== undefined ? enabled : true,
+        pointsPerDollar: pointsPerDollar || 1
+      },
+      create: {
+        clientId,
+        enabled: enabled !== undefined ? enabled : true,
+        pointsPerDollar: pointsPerDollar || 1
+      },
+      include: {
+        rewards: true
+      }
+    })
+
+    res.json(config)
+  } catch (err) {
+    console.error('Update loyalty config error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/clients/:id/loyalty/rewards - Get rewards
+router.get('/rewards', async (req, res) => {
   try {
     const clientId = getClientId(req)
 
@@ -162,8 +218,8 @@ router.get('/clients/:clientId/rewards', async (req, res) => {
   }
 })
 
-// POST /api/clients/:clientId/rewards - Create reward (auth required)
-router.post('/clients/:clientId/rewards', authenticateToken, async (req, res) => {
+// POST /api/clients/:id/loyalty/rewards - Create reward (auth required)
+router.post('/rewards', authenticateToken, async (req, res) => {
   try {
     const clientId = getClientId(req)
     const { name, description, pointsRequired, discountValue, discountType = 'fixed' } = req.body
@@ -202,8 +258,8 @@ router.post('/clients/:clientId/rewards', authenticateToken, async (req, res) =>
   }
 })
 
-// PATCH /api/clients/:clientId/rewards/:rewardId - Update reward (auth required)
-router.patch('/clients/:clientId/rewards/:rewardId', authenticateToken, async (req, res) => {
+// PATCH /api/clients/:id/loyalty/rewards/:rewardId - Update reward (auth required)
+router.patch('/rewards/:rewardId', authenticateToken, async (req, res) => {
   try {
     const { rewardId } = req.params
     const { name, description, pointsRequired, discountValue, discountType, isActive } = req.body
@@ -227,8 +283,8 @@ router.patch('/clients/:clientId/rewards/:rewardId', authenticateToken, async (r
   }
 })
 
-// DELETE /api/clients/:clientId/rewards/:rewardId - Delete reward (auth required)
-router.delete('/clients/:clientId/rewards/:rewardId', authenticateToken, async (req, res) => {
+// DELETE /api/clients/:id/loyalty/rewards/:rewardId - Delete reward (auth required)
+router.delete('/rewards/:rewardId', authenticateToken, async (req, res) => {
   try {
     const { rewardId } = req.params
 

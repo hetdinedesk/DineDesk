@@ -182,6 +182,86 @@ export default function CheckoutPage({ data }) {
     )
   }
 
+  const siteName = data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''
+
+  return (
+    <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
+      <CheckoutContentWrapper data={data} siteName={siteName} router={router} />
+    </LoyaltyProvider>
+  )
+}
+
+function CheckoutContentWrapper({ data, siteName, router }) {
+  const { customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled } = useLoyalty()
+  return <CheckoutContent 
+    data={data} 
+    siteName={siteName} 
+    router={router} 
+    customer={customer} 
+    loyaltyConfig={loyaltyConfig} 
+    lookupCustomer={lookupCustomer} 
+    upsertCustomer={upsertCustomer} 
+    redeemReward={redeemReward} 
+    canRedeemReward={canRedeemReward} 
+    getPointsToNextReward={getPointsToNextReward} 
+    isLoyaltyEnabled={isLoyaltyEnabled}
+  />
+}
+
+function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled }) {
+  const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
+  const paymentGateway = data?.paymentGateway || {}
+
+  const [step, setStep] = useState(1) // 1: Info, 2: Pickup, 3: Payment
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [clientSecret, setClientSecret] = useState(null)
+  const [orderId, setOrderId] = useState(null)
+  const [stripePromise, setStripePromise] = useState(null)
+
+  // Initialize Stripe with publishable key
+  useEffect(() => {
+    if (paymentGateway?.isActive && paymentGateway?.provider === 'stripe') {
+      const publishableKey = paymentGateway.testMode 
+        ? paymentGateway.testPublishableKey 
+        : paymentGateway.livePublishableKey
+      
+      if (publishableKey) {
+        setStripePromise(loadStripe(publishableKey))
+      }
+    }
+  }, [paymentGateway])
+
+  // Customer info
+  const [customerInfo, setCustomerInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    note: ''
+  })
+
+  // Pickup info
+  const [pickupType, setPickupType] = useState('asap') // asap | scheduled
+  const [scheduledTime, setScheduledTime] = useState('')
+  const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine-in
+  const [selectedLocation, setSelectedLocation] = useState('')
+
+  // Auto-select first location if only one active location exists
+  useEffect(() => {
+    const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
+    if (activeLocations.length === 1) {
+      setSelectedLocation(activeLocations[0].id)
+    }
+  }, [data?.locations])
+
+  // Payment
+  const [paymentMethod, setPaymentMethod] = useState('cash') // stripe | cash
+
+  // Loyalty state
+  const [showLoyaltyInfo, setShowLoyaltyInfo] = useState(false)
+  const [redeemedReward, setRedeemedReward] = useState(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
+
   const handlePlaceOrder = async () => {
     setLoading(true)
     setError(null)
@@ -287,74 +367,6 @@ export default function CheckoutPage({ data }) {
   const handlePaymentError = (errorMessage) => {
     setError(errorMessage)
   }
-
-  const siteName = data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''
-
-  return (
-    <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
-      <CheckoutContentWrapper data={data} siteName={siteName} router={router} />
-    </LoyaltyProvider>
-  )
-}
-
-function CheckoutContentWrapper({ data, siteName, router }) {
-  const { customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled } = useLoyalty()
-  return <CheckoutContent data={data} siteName={siteName} router={router} customer={customer} loyaltyConfig={loyaltyConfig} lookupCustomer={lookupCustomer} upsertCustomer={upsertCustomer} redeemReward={redeemReward} canRedeemReward={canRedeemReward} getPointsToNextReward={getPointsToNextReward} isLoyaltyEnabled={isLoyaltyEnabled} />
-}
-
-function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled }) {
-  const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
-  const paymentGateway = data?.paymentGateway || {}
-
-  const [step, setStep] = useState(1) // 1: Info, 2: Pickup, 3: Payment
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [clientSecret, setClientSecret] = useState(null)
-  const [orderId, setOrderId] = useState(null)
-  const [stripePromise, setStripePromise] = useState(null)
-
-  // Initialize Stripe with publishable key
-  useEffect(() => {
-    if (paymentGateway?.isActive && paymentGateway?.provider === 'stripe') {
-      const publishableKey = paymentGateway.testMode 
-        ? paymentGateway.testPublishableKey 
-        : paymentGateway.livePublishableKey
-      
-      if (publishableKey) {
-        setStripePromise(loadStripe(publishableKey))
-      }
-    }
-  }, [paymentGateway])
-
-  // Customer info
-  const [customerInfo, setCustomerInfo] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    note: ''
-  })
-
-  // Pickup info
-  const [pickupType, setPickupType] = useState('asap') // asap | scheduled
-  const [scheduledTime, setScheduledTime] = useState('')
-  const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine-in
-  const [selectedLocation, setSelectedLocation] = useState('')
-
-  // Auto-select first location if only one active location exists
-  useEffect(() => {
-    const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
-    if (activeLocations.length === 1) {
-      setSelectedLocation(activeLocations[0].id)
-    }
-  }, [data?.locations])
-
-  // Payment
-  const [paymentMethod, setPaymentMethod] = useState('cash') // stripe | cash
-
-  // Loyalty state
-  const [showLoyaltyInfo, setShowLoyaltyInfo] = useState(false)
-  const [redeemedReward, setRedeemedReward] = useState(null)
-  const [discountAmount, setDiscountAmount] = useState(0)
 
   // Lookup customer when phone changes
   useEffect(() => {
@@ -476,20 +488,34 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                       placeholder="Your phone number"
                     />
                     {/* Loyalty info display */}
-                    {isLoyaltyEnabled && customer && (
-                      <div style={{ marginTop: 12, padding: 12, background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <Star size={16} style={{ color: '#059669' }} />
-                          <span style={{ fontSize: 14, fontWeight: 600, color: '#059669' }}>
-                            Welcome back! You have {customer.points} points
-                          </span>
+                    {isLoyaltyEnabled && customerInfo.phone && (
+                      customer ? (
+                        <div style={{ marginTop: 12, padding: 12, background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <Star size={16} style={{ color: '#059669' }} />
+                            <span style={{ fontSize: 14, fontWeight: 600, color: '#059669' }}>
+                              Welcome back! You have {customer.points} points
+                            </span>
+                          </div>
+                          {getPointsToNextReward() && (
+                            <p style={{ fontSize: 12, color: '#047857', margin: 0 }}>
+                              Only {getPointsToNextReward().pointsNeeded} more points for {getPointsToNextReward().reward.name}
+                            </p>
+                          )}
                         </div>
-                        {getPointsToNextReward() && (
-                          <p style={{ fontSize: 12, color: '#047857', margin: 0 }}>
-                            Only {getPointsToNextReward().pointsNeeded} more points for {getPointsToNextReward().reward.name}
+                      ) : (
+                        <div style={{ marginTop: 12, padding: 12, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Gift size={16} style={{ color: '#d97706' }} />
+                            <span style={{ fontSize: 14, fontWeight: 600, color: '#92400e' }}>
+                              Join our loyalty program!
+                            </span>
+                          </div>
+                          <p style={{ fontSize: 12, color: '#b45309', margin: '4px 0 0 0' }}>
+                            Earn points with every order and redeem rewards
                           </p>
-                        )}
-                      </div>
+                        </div>
+                      )
                     )}
                   </div>
 

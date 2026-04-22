@@ -413,7 +413,6 @@ console.log('[REVIEWS] Config settings:', {
       }
       const minStars = cfg?.reviews?.minStars || 3
       const rawReviews = gData.result.reviews || []
-      const filteredReviews = rawReviews.filter(r => r.rating >= minStars)
       googleReviews = (gData.result.reviews || [])
         .filter(r => r.rating >= minStars)
         .map(r => ({
@@ -424,57 +423,9 @@ console.log('[REVIEWS] Config settings:', {
           source: 'Google',
           photo:  r.profile_photo_url,
         }))
-      console.log('[GOOGLE API] Fetched', googleReviews.length, 'reviews after filtering')
-      // If we have very few reviews after filtering, supplement with sample reviews to ensure variety
+        .slice(0, 10) // Limit to max 10 reviews
+      console.log('[GOOGLE API] Fetched', googleReviews.length, 'reviews (max 10)')
       finalReviews = googleReviews;
-      if (finalReviews.length < 5 && cfg?.reviews?.showSampleReviews !== false) {
-        const sampleReviews = [
-          {
-            name: 'Sarah Mitchell',
-            stars: 5,
-            text: 'Absolutely fantastic dining experience! The atmosphere was perfect and the food was exceptional. Will definitely be coming back.',
-            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week ago
-            source: 'Sample',
-            photo: null,
-          },
-          {
-            name: 'Michael Chen',
-            stars: 4,
-            text: 'Great restaurant with excellent service. The menu variety is impressive and everything we tried was delicious. Highly recommend!',
-            date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 2 weeks ago
-            source: 'Sample',
-            photo: null,
-          },
-          {
-            name: 'Emma Thompson',
-            stars: 5,
-            text: 'One of the best dining experiences we\'ve had! The attention to detail and quality of ingredients really shows. Perfect for special occasions.',
-            date: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(), // 3 weeks ago
-            source: 'Sample',
-            photo: null,
-          },
-          {
-            name: 'David Rodriguez',
-            stars: 4,
-            text: 'Excellent food and wonderful ambiance. The staff was very attentive and made us feel welcome. Will return soon!',
-            date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 1 month ago
-            source: 'Sample',
-            photo: null,
-          },
-          {
-            name: 'Lisa Anderson',
-            stars: 5,
-            text: 'Outstanding in every way! From the moment we walked in until we left, everything was perfect. The chef is truly talented.',
-            date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(), // 1.5 months ago
-            source: 'Sample',
-            photo: null,
-          }
-        ];
-        
-        // Add sample reviews to reach at least 5 total reviews
-        const neededReviews = 5 - finalReviews.length;
-        finalReviews = [...finalReviews, ...sampleReviews.slice(0, neededReviews)];
-      }
     }
   } catch (err) {
     console.error('[GOOGLE API] Error fetching Google reviews:', err)
@@ -1704,8 +1655,19 @@ router.get('/:id/banners', async (req, res) => {
 
 router.post('/:id/banners', async (req, res) => {
   try {
+    // Get current max sortOrder for this client
+    const maxSortOrder = await prisma.banner.findFirst({
+      where: { clientId: req.params.id },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true }
+    })
+
     const banner = await prisma.banner.create({
-      data: { ...req.body, clientId: req.params.id }
+      data: {
+        ...req.body,
+        clientId: req.params.id,
+        sortOrder: req.body.sortOrder ?? (maxSortOrder ? maxSortOrder.sortOrder + 1 : 0)
+      }
     })
     res.json(banner)
   } catch (err) {
@@ -1731,6 +1693,30 @@ router.delete('/:id/banners/:bannerId', async (req, res) => {
     await prisma.banner.delete({ where: { id: req.params.bannerId } })
     res.json({ success: true })
   } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/:id/banners/reorder', async (req, res) => {
+  try {
+    const { bannerIds } = req.body
+    if (!Array.isArray(bannerIds)) {
+      return res.status(400).json({ error: 'bannerIds must be an array' })
+    }
+
+    // Update sortOrder for each banner
+    await Promise.all(
+      bannerIds.map((bannerId, index) =>
+        prisma.banner.update({
+          where: { id: bannerId },
+          data: { sortOrder: index }
+        })
+      )
+    )
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('Reorder banners error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -2169,6 +2155,7 @@ router.post('/:id/deploy', async (req, res) => {
   try {
     const config = await prisma.siteConfig.findUnique({ where: { clientId: req.params.id } })
     const hookUrl = config?.netlify?.buildHook
+    const previewUrl = config?.netlify?.previewUrl
 
     if (!hookUrl) {
       return res.status(400).json({
@@ -2176,7 +2163,15 @@ router.post('/:id/deploy', async (req, res) => {
       })
     }
 
-    await netlifyService.triggerDeploy(hookUrl)
+    // Handle clearCache parameter - Netlify doesn't have a direct cache-clear API,
+    // but we can add a cache-busting timestamp to the build hook
+    let buildHookUrl = hookUrl
+    if (req.query.clearCache === 'true') {
+      // Add timestamp to URL to bypass any potential caching
+      buildHookUrl = `${hookUrl}?t=${Date.now()}`
+    }
+
+    await netlifyService.triggerDeploy(buildHookUrl)
 
     await prisma.deployment.create({
       data: { clientId: req.params.id, status: 'triggered', triggeredBy: req.user.name }
@@ -2187,7 +2182,13 @@ router.post('/:id/deploy', async (req, res) => {
       userId: req.user.id, userName: req.user.name, clientId: req.params.id
     })
 
-    res.json({ success: true })
+    res.json({ 
+      success: true, 
+      previewUrl: previewUrl,
+      message: req.query.clearCache === 'true' 
+        ? 'Build triggered with cache disabled' 
+        : 'Build triggered successfully'
+    })
   } catch (err) {
     console.error('Deploy error:', err.message)
     res.status(500).json({ error: err.message })
@@ -2869,5 +2870,161 @@ router.use('/:id/homepage',   require('./homepage'))
 router.use('/:id/alerts',     require('./alerts'))
 router.use('/:id/legal',      require('./legal'))
 router.use('/:id/analytics',  require('./analytics'))
+
+// Legacy loyalty routes for compatibility with current production API
+// These routes handle /api/clients/:clientId/loyalty/config and /api/clients/:clientId/rewards
+
+// GET /api/clients/:clientId/loyalty/config - Get loyalty config (legacy)
+router.get('/:clientId/loyalty/config', async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+
+    const config = await prisma.loyaltyConfig.findUnique({
+      where: { clientId },
+      include: {
+        rewards: {
+          where: { isActive: true },
+          orderBy: { pointsRequired: 'asc' }
+        }
+      }
+    })
+
+    if (!config) {
+      return res.json({ enabled: false, pointsPerDollar: 1, rewards: [] })
+    }
+
+    res.json(config)
+  } catch (err) {
+    console.error('Get loyalty config error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/clients/:clientId/loyalty/config - Update loyalty config (legacy)
+router.post('/:clientId/loyalty/config', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+    const { enabled, pointsPerDollar } = req.body
+
+    const config = await prisma.loyaltyConfig.upsert({
+      where: { clientId },
+      update: {
+        enabled: enabled !== undefined ? enabled : true,
+        pointsPerDollar: pointsPerDollar || 1
+      },
+      create: {
+        clientId,
+        enabled: enabled !== undefined ? enabled : true,
+        pointsPerDollar: pointsPerDollar || 1
+      },
+      include: {
+        rewards: true
+      }
+    })
+
+    res.json(config)
+  } catch (err) {
+    console.error('Update loyalty config error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/clients/:clientId/rewards - Get rewards (legacy)
+router.get('/:clientId/rewards', async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+
+    const rewards = await prisma.reward.findMany({
+      where: { clientId, isActive: true },
+      orderBy: { pointsRequired: 'asc' }
+    })
+
+    res.json(rewards)
+  } catch (err) {
+    console.error('Get rewards error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/clients/:clientId/rewards - Create reward (legacy)
+router.post('/:clientId/rewards', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+    const { name, description, pointsRequired, discountValue, discountType = 'fixed' } = req.body
+
+    if (!name || !pointsRequired || !discountValue) {
+      return res.status(400).json({ error: 'name, pointsRequired, and discountValue are required' })
+    }
+
+    // Get or create loyalty config
+    let loyaltyConfig = await prisma.loyaltyConfig.findUnique({
+      where: { clientId }
+    })
+
+    if (!loyaltyConfig) {
+      loyaltyConfig = await prisma.loyaltyConfig.create({
+        data: { clientId, enabled: false, pointsPerDollar: 1 }
+      })
+    }
+
+    const reward = await prisma.reward.create({
+      data: {
+        clientId,
+        loyaltyConfigId: loyaltyConfig.id,
+        name,
+        description,
+        pointsRequired,
+        discountValue,
+        discountType
+      }
+    })
+
+    res.json(reward)
+  } catch (err) {
+    console.error('Create reward error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// PATCH /api/clients/:clientId/rewards/:rewardId - Update reward (legacy)
+router.patch('/:clientId/rewards/:rewardId', authenticateToken, async (req, res) => {
+  try {
+    const { rewardId } = req.params
+    const { name, description, pointsRequired, discountValue, discountType, isActive } = req.body
+
+    const reward = await prisma.reward.update({
+      where: { id: rewardId },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(pointsRequired !== undefined && { pointsRequired }),
+        ...(discountValue !== undefined && { discountValue }),
+        ...(discountType !== undefined && { discountType }),
+        ...(isActive !== undefined && { isActive })
+      }
+    })
+
+    res.json(reward)
+  } catch (err) {
+    console.error('Update reward error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// DELETE /api/clients/:clientId/rewards/:rewardId - Delete reward (legacy)
+router.delete('/:clientId/rewards/:rewardId', authenticateToken, async (req, res) => {
+  try {
+    const { rewardId } = req.params
+
+    await prisma.reward.delete({
+      where: { id: rewardId }
+    })
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('Delete reward error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
 
 module.exports = router

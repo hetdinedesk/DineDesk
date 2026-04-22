@@ -28,6 +28,9 @@ export default function MenuPage({ data, page, banner }) {
   const pageTitle = replaceShortcodes(menuPage?.title || 'Our Menu', shortcodes);
   const pageSubtitle = replaceShortcodes(menuPage?.subtitle || menuPage?.metaDesc || 'Crafted with passion, served with excellence', shortcodes);
 
+  // Resolve banner from prop or page bannerId (fallback for preview mode)
+  const pageBanner = banner || (menuPage?.bannerId ? data?.banners?.find(b => b.id === menuPage.bannerId) : null);
+
   const activeCategories = menuCategories
     .filter((cat) => cat.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -48,9 +51,7 @@ export default function MenuPage({ data, page, banner }) {
 
   const getItemImage = (item) => {
     if (item.image) return item.image;
-    const imageKeys = Object.keys(IMAGES);
-    const hash = (item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    return IMAGES[imageKeys[Math.abs(hash) % imageKeys.length]];
+    return null;
   };
 
   const handleAddItem = (item) => {
@@ -75,14 +76,14 @@ export default function MenuPage({ data, page, banner }) {
           minHeight: '60vh',
           marginTop: 'calc(var(--header-offset, 5rem) * -1)',
           paddingTop: 'var(--header-offset, 5rem)',
-          background: banner?.imageUrl ? 'transparent' : 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary, #8B5A2B) 100%)'
+          background: pageBanner?.imageUrl ? 'transparent' : 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary, #8B5A2B) 100%)'
         }}
       >
         {/* Banner Image Background */}
-        {banner?.imageUrl && (
+        {pageBanner?.imageUrl && (
           <>
             <img 
-              src={banner.imageUrl} 
+              src={pageBanner.imageUrl} 
               alt="" 
               className="absolute inset-0 w-full h-full object-cover"
             />
@@ -91,7 +92,7 @@ export default function MenuPage({ data, page, banner }) {
         )}
         
         {/* Background Pattern (only when no banner) */}
-        {!banner?.imageUrl && (
+        {!pageBanner?.imageUrl && (
           <div 
             className="absolute inset-0 opacity-10"
             style={{
@@ -218,13 +219,17 @@ export default function MenuPage({ data, page, banner }) {
                       animate={{ opacity: 1 }}
                       className="flex bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300"
                     >
-                      <div className="w-32 h-32 flex-shrink-0">
-                        <img
-                          src={getItemImage(item)}
-                          alt={name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      {getItemImage(item) ? (
+                        <div className="w-32 h-32 flex-shrink-0">
+                          <img
+                            src={getItemImage(item)}
+                            alt={name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-32 h-32 flex-shrink-0 bg-gray-100"></div>
+                      )}
                       <div className="flex-1 p-4 flex flex-col justify-between">
                         <div>
                           <div className="flex items-start justify-between mb-2">

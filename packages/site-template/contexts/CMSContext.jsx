@@ -41,6 +41,71 @@ function adaptCMSData(data) {
     _homePage = null,
   } = data || {};
 
+  // Normalize hours to always be an array of { day, open, close, closed }
+  // Always returns all 7 days in consistent order for consistent display across clients
+  const normalizeHours = (hours) => {
+    const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    // Map abbreviated day names to full names
+    const dayNameMap = {
+      'Mon': 'Monday', 'Mon.': 'Monday', 'Monday': 'Monday',
+      'Tue': 'Tuesday', 'Tue.': 'Tuesday', 'Tuesday': 'Tuesday',
+      'Wed': 'Wednesday', 'Wed.': 'Wednesday', 'Wednesday': 'Wednesday',
+      'Thu': 'Thursday', 'Thu.': 'Thursday', 'Thursday': 'Thursday',
+      'Fri': 'Friday', 'Fri.': 'Friday', 'Friday': 'Friday',
+      'Sat': 'Saturday', 'Sat.': 'Saturday', 'Saturday': 'Saturday',
+      'Sun': 'Sunday', 'Sun.': 'Sunday', 'Sunday': 'Sunday'
+    };
+    // Map numeric indices to day names (0=Monday, 6=Sunday)
+    const indexToDay = {
+      '0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday',
+      '4': 'Friday', '5': 'Saturday', '6': 'Sunday'
+    };
+
+    if (!hours) {
+      // Return all days as closed if no hours data
+      return allDays.map(day => ({ day, open: '', close: '', closed: true }));
+    }
+
+    // Build a map of existing hours
+    const hoursMap = {};
+
+    if (Array.isArray(hours)) {
+      hours.forEach(h => {
+        const hasTimes = h.open && h.close;
+        const isClosed = !hasTimes && (h.closed === true || h.closed !== false);
+        hoursMap[h.day] = {
+          day: h.day,
+          open: h.open || '',
+          close: h.close || '',
+          closed: isClosed
+        };
+      });
+    } else if (typeof hours === 'object') {
+      Object.entries(hours).forEach(([key, value]) => {
+        const day = dayNameMap[key] || indexToDay[key] || key;
+        if (typeof value === 'string') {
+          // Parse "9am-5pm" format
+          const match = value.match(/(\d+(?::\d+)?(?:am|pm)?)\s*-\s*(\d+(?::\d+)?(?:am|pm)?)/i);
+          if (match) {
+            hoursMap[day] = { day, open: match[1], close: match[2], closed: false };
+          } else {
+            hoursMap[day] = { day, open: '', close: '', closed: true };
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          hoursMap[day] = {
+            day,
+            open: value.open || '',
+            close: value.close || '',
+            closed: value.closed === true || (!value.open && !value.close)
+          };
+        }
+      });
+    }
+
+    // Build final array in consistent order
+    return allDays.map(day => hoursMap[day] || { day, open: '', close: '', closed: true });
+  };
+
   // Find primary location
   const primaryLoc = client?.locations?.find(l => l.isPrimary) || client?.locations?.[0] || {};
 
@@ -49,6 +114,11 @@ function adaptCMSData(data) {
     id: client?.id || 'rest-1',
     name: settings.displayName || settings.restaurantName || client?.name || 'Restaurant',
     domain: client?.domain || '',
+    email: settings.defaultEmail || client?.email || '',
+    description: settings.tagline || client?.description || '',
+    hours: normalizeHours(primaryLoc?.hours),
+    address: primaryLoc?.address || '',
+    phone: primaryLoc?.phone || settings.phone || '',
     branding: {
       primaryColor: colours.primary || '#1a1a1a',
       secondaryColor: colours.secondary || '#d4af37',
@@ -71,128 +141,6 @@ function adaptCMSData(data) {
       try { return JSON.parse(section.content) } catch { return {} }
     })()
   }));
-
-  // Normalize hours to always be an array of { day, open, close, closed }
-  // Always returns all 7 days in consistent order for consistent display across clients
-  const normalizeHours = (hours) => {
-    const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    // Map abbreviated day names to full names
-    const dayNameMap = {
-      'Mon': 'Monday', 'Mon.': 'Monday', 'Monday': 'Monday',
-      'Tue': 'Tuesday', 'Tue.': 'Tuesday', 'Tuesday': 'Tuesday',
-      'Wed': 'Wednesday', 'Wed.': 'Wednesday', 'Wednesday': 'Wednesday',
-      'Thu': 'Thursday', 'Thu.': 'Thursday', 'Thursday': 'Thursday',
-      'Fri': 'Friday', 'Fri.': 'Friday', 'Friday': 'Friday',
-      'Sat': 'Saturday', 'Sat.': 'Saturday', 'Saturday': 'Saturday',
-      'Sun': 'Sunday', 'Sun.': 'Sunday', 'Sunday': 'Sunday'
-    };
-    // Map numeric indices to day names (0=Monday, 6=Sunday)
-    const indexToDay = {
-      '0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday',
-      '4': 'Friday', '5': 'Saturday', '6': 'Sunday'
-    };
-    
-    if (!hours) {
-      // Return all days as closed if no hours data
-      return allDays.map(day => ({ day, open: '', close: '', closed: true }));
-    }
-    
-    // Build a map of existing hours
-    const hoursMap = {};
-    
-    if (Array.isArray(hours)) {
-      hours.forEach(h => {
-        const hasTimes = h.open && h.close;
-        const isClosed = !hasTimes && (h.closed === true || h.closed !== false);
-        hoursMap[h.day] = {
-          day: h.day,
-          open: h.open || '',
-          close: h.close || '',
-          closed: isClosed
-        };
-      });
-    } else if (typeof hours === 'object') {
-      // Object format: { Monday: { open, close, closed }, ... } 
-      // or { Mon: {...}, Tue: {...} }
-      // or { 0: {...}, 1: {...}, Fri: {...} } (mixed format from API)
-      
-      const abbreviatedKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const fullNameKeys = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      
-      const entries = Object.entries(hours);
-      
-      // Check if ANY abbreviated key exists (CMS has been used)
-      const hasAbbreviatedKeys = entries.some(([key]) => abbreviatedKeys.includes(key));
-      
-      // Process abbreviated keys first (prioritize CMS data)
-      entries.forEach(([key, h]) => {
-        if (!abbreviatedKeys.includes(key)) return;
-        
-        const fullDayName = dayNameMap[key];
-        if (!fullDayName) return;
-        
-        const hasTimes = h?.open && h?.close;
-        const isClosed = h?.closed === true || (!hasTimes && h?.closed !== false);
-        
-        hoursMap[fullDayName] = {
-          day: fullDayName,
-          open: h?.open || '',
-          close: h?.close || '',
-          closed: isClosed
-        };
-      });
-      
-      // Only use full names if NO abbreviated keys exist at all (pure seed data)
-      if (!hasAbbreviatedKeys) {
-        entries.forEach(([key, h]) => {
-          if (!fullNameKeys.includes(key)) return;
-          
-          const hasTimes = h?.open && h?.close;
-          const isClosed = h?.closed === true || (!hasTimes && h?.closed !== false);
-          
-          hoursMap[key] = {
-            day: key,
-            open: h?.open || '',
-            close: h?.close || '',
-            closed: isClosed
-          };
-        });
-      }
-      // If abbreviated keys exist, days not in hoursMap remain closed (default)
-      
-      // Process numeric indices only if no other format exists
-      if (!hasAbbreviatedKeys) {
-        entries.forEach(([key, h]) => {
-          if (!indexToDay[key]) return;
-          
-          const fullDayName = indexToDay[key];
-          
-          // Skip if already set
-          if (hoursMap[fullDayName]) return;
-          
-          const hasTimes = h?.open && h?.close;
-          const isClosed = h?.closed === true || (!hasTimes && h?.closed !== false);
-          
-          hoursMap[fullDayName] = {
-            day: fullDayName,
-            open: h?.open || '',
-            close: h?.close || '',
-            closed: isClosed
-          };
-        });
-      }
-    }
-    
-    // Return all 7 days, using saved data or defaulting to closed
-    const result = allDays.map(day => {
-      if (hoursMap[day]) {
-        return hoursMap[day];
-      }
-      return { day, open: '', close: '', closed: true };
-    });
-    
-    return result;
-  };
 
   // Map locations
   const locations = (client?.locations || []).map(loc => {
@@ -501,6 +449,17 @@ function adaptCMSData(data) {
     homepageLayout: data?.homepageLayout || { components: [] },
     customTextBlocks: data?.customTextBlocks || [],
     ordering: ordering || { enabled: false },
+    footer: footer || { columns: footerSections || [], theme: 'dark' },
+    socialLinks: [
+      ...(siteConfig.social?.facebook ? [{ platform: 'facebook', url: siteConfig.social.facebook }] : []),
+      ...(siteConfig.social?.instagram ? [{ platform: 'instagram', url: siteConfig.social.instagram }] : []),
+      ...(siteConfig.social?.twitter ? [{ platform: 'twitter', url: siteConfig.social.twitter }] : []),
+      ...(siteConfig.social?.linkedin ? [{ platform: 'linkedin', url: siteConfig.social.linkedin }] : []),
+    ],
+    team: teamDepartments || [],
+    googleReviewUrl: siteConfig.googleReviews?.placeId 
+      ? `https://search.google.com/local/writereview?placeid=${siteConfig.googleReviews.placeId}` 
+      : null,
   }
 }
 

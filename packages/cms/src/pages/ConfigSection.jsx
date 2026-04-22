@@ -1887,6 +1887,20 @@ const THEMES = [
                 utilityBeltBg:'#C8823A', utilityBeltText:'#ffffff' }
   },
   {
+    key:   'cafe-d1',
+    label: 'Cafe (D1)',
+    target: 'Coffee shops, Artisan cafes, Bakeries',
+    sellAngle: 'Warm, elegant, and artisanal',
+    style: 'Premium cafe theme with elegant typography and smooth animations',
+    features: ['Utility belt', 'Banner carousel', 'Promo tiles', 'Reviews carousel', 'Responsive header'],
+    hasSeparateNav: false,
+    defaults: { primary:'#1A0F0A', secondary:'#C68642', headerBg:'#FAF7F2',
+                headerText:'#1A0F0A', navBg:'#1A0F0A', navText:'#ffffff',
+                bodyBg:'#FAF7F2', bodyText:'#1A0F0A',
+                ctaBg:'#C68642', ctaText:'#ffffff', accentBg:'#FAF7F2',
+                utilityBeltBg:'#1A0F0A', utilityBeltText:'#ffffff' }
+  },
+  {
     key:   'theme-v2',
     label: 'Classic Bistro',
     target: 'Traditional venues',
@@ -1991,11 +2005,24 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
           }
   })
 
-  // Fully replace colours with theme defaults when switching theme
+  // When switching theme, preserve custom colors and only apply new theme's defaults for uncustomized colors
   const selectTheme = (themeKey) => {
     setSelected(themeKey)
     const theme = THEMES.find(t => t.key === themeKey)
-    if (theme) setColours({ ...theme.defaults, theme: themeKey })
+    if (theme) {
+      // Keep user's custom colors, only replace with new theme defaults for colors that match old theme defaults
+      const oldTheme = THEMES.find(t => t.key === selected) || THEMES[0]
+      const newColours = { ...theme.defaults, theme: themeKey }
+      
+      // Preserve any colors that differ from the old theme's defaults (user customizations)
+      Object.keys(colours).forEach(key => {
+        if (key !== 'theme' && colours[key] !== oldTheme.defaults[key]) {
+          newColours[key] = colours[key]
+        }
+      })
+      
+      setColours(newColours)
+    }
   }
 
   const setColour = (key, value) => setColours(prev => ({ ...prev, [key]: value }))
@@ -4459,9 +4486,6 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
 
   // Repo / setup status
   const [setupStatus,   setSetupStatus]   = useState(null)
-  const [linkingRepo,   setLinkingRepo]   = useState(false)
-  const [linkRepoMsg,   setLinkRepoMsg]   = useState('')
-  const [linkRepoBranch, setLinkRepoBranch] = useState('main')
 
   // Environment variables tab
   const [envVars,    setEnvVars]    = useState([])
@@ -4814,25 +4838,6 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
     } catch { /* non-critical */ }
   }
 
-  const linkRepo = async () => {
-    setLinkingRepo(true)
-    setLinkRepoMsg('')
-    try {
-      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/link-repo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
-        body: JSON.stringify({ branch: linkRepoBranch.trim() || 'main' })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed')
-      setLinkRepoMsg('✅ ' + data.message)
-      await loadSetupStatus()
-    } catch (err) {
-      setLinkRepoMsg('❌ ' + err.message)
-    } finally {
-      setLinkingRepo(false)
-    }
-  }
 
   useEffect(() => { loadSetupStatus() }, [])
 
@@ -5228,39 +5233,6 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
             </div>
           )}
 
-          {/* Repo warning — only if site exists but repo not linked */}
-          {setupStatus && siteExists && !setupStatus.repoLinked && (
-            <div style={{ background:'rgba(239,68,68,0.06)', border:'1px solid #EF444440',
-              borderRadius:10, padding:14, marginBottom:16 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                <span style={{ fontSize:13, fontWeight:700, color:'#EF4444' }}>
-                  GitHub repo not linked
-                </span>
-              </div>
-              <div style={{ fontSize:12, color:C.t3, lineHeight:1.7, marginBottom:10 }}>
-                Builds require a linked GitHub repo. 
-                {setupStatus.hasRepo
-                  ? <span> Click below to link <code style={{ color:C.cyan }}>{setupStatus.repoPath}</code>.</span>
-                  : <span> Add <code style={{ color:C.cyan }}>SITE_TEMPLATE_REPO</code> to your API .env file.</span>}
-              </div>
-              {setupStatus.hasRepo && (
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <input value={linkRepoBranch} onChange={e => setLinkRepoBranch(e.target.value)}
-                    placeholder="main"
-                    style={{ padding:'5px 10px', background:C.input, border:`1px solid ${C.border}`,
-                      borderRadius:6, color:C.t0, fontSize:12, fontFamily:'monospace', width:100 }}/>
-                  <button onClick={linkRepo} disabled={linkingRepo}
-                    style={{ padding:'7px 16px', background:'#EF4444', border:'none',
-                      borderRadius:6, color:'#fff', fontWeight:700, fontSize:12,
-                      cursor: linkingRepo ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
-                    {linkingRepo ? 'Linking…' : 'Link Repo'}
-                  </button>
-                  {linkRepoMsg && <span style={{ fontSize:12,
-                    color: linkRepoMsg.startsWith('✅') ? C.green : '#EF4444' }}>{linkRepoMsg}</span>}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
 

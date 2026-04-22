@@ -17,7 +17,10 @@ export default function CartDrawer() {
   const handleCheckout = () => {
   closeCart()
   const siteId = router.query.site || process.env.SITE_ID || ''
-  router.push(`/checkout?site=${siteId}`)
+  // Only navigate if not already on checkout page
+  if (router.pathname !== '/checkout') {
+    router.push(`/checkout?site=${siteId}`)
+  }
 }
 
 return (

@@ -11,3 +11,6 @@ export const updateBanner = (clientId, id, data) =>
 
 export const deleteBanner = (clientId, id) =>
   api.delete(`/clients/${clientId}/banners/${id}`).then(r => r.data)
+
+export const reorderBanners = (clientId, bannerIds) =>
+  api.put(`/clients/${clientId}/banners/reorder`, { bannerIds }).then(r => r.data)

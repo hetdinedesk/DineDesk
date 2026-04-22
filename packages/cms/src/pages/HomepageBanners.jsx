@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getBanners, createBanner, updateBanner, deleteBanner } from '../api/banners'
+import { getBanners, createBanner, updateBanner, deleteBanner, reorderBanners } from '../api/banners'
 import ImageUpload from '../Components/ImageUpload'
 import ConfirmationModal from '../Components/ConfirmationModal'
 import { C } from '../theme'
@@ -55,14 +55,17 @@ const btnDanger = { padding: '6px 14px', background: C.red, border: 'none', bord
 export default function HomepageBanners({ clientId }) {
   const [modal, setModal] = useState(null)
   const [delId, setDelId] = useState(null)
-  
+  const [draggedIndex, setDraggedIndex] = useState(null)
+
   const { data: banners = [] } = useQuery({
     queryKey: ['banners', clientId],
     queryFn: () => getBanners(clientId)
   })
-  
-  // Filter for homepage banners only
-  const homepageBanners = banners.filter(b => b.location === 'home' || b.location === 'both')
+
+  // Filter for homepage banners only and sort by sortOrder
+  const homepageBanners = banners
+    .filter(b => b.location === 'home' || b.location === 'both')
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
 
   const qc = useQueryClient()
 
@@ -78,6 +81,41 @@ export default function HomepageBanners({ clientId }) {
     mutationFn: (id) => deleteBanner(clientId, id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['banners', clientId] }); qc.invalidateQueries({ queryKey: ['navbar', clientId] }) }
   })
+  const mReorder = useMutation({
+    mutationFn: (bannerIds) => reorderBanners(clientId, bannerIds),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['banners', clientId] }) }
+  })
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDragEnter = (e) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault()
+    if (draggedIndex === null || draggedIndex === dropIndex) return
+
+    const newOrder = [...homepageBanners]
+    const [draggedBanner] = newOrder.splice(draggedIndex, 1)
+    newOrder.splice(dropIndex, 0, draggedBanner)
+
+    const bannerIds = newOrder.map(b => b.id)
+    mReorder.mutate(bannerIds)
+    setDraggedIndex(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null)
+  }
 
   const openAdd = () => setModal({
     title: '', subtitle: '', text: '', imageUrl: '', buttonText: '', buttonUrl: '', 
@@ -146,16 +184,43 @@ export default function HomepageBanners({ clientId }) {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
-          {homepageBanners.map((b) => (
+          {homepageBanners.map((b, index) => (
             <div
               key={b.id}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDrop={(e) => handleDrop(e, index)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: C.panel,
-                border: `1px solid ${b.isActive === false ? C.border2 : C.border}`, 
+                border: `1px solid ${draggedIndex === index ? C.acc : (b.isActive === false ? C.border2 : C.border)}`,
                 borderRadius: 12,
-                opacity: b.isActive === false ? 0.7 : 1
+                opacity: b.isActive === false ? 0.7 : 1,
+                transition: draggedIndex === index ? 'transform 0.2s, box-shadow 0.2s' : 'none',
+                transform: draggedIndex === index ? 'scale(1.02)' : 'none',
+                boxShadow: draggedIndex === index ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
               }}
             >
+              <div
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragEnd={handleDragEnd}
+                title="Drag to reorder"
+                style={{
+                  cursor: 'grab',
+                  padding: '12px 8px',
+                  color: C.t3,
+                  fontSize: 24,
+                  userSelect: 'none',
+                  lineHeight: 1,
+                  minWidth: 40,
+                  textAlign: 'center',
+                  background: draggedIndex === index ? C.acc : 'transparent',
+                  borderRadius: 6,
+                  transition: 'background 0.2s'
+                }}
+              >
+                ⋮⋮
+              </div>
               {b.imageUrl && (
                 <img src={b.imageUrl} alt="" style={{ width: 160, height: 64, objectFit: 'cover', borderRadius: 8 }} />
               )}

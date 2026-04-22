@@ -17,6 +17,9 @@ export default function SpecialsPage({ data, page, banner }) {
   const pageTitle = replaceShortcodes(specialsPage?.title || 'Current Specials', shortcodes);
   const pageSubtitle = replaceShortcodes(specialsPage?.subtitle || specialsPage?.metaDesc || 'Limited time offerings crafted by our chefs', shortcodes);
 
+  // Resolve banner from prop or page bannerId (fallback for preview mode)
+  const pageBanner = banner || (specialsPage?.bannerId ? data?.banners?.find(b => b.id === specialsPage.bannerId) : null);
+
   const activeSpecials = specials.filter((special) => {
     if (!special.isActive) return false;
     const now = new Date();
@@ -58,14 +61,14 @@ export default function SpecialsPage({ data, page, banner }) {
           minHeight: '60vh',
           marginTop: 'calc(var(--header-offset, 5rem) * -1)',
           paddingTop: 'var(--header-offset, 5rem)',
-          background: banner?.imageUrl ? 'transparent' : 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary, #8B5A2B) 100%)'
+          background: pageBanner?.imageUrl ? 'transparent' : 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary, #8B5A2B) 100%)'
         }}
       >
         {/* Banner Image Background */}
-        {banner?.imageUrl && (
+        {pageBanner?.imageUrl && (
           <>
             <img 
-              src={banner.imageUrl} 
+              src={pageBanner.imageUrl} 
               alt="" 
               className="absolute inset-0 w-full h-full object-cover"
             />
@@ -74,7 +77,7 @@ export default function SpecialsPage({ data, page, banner }) {
         )}
         
         {/* Background Pattern (only when no banner) */}
-        {!banner?.imageUrl && (
+        {!pageBanner?.imageUrl && (
           <div 
             className="absolute inset-0 opacity-10"
             style={{

@@ -2649,7 +2649,7 @@ GOOGLE_PLACES_API_KEY=your-api-key
 
 # Template Repository (for Netlify)
 SITE_TEMPLATE_REPO=https://github.com/hetdinedesk/DineDesk
-SITE_TEMPLATE_REPO_BRANCH=master
+SITE_TEMPLATE_REPO_BRANCH=main
 ```
 
 ---
