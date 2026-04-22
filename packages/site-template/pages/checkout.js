@@ -212,6 +212,14 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
   const paymentGateway = data?.paymentGateway || {}
 
+  // Debug logging
+  console.log('[LOYALTY DEBUG]', {
+    isLoyaltyEnabled,
+    loyaltyConfig,
+    dataLoyaltyConfig: data?.loyaltyConfig,
+    customer
+  })
+
   const [step, setStep] = useState(1) // 1: Info, 2: Pickup, 3: Payment
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
