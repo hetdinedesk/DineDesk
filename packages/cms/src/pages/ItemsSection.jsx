@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Utensils, Trash2, Image as ImageIcon, Upload, Loader2 } from 'lucide-react'
 import { getMenuItems, deleteMenuItem, reorderMenuItems } from '../api/menuItems'
@@ -244,6 +244,12 @@ function MenuItemsTab({ clientId }) {
     setEditingId(null)
     setAdding(false)
     setFormErr('')
+  }
+
+  const handleDelete = (id, name) => {
+    if (window.confirm(`Delete "${name}"?`)) {
+      deleteMut.mutate(id)
+    }
   }
 
   const saveMenuItemDirectly = async (itemData) => {
@@ -493,10 +499,11 @@ function MenuItemsTab({ clientId }) {
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.acc}40`, borderRadius:4,
                         color:C.acc, fontSize:11, cursor:'pointer', marginRight:4 }} title="Edit">✎</button>
-                    <button onClick={() => { if (window.confirm(`Delete "${item.name}"?`)) deleteMut.mutate(item.id) }}
+                    <button onClick={() => handleDelete(item.id, item.name)}
                       style={{ padding:'4px 8px', background:'transparent',
                         border:`1px solid ${C.red}40`, borderRadius:4,
-                        color:C.red, fontSize:11, cursor:'pointer' }} title="Delete"><Trash2 size={14} />
+                        color:C.red, fontSize:11, cursor:'pointer' }} title="Delete">
+                      <Trash2 size={14} />
                     </button>
                   ]}/>
                 ))}
