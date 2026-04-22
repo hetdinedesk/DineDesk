@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Utensils, Trash2, Image as ImageIcon } from 'lucide-react'
+import { Utensils, Trash2, Image as ImageIcon, Upload, Loader2 } from 'lucide-react'
 import { getMenuItems, deleteMenuItem, reorderMenuItems } from '../api/menuItems'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -101,6 +101,8 @@ function MenuItemsTab({ clientId }) {
   const [adding,    setAdding]    = useState(false)
   const [newItem,   setNewItem]   = useState({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
   const [formErr, setFormErr] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState('')
 
   // Track unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -122,7 +124,7 @@ function MenuItemsTab({ clientId }) {
       (catFilter==='All' || i.category?.name===catFilter) &&
       i.name.toLowerCase().includes(search.toLowerCase())
     ))
-  }, [items, catFilter, search])
+  }, [items, catFilter, search, clientId])
 
   const createMut = useMutation({
     mutationFn: async () => {
@@ -168,7 +170,6 @@ function MenuItemsTab({ clientId }) {
     mutationFn: (id) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'DELETE'),
     onSuccess:  () => qc.invalidateQueries(['menu-items', clientId])
   })
-
   const toggleAvailability = useMutation({
     mutationFn: ({ id, isAvailable }) => apiFetch(`/clients/${clientId}/menu-items/${id}`, 'PUT', { isAvailable }),
     onSuccess: () => qc.invalidateQueries(['menu-items', clientId])
@@ -185,6 +186,108 @@ function MenuItemsTab({ clientId }) {
     await apiFetch(`/clients/${clientId}/menu-items/reorder`, 'PUT', {
       items: reordered.map((item, idx) => ({ id: item.id, sortOrder: idx }))
     })
+  }
+
+  const extractMenuItemsFromImages = async (imageFiles) => {
+    const allItems = []
+
+    // Convert all images to base64 with mime type
+    const images = await Promise.all(imageFiles.map(file => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result) // Keep full data URL with mime type
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }))
+
+    setProcessingStatus('Analyzing menu photos with AI...')
+    
+    // Call backend API which handles Hugging Face
+    const result = await apiFetch(`/clients/${clientId}/extract-menu-items`, 'POST', { images })
+    
+    return result.items || []
+  }
+
+  const saveMenuItemDirectly = async (itemData) => {
+    let categoryId = null
+    if (itemData.categoryName?.trim()) {
+      const cats = await apiFetch(`/clients/${clientId}/menu-categories`)
+      const existing = cats.find(c =>
+        c.name.toLowerCase() === itemData.categoryName.trim().toLowerCase()
+      )
+      if (existing) {
+        categoryId = existing.id
+      } else {
+        const created = await apiFetch(`/clients/${clientId}/menu-categories`, 'POST', {
+          name: itemData.categoryName.trim(),
+          sortOrder: 0
+        })
+        categoryId = created.id
+      }
+    }
+
+    return apiFetch(`/clients/${clientId}/menu-items`, 'POST', {
+      name: itemData.name.trim(),
+      description: itemData.description?.trim() || null,
+      price: itemData.price ? parseFloat(itemData.price) : null,
+      imageUrl: itemData.imageUrl || null,
+      isFeatured: itemData.isFeatured || false,
+      isAvailable: true,
+      sortOrder: 0,
+      ...(categoryId ? { categoryId } : {})
+    })
+  }
+
+  const handlePhotoUpload = async (e) => {
+    const files = Array.from(e.target.files)
+    if (files.length === 0) return
+
+    setIsProcessing(true)
+    setFormErr('')
+    
+    try {
+      setProcessingStatus('Analyzing menu photos with AI...')
+      const extractedItems = await extractMenuItemsFromImages(files)
+      
+      if (extractedItems.length === 0) {
+        setFormErr('No menu items could be extracted from the photos. Please try clearer images.')
+        setIsProcessing(false)
+        setProcessingStatus('')
+        return
+      }
+
+      setProcessingStatus(`Saving ${extractedItems.length} menu items...`)
+      
+      for (let i = 0; i < extractedItems.length; i++) {
+        setProcessingStatus(`Saving item ${i + 1} of ${extractedItems.length}: ${extractedItems[i].name}`)
+        await saveMenuItemDirectly({
+          name: extractedItems[i].name,
+          price: extractedItems[i].price,
+          description: extractedItems[i].description,
+          categoryName: extractedItems[i].category,
+          isFeatured: false,
+          imageUrl: null
+        })
+      }
+
+      qc.invalidateQueries(['menu-items', clientId])
+      setProcessingStatus(`Successfully added ${extractedItems.length} items!`)
+      
+      setTimeout(() => {
+        setProcessingStatus('')
+        setIsProcessing(false)
+      }, 2000)
+      
+    } catch (err) {
+      console.error('Photo upload error:', err)
+      setFormErr(err.message || 'Failed to process photos. Please check your API key and try again.')
+      setIsProcessing(false)
+      setProcessingStatus('')
+    }
+    
+    // Reset file input
+    e.target.value = ''
   }
 
   if (isLoading) return <div style={{color:C.t3,padding:20}}>Loading...</div>
@@ -209,12 +312,38 @@ function MenuItemsTab({ clientId }) {
               border:`1px solid ${C.border2}`, borderRadius:6, color:C.t0,
               fontFamily:'inherit', outline:'none', width:160 }}/>
         </div>
-        <button onClick={() => { setAdding(!adding); setFormErr('') }}
-          style={{ padding:'8px 16px', background:C.acc, border:'none', borderRadius:7,
-            color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
-          + Add Menu Item
-        </button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => { setAdding(!adding); setFormErr('') }}
+            style={{ padding:'8px 16px', background:C.acc, border:'none', borderRadius:7,
+              color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+            + Add Menu Item
+          </button>
+          <button onClick={() => document.getElementById('menu-photo-upload').click()}
+            disabled={isProcessing}
+            style={{ padding:'8px 16px', background:C.card, border:`1px solid ${C.border}`, borderRadius:7,
+              color:C.t1, fontWeight:700, fontSize:13, cursor:isProcessing ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+              display:'flex', alignItems:'center', gap:6, opacity:isProcessing ? 0.5 : 1 }}>
+            {isProcessing ? <Loader2 size={14} className="spin" /> : <Upload size={14} />}
+            {isProcessing ? 'Processing...' : 'Upload Menu Photos'}
+          </button>
+          <input
+            id="menu-photo-upload"
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display:'none' }}
+            onChange={handlePhotoUpload}
+          />
+        </div>
       </div>
+
+      {processingStatus && (
+        <div style={{ background:C.accBg, border:`1px solid ${C.acc}40`, borderRadius:10,
+          padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>
+          <Loader2 size={16} className="spin" style={{ color:C.acc }} />
+          <span style={{ fontSize:13, color:C.acc, fontWeight:600 }}>{processingStatus}</span>
+        </div>
+      )}
 
       {adding && (
         <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10,

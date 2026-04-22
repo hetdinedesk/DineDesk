@@ -5,6 +5,76 @@ const { log } = require('../lib/activityLog')
 const router = express.Router()
 router.use(authenticateToken)
 
+// Hugging Face API endpoint for menu item extraction
+router.post('/:clientId/extract-menu-items', async (req, res) => {
+  try {
+    const { images } = req.body // Array of base64 image strings with mime types
+    
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'No images provided' })
+    }
+
+    const apiKey = process.env.HUGGINGFACE_API_KEY
+    const modelId = 'llava-hf/llava-1.5-7b-hf'
+    const apiUrl = `https://api-inference.huggingface.co/models/${modelId}`
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
+    }
+
+    const prompt = `Analyze this menu photo and extract all menu items. Return a JSON array with this exact structure:
+[
+  {
+    "name": "item name",
+    "price": "price as number (e.g., 12.99)",
+    "description": "brief description if visible",
+    "category": "category name if visible (e.g., Appetizers, Mains, Desserts)"
+  }
+]
+Only return valid JSON. If no menu items are visible, return an empty array.`
+
+    const allItems = []
+
+    for (const imageData of images) {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          inputs: {
+            image: imageData,
+            question: prompt
+          },
+          parameters: {
+            max_new_tokens: 2000,
+            return_full_text: false
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to process image' }))
+        throw new Error(error.error || 'Failed to process image with Hugging Face API')
+      }
+
+      const result = await response.json()
+      const text = Array.isArray(result) ? result[0]?.generated_text : result?.generated_text || result
+      
+      // Extract JSON from response
+      const jsonMatch = text.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        const items = JSON.parse(jsonMatch[0])
+        allItems.push(...items)
+      }
+    }
+
+    res.json({ items: allItems })
+  } catch (err) {
+    console.error('Extract menu items error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 router.get('/:clientId/menu-categories', async (req, res) => {
   try {
     const cats = await prisma.menuCategory.findMany({
