@@ -15,6 +15,8 @@ router.post('/:clientId/extract-menu-items', async (req, res) => {
     }
 
     const apiKey = process.env.HUGGINGFACE_API_KEY
+    console.log('Hugging Face API Key present:', !!apiKey)
+    
     const modelId = 'llava-hf/llava-1.5-7b-hf'
     const apiUrl = `https://api-inference.huggingface.co/models/${modelId}`
     
@@ -37,6 +39,8 @@ Only return valid JSON. If no menu items are visible, return an empty array.`
     const allItems = []
 
     for (const imageData of images) {
+      console.log('Processing image, data URL length:', imageData.length)
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers,
@@ -52,25 +56,36 @@ Only return valid JSON. If no menu items are visible, return an empty array.`
         })
       })
 
+      console.log('Hugging Face response status:', response.status)
+      
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Failed to process image' }))
-        throw new Error(error.error || 'Failed to process image with Hugging Face API')
+        const errorText = await response.text()
+        console.error('Hugging Face error response:', errorText)
+        throw new Error(`Hugging Face API error: ${response.status} - ${errorText}`)
       }
 
       const result = await response.json()
+      console.log('Hugging Face result type:', Array.isArray(result) ? 'array' : typeof result)
+      
       const text = Array.isArray(result) ? result[0]?.generated_text : result?.generated_text || result
+      console.log('Extracted text length:', text?.length || 0)
       
       // Extract JSON from response
       const jsonMatch = text.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
         const items = JSON.parse(jsonMatch[0])
+        console.log('Parsed items:', items.length)
         allItems.push(...items)
+      } else {
+        console.log('No JSON found in response')
       }
     }
 
+    console.log('Total items extracted:', allItems.length)
     res.json({ items: allItems })
   } catch (err) {
     console.error('Extract menu items error:', err.message)
+    console.error('Full error:', err)
     res.status(500).json({ error: err.message })
   }
 })
