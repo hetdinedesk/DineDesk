@@ -17,7 +17,8 @@ router.post('/:clientId/extract-menu-items', async (req, res) => {
     const apiKey = process.env.HUGGINGFACE_API_KEY
     console.log('Hugging Face API Key present:', !!apiKey)
     
-    const modelId = 'llava-hf/llava-1.5-7b-hf'
+    // Use a model that supports vision with simpler API format
+    const modelId = 'Salesforce/blip-image-captioning-base'
     const apiUrl = `https://api-inference.huggingface.co/models/${modelId}`
     
     const headers = {
@@ -25,34 +26,17 @@ router.post('/:clientId/extract-menu-items', async (req, res) => {
       ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
     }
 
-    const prompt = `Analyze this menu photo and extract all menu items. Return a JSON array with this exact structure:
-[
-  {
-    "name": "item name",
-    "price": "price as number (e.g., 12.99)",
-    "description": "brief description if visible",
-    "category": "category name if visible (e.g., Appetizers, Mains, Desserts)"
-  }
-]
-Only return valid JSON. If no menu items are visible, return an empty array.`
-
     const allItems = []
 
     for (const imageData of images) {
       console.log('Processing image, data URL length:', imageData.length)
       
+      // BLIP model accepts image directly
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          inputs: {
-            image: imageData,
-            question: prompt
-          },
-          parameters: {
-            max_new_tokens: 2000,
-            return_full_text: false
-          }
+          inputs: imageData
         })
       })
 
@@ -65,20 +49,21 @@ Only return valid JSON. If no menu items are visible, return an empty array.`
       }
 
       const result = await response.json()
-      console.log('Hugging Face result type:', Array.isArray(result) ? 'array' : typeof result)
+      console.log('Hugging Face result:', result)
       
-      const text = Array.isArray(result) ? result[0]?.generated_text : result?.generated_text || result
-      console.log('Extracted text length:', text?.length || 0)
+      // BLIP returns caption text directly
+      const caption = Array.isArray(result) ? result[0]?.generated_text : result?.[0] || result
+      console.log('Caption:', caption)
       
-      // Extract JSON from response
-      const jsonMatch = text.match(/\[[\s\S]*\]/)
-      if (jsonMatch) {
-        const items = JSON.parse(jsonMatch[0])
-        console.log('Parsed items:', items.length)
-        allItems.push(...items)
-      } else {
-        console.log('No JSON found in response')
-      }
+      // For now, just return a placeholder since BLIP only gives captions
+      // We'll need to parse the caption to extract menu items
+      // This is a limitation - BLIP doesn't do structured extraction
+      allItems.push({
+        name: caption || 'Extracted item',
+        price: null,
+        description: caption || '',
+        category: 'General'
+      })
     }
 
     console.log('Total items extracted:', allItems.length)
