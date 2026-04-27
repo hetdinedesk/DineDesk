@@ -2067,7 +2067,9 @@ router.get('/:id/config', async (req, res) => {
 router.put('/:id/config', async (req, res) => {
   try {
     const clientId = req.params.id
-    
+
+    console.log('[BOOKING DEBUG] Request body.booking:', JSON.stringify(req.body.booking, null, 2))
+
     // Check if client exists first to avoid foreign key errors on upsert
     const client = await prisma.client.findUnique({ where: { id: clientId } })
     if (!client) {
@@ -2081,6 +2083,8 @@ router.put('/:id/config', async (req, res) => {
       console.error('[CONFIG SAVE] Validation failed:', validation.errors)
       return res.status(400).json({ error: 'Validation failed', details: validation.errors })
     }
+
+    console.log('[BOOKING DEBUG] After validation, booking:', JSON.stringify(validation.data.booking, null, 2))
 
     // Increment version if not explicitly provided
     const updateData = validation.data
@@ -2096,6 +2100,8 @@ router.put('/:id/config', async (req, res) => {
     const existing = await prisma.siteConfig.findUnique({
       where: { clientId }
     })
+
+    console.log('[BOOKING DEBUG] Existing booking from DB:', JSON.stringify(existing?.booking, null, 2))
 
     // Build update data by merging existing with new data
     // Use Prisma's set to properly handle JSON fields
@@ -2113,11 +2119,15 @@ router.put('/:id/config', async (req, res) => {
       }
     }
 
+    console.log('[BOOKING DEBUG] Final updateObject.booking:', JSON.stringify(updateObject.booking, null, 2))
+
     const config = await prisma.siteConfig.upsert({
       where:  { clientId },
       update: updateObject,
       create: { clientId, ...updateObject }
     })
+
+    console.log('[BOOKING DEBUG] After upsert, config.booking:', JSON.stringify(config.booking, null, 2))
 
     // Clear export cache for this client
     exportCache.delete(clientId)

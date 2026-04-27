@@ -150,7 +150,7 @@ const bookingSchema = z.object({
   deliveryFee: z.union([z.number(), z.string()]).optional(),
   deliveryTime: z.string().optional(),
   freeDeliveryOver: z.union([z.number(), z.string()]).optional(),
-}).catchall(z.any()).optional().passthrough()
+}).catchall(z.any()).passthrough().optional()
 
 const shortcodesSchema = z.object({
   _overrides: z.record(z.string()).optional(),
