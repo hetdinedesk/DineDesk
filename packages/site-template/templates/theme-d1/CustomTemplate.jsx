@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { MapPin, Phone, Mail, Clock, Navigation } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
-import DOMPurify from 'dompurify';
+import * as DOMPurify from 'dompurify';
 
 // Clean HTML content - strip complex structures, keep basic text elements
 const cleanPageContent = (html) => {
