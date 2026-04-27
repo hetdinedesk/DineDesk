@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { Users, Building2 } from 'lucide-react';
 
@@ -60,7 +60,7 @@ export default function TeamPage({ data, page, banner }) {
       <div
         className="relative flex items-center justify-center text-white overflow-hidden"
         style={{
-          minHeight: '60vh',
+          minHeight: '50vh',
           marginTop: 'calc(var(--header-offset, 5rem) * -1)',
           paddingTop: 'var(--header-offset, 5rem)',
           background: bannerImg ? 'transparent' : 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary, #8B5A2B) 100%)'
@@ -83,19 +83,28 @@ export default function TeamPage({ data, page, banner }) {
         )}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
-          <h1
-            className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6"
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-4xl sm:text-5xl md:text-7xl font-bold mb-6"
             style={{
               fontFamily: 'var(--font-heading, inherit)',
               textShadow: '0 4px 20px rgba(0,0,0,0.3)'
             }}
           >
             {pageTitle}
-          </h1>
+          </motion.h1>
           {pageSubtitle && (
-            <p className="text-xl md:text-2xl max-w-2xl mx-auto opacity-90" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-xl md:text-2xl max-w-2xl mx-auto opacity-90"
+              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
+            >
               {pageSubtitle}
-            </p>
+            </motion.p>
           )}
         </div>
 
@@ -108,7 +117,7 @@ export default function TeamPage({ data, page, banner }) {
 
       {/* Page content if provided */}
       {pageContent && (
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div
             className="prose prose-lg max-w-none text-gray-700"
             dangerouslySetInnerHTML={{ __html: pageContent }}
@@ -118,99 +127,134 @@ export default function TeamPage({ data, page, banner }) {
 
       {/* Department Tabs */}
       {Object.keys(membersByDepartment.grouped).length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="border-b border-gray-200">
-            <div className="flex flex-wrap gap-0">
-              {Object.values(membersByDepartment.grouped)
-                .sort((a, b) => (a.department.sortOrder || 0) - (b.department.sortOrder || 0))
-                .map(({ department, members }) => (
-                <button
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-wrap justify-center gap-3"
+          >
+            {Object.values(membersByDepartment.grouped)
+              .sort((a, b) => (a.department.sortOrder || 0) - (b.department.sortOrder || 0))
+              .map(({ department, members }) => (
+                <motion.button
                   key={department.id}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setSelectedDepartment(department.id)}
-                  className={`px-6 py-3 font-medium transition-all border-b-2 ${
+                  className={`px-8 py-4 rounded-full font-semibold transition-all duration-300 ${
                     selectedDepartment === department.id
-                      ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'bg-[var(--color-primary)] text-white shadow-lg'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                   }`}
+                  style={{
+                    fontFamily: 'var(--font-heading, inherit)'
+                  }}
                 >
                   {department.name}
-                </button>
+                  <span className="ml-2 text-sm opacity-75">({members.length})</span>
+                </motion.button>
               ))}
-            </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
       {/* Team Members by Department */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {Object.keys(membersByDepartment.grouped).length === 0 && membersByDepartment.unassigned.length === 0 ? (
-          <div className="text-center py-20">
-            <Users size={48} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-500">No team members added yet</h3>
-            <p className="text-gray-400 mt-2">Check back soon to meet our amazing team!</p>
-          </div>
-        ) : selectedDepartment ? (
-          /* Show only selected department */
-          (() => {
-            const selected = membersByDepartment.grouped[selectedDepartment];
-            if (!selected) return null;
-            const { department, members } = selected;
-            return (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-              >
-                <div className="flex items-center gap-3 mb-8">
-                  <Building2 size={24} className="text-blue-600" />
-                  <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
-                    {department.name}
-                  </h2>
-                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                    {members.length} member{members.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {members.map((member, memberIndex) => (
-                    <TeamMemberCard key={member.id} member={member} index={memberIndex} />
-                  ))}
-                </div>
-              </motion.div>
-            );
-          })()
-        ) : (
-          /* Show unassigned members when no department selected */
-          membersByDepartment.unassigned.length > 0 ? (
+          <div className="text-center py-32">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="flex items-center gap-3 mb-8">
-                <Users size={24} className="text-gray-600" />
-                <h2 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
-                  Team Members
-                </h2>
-                <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                  {membersByDepartment.unassigned.length} member{membersByDepartment.unassigned.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {membersByDepartment.unassigned.map((member, index) => (
-                  <TeamMemberCard key={member.id} member={member} index={index} />
-                ))}
-              </div>
+              <Users size={64} className="mx-auto text-gray-300 mb-6" />
+              <h3 className="text-2xl font-semibold text-gray-500 mb-2" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                No team members added yet
+              </h3>
+              <p className="text-gray-400">Check back soon to meet our amazing team!</p>
             </motion.div>
-          ) : (
-            <div className="text-center py-20">
-              <Users size={48} className="mx-auto text-gray-300 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-500">Select a department to view team members</h3>
-            </div>
-          )
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {selectedDepartment ? (
+              /* Show only selected department */
+              (() => {
+                const selected = membersByDepartment.grouped[selectedDepartment];
+                if (!selected) return null;
+                const { department, members } = selected;
+                return (
+                  <motion.div
+                    key={selectedDepartment}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.1 }}
+                      className="flex items-center justify-center gap-3 mb-12"
+                    >
+                      <Building2 size={28} className="text-[var(--color-primary)]" />
+                      <h2 className="text-4xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                        {department.name}
+                      </h2>
+                      <span className="text-sm font-semibold text-gray-500 bg-gray-100 px-4 py-2 rounded-full">
+                        {members.length} member{members.length !== 1 ? 's' : ''}
+                      </span>
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {members.map((member, memberIndex) => (
+                        <TeamMemberCard key={member.id} member={member} index={memberIndex} />
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+              })()
+            ) : (
+              /* Show unassigned members when no department selected */
+              membersByDepartment.unassigned.length > 0 ? (
+                <motion.div
+                  key="unassigned"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                    className="flex items-center justify-center gap-3 mb-12"
+                  >
+                    <Users size={28} className="text-[var(--color-primary)]" />
+                    <h2 className="text-4xl font-bold text-gray-900" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                      Team Members
+                    </h2>
+                    <span className="text-sm font-semibold text-gray-500 bg-gray-100 px-4 py-2 rounded-full">
+                      {membersByDepartment.unassigned.length} member{membersByDepartment.unassigned.length !== 1 ? 's' : ''}
+                    </span>
+                  </motion.div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {membersByDepartment.unassigned.map((member, index) => (
+                      <TeamMemberCard key={member.id} member={member} index={index} />
+                    ))}
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="text-center py-32">
+                  <Users size={64} className="mx-auto text-gray-300 mb-6" />
+                  <h3 className="text-2xl font-semibold text-gray-500" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                    Select a department to view team members
+                  </h3>
+                </div>
+              )
+            )}
+          </AnimatePresence>
         )}
       </div>
     </div>
@@ -219,38 +263,48 @@ export default function TeamPage({ data, page, banner }) {
 
 function TeamMemberCard({ member, index }) {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.08 }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="group"
     >
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2">
+      <div
+        className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
+        style={{
+          borderTop: `4px solid var(--color-primary)`
+        }}
+      >
         {/* Image */}
-        <div className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+        <div className="relative h-72 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
           {member.imageUrl ? (
             <img
               src={member.imageUrl}
               alt={member.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Users size={64} className="text-gray-300" />
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+              <Users size={72} className="text-gray-300" />
             </div>
           )}
           {member.isActive === false && (
             <div className="absolute top-4 right-4">
-              <span className="bg-gray-500 text-white text-xs px-3 py-1 rounded-full">
+              <span className="bg-gray-600 text-white text-xs px-3 py-1.5 rounded-full font-semibold">
                 Inactive
               </span>
             </div>
           )}
+          {/* Overlay on hover */}
+          <div
+            className={`absolute inset-0 bg-gradient-to-t from-black/60 to-transparent transition-opacity duration-300 ${
+              isHovered ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
         </div>
 
         {/* Content */}
@@ -258,7 +312,7 @@ function TeamMemberCard({ member, index }) {
           <h3 className="text-xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
             {member.title}
           </h3>
-          <h4 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wide">
+          <h4 className="text-sm font-semibold text-[var(--color-primary)] mb-4 uppercase tracking-wider">
             {typeof member.content === 'object' ? member.content?.text || '' : member.content}
           </h4>
         </div>
