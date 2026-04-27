@@ -139,7 +139,9 @@ function adaptCMSData(data) {
     content: (() => {
       if (typeof section.content !== 'string') return section.content || {}
       try { return JSON.parse(section.content) } catch { return {} }
-    })()
+    })(),
+    // Map memberDepartments to departmentIds for team template
+    departmentIds: section.memberDepartments?.map(md => md.departmentId) || []
   }));
 
   // Map locations
