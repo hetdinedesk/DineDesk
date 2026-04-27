@@ -105,7 +105,6 @@ router.get('/:id/export', async (req, res) => {
           name: true,
           domain: true,
           status: true,
-          colours: true,
           locations: {
             select: {
               id: true,
