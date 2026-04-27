@@ -93,7 +93,7 @@ export default function LocationsPage({ data, page, banner }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">No Locations Available</h1>
-            <p className="text-lg text-gray-600">Please add locations in the CMS to display them here.</p>
+            <p className="text-lg text-gray-600">Please add locations to display them here.</p>
           </div>
         </div>
       </div>

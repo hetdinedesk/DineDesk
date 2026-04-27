@@ -214,31 +214,7 @@ function LocationMapSection({ locations, restaurantName }) {
 
           {/* Map */}
           <div className="lg:col-span-2 min-h-[400px] relative bg-gray-100">
-            {hasCoordinates ? (
-              <MapEmbed location={activeLocation} provider="google" />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6">
-                <MapPin size={48} className="text-[var(--color-secondary)] mb-4" />
-                <p className="text-gray-600 text-center mb-4">
-                  {activeLocation.address.street}<br />
-                  {activeLocation.address.city}, {activeLocation.address.state} {activeLocation.address.zipCode}
-                </p>
-                <p className="text-sm text-gray-500 mb-4">
-                  Coordinates not available. Please add them in the CMS to display the map.
-                </p>
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(
-                    `${activeLocation.address.street}, ${activeLocation.address.city}, ${activeLocation.address.state} ${activeLocation.address.zipCode}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-[var(--color-secondary)] text-white rounded-lg hover:bg-opacity-90 transition-all"
-                >
-                  <Navigation size={18} />
-                  View on Google Maps
-                </a>
-              </div>
-            )}
+            <MapEmbed location={activeLocation} provider="google" />
           </div>
         </div>
       </div>
