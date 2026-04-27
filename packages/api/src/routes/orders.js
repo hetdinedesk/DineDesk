@@ -2,6 +2,7 @@ const express = require('express')
 const { prisma } = require('../lib/prisma')
 const { sendOrderConfirmation, sendRestaurantNotification } = require('../lib/email')
 const { authenticateToken } = require('../middleware/auth')
+const { updateOrderStatuses } = require('../jobs/updateOrderStatus')
 const OrderRouter = require('../pos-adapters')
 const router = express.Router({ mergeParams: true })
 
@@ -18,6 +19,9 @@ async function getNextOrderNumber(clientId) {
 
 // POST - Create order
 router.post('/', async (req, res) => {
+  console.log('[ORDER] Create order request received')
+  console.log('[ORDER] Request body:', JSON.stringify(req.body, null, 2))
+
   try {
     const clientId = getClientId(req)
     const {
@@ -37,7 +41,8 @@ router.post('/', async (req, res) => {
       locationId,
       loyaltyCustomerId,
       pointsUsed = 0,
-      rewardUsed = null
+      rewardUsed = null,
+      discountAmount = 0
     } = req.body
 
     // Validate required fields
@@ -78,32 +83,62 @@ router.post('/', async (req, res) => {
 
     // Server-side price verification — look up actual prices from DB
     const itemIds = items.map(i => i.id).filter(Boolean)
-    const dbItems = await prisma.menuItem.findMany({
-      where: { id: { in: itemIds }, clientId }
-    })
+    const [dbItems, dbSpecials] = await Promise.all([
+      prisma.menuItem.findMany({
+        where: { id: { in: itemIds }, clientId }
+      }),
+      prisma.special.findMany({
+        where: { id: { in: itemIds }, clientId }
+      })
+    ])
     const priceMap = {}
     for (const dbItem of dbItems) {
       priceMap[dbItem.id] = parseFloat(dbItem.price) || 0
     }
+    for (const dbSpecial of dbSpecials) {
+      priceMap[dbSpecial.id] = parseFloat(dbSpecial.price) || 0
+    }
+
+    console.log('[ORDER DEBUG] Price verification:', {
+      itemIds,
+      dbItemsFound: dbItems.length,
+      dbSpecialsFound: dbSpecials.length,
+      priceMap,
+      submittedItems: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity }))
+    })
 
     let verifiedSubtotal = 0
     const verifiedItems = items.map(item => {
       const realPrice = priceMap[item.id]
-      if (realPrice === undefined) {
-        // Item not found — keep submitted price but flag it
-        return item
-      }
       const qty = parseInt(item.quantity) || 1
-      verifiedSubtotal += realPrice * qty
-      return { ...item, price: realPrice }
+      if (realPrice !== undefined) {
+        console.log('[ORDER DEBUG] Item found in DB:', item.id, item.name, 'DB price:', realPrice, 'Submitted price:', item.price)
+        verifiedSubtotal += realPrice * qty
+        return { ...item, price: realPrice }
+      }
+      // Item not found in either table — use submitted price
+      console.log('[ORDER DEBUG] Item NOT found in DB, using submitted price:', item.id, item.name, item.price)
+      verifiedSubtotal += (parseFloat(item.price) || 0) * qty
+      return item
     })
 
     // Recalculate tax and total
-    const taxConfig = ordering.tax || {}
-    const taxRate = parseFloat(taxConfig.rate || 0) / 100
+    const taxRate = parseFloat(ordering.taxRate || 0) / 100
     const verifiedTaxAmount = Math.round(verifiedSubtotal * taxRate * 100) / 100
     const verifiedDeliveryFee = orderType === 'delivery' ? parseFloat(deliveryFee || 0) : 0
-    const verifiedTotal = Math.round((verifiedSubtotal + verifiedTaxAmount + verifiedDeliveryFee) * 100) / 100
+    const verifiedTotal = Math.round((verifiedSubtotal + verifiedTaxAmount + verifiedDeliveryFee - discountAmount) * 100) / 100
+
+    console.log('[ORDER DEBUG] Final calculated totals:', {
+      verifiedSubtotal,
+      verifiedTaxAmount,
+      verifiedDeliveryFee,
+      discountAmount,
+      verifiedTotal,
+      submittedSubtotal: subtotal,
+      submittedTax: taxAmount,
+      submittedTotal: total,
+      taxRate: ordering.taxRate
+    })
 
     const orderNumber = await getNextOrderNumber(clientId)
 
@@ -203,7 +238,8 @@ router.post('/', async (req, res) => {
         locationId: locationId || null,
         pointsEarned,
         pointsUsed: pointsUsed || 0,
-        rewardUsed: rewardUsed || null
+        rewardUsed: rewardUsed || null,
+        discountAmount: discountAmount || 0
       }
     })
 
@@ -231,15 +267,18 @@ router.post('/', async (req, res) => {
       address: client.address || ''
     }
 
+    // Get POS config for email override
+    const posConfig = client.siteConfig?.posConfig || {}
+
     // Send email notifications (non-blocking)
     const clientName = client.name || 'Restaurant'
+    const restaurantEmail = posConfig?.fallbackEmail || client.email
     Promise.all([
       sendOrderConfirmation(order, clientName, notificationConfig, clientData, locationData),
-      sendRestaurantNotification(order, clientName, notificationConfig, client.email)
+      sendRestaurantNotification(order, clientName, notificationConfig, restaurantEmail)
     ]).catch(err => console.error('Email notification error:', err))
 
     // Send order to POS using adapter layer (non-blocking)
-    const posConfig = client.siteConfig?.posConfig || {}
     if (posConfig.posType && posConfig.posType !== 'none') {
       const orderRouter = new OrderRouter(posConfig)
       
@@ -322,7 +361,7 @@ router.get('/:orderId', async (req, res) => {
 router.patch('/:orderId/status', authenticateToken, async (req, res) => {
   try {
     const { status } = req.body
-    const validStatuses = ['new', 'preparing', 'ready', 'completed', 'cancelled']
+    const validStatuses = ['new', 'preparing', 'almost_ready', 'packing', 'ready', 'completed', 'cancelled']
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' })
     }
@@ -332,6 +371,16 @@ router.patch('/:orderId/status', authenticateToken, async (req, res) => {
       data: { status }
     })
     res.json(order)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /update-statuses - Trigger automatic status update (for cron job or manual trigger)
+router.get('/update-statuses', async (req, res) => {
+  try {
+    const result = await updateOrderStatuses()
+    res.json(result)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

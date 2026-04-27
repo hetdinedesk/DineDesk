@@ -169,7 +169,7 @@ export default function CheckoutPage({ data }) {
               <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Your cart is empty</h1>
               <p style={{ color: '#666', marginBottom: 24 }}>Add items from the menu to proceed to checkout</p>
               <button
-                onClick={() => router.push(`/?site=${router.query.site}`)}
+                onClick={() => router.push(`/menu?site=${router.query.site}`)}
                 style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
               >
                 Browse Menu
@@ -267,6 +267,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
   // Loyalty state
   const [showLoyaltyInfo, setShowLoyaltyInfo] = useState(false)
+  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false)
   const [redeemedReward, setRedeemedReward] = useState(null)
   const [discountAmount, setDiscountAmount] = useState(0)
 
@@ -306,8 +307,14 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         locationId: selectedLocation || null,
         loyaltyCustomerId,
         pointsUsed: redeemedReward ? redeemedReward.pointsRequired : 0,
-        rewardUsed: redeemedReward ? { id: redeemedReward.id, name: redeemedReward.name, discountValue: redeemedReward.discountValue } : null
+        rewardUsed: redeemedReward ? { id: redeemedReward.id, name: redeemedReward.name, discountValue: redeemedReward.discountValue } : null,
+        discountAmount
       }
+
+      console.log('[CHECKOUT DEBUG] Sending order data:', {
+        orderData,
+        cartTotals: { subtotal, taxAmount, total, discountAmount, totalWithDiscount }
+      })
 
       // For Stripe, create order first then PaymentIntent
       if (paymentMethod === 'stripe') {
@@ -358,7 +365,8 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
         const result = await response.json()
         router.push(`/order/${result.order.id}?site=${siteId}`)
-        clearCart()
+        // Clear cart after redirect to prevent empty cart flash
+        setTimeout(() => clearCart(), 100)
       }
     } catch (err) {
       setError(err.message)
@@ -369,7 +377,8 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const handlePaymentSuccess = (paymentIntent) => {
     const siteId = router.query.site
     router.push(`/order/${orderId}?site=${siteId}`)
-    clearCart()
+    // Clear cart after redirect to prevent empty cart flash
+    setTimeout(() => clearCart(), 100)
   }
 
   const handlePaymentError = (errorMessage) => {
@@ -402,7 +411,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       return (pickupType === 'asap' || (pickupType === 'scheduled' && scheduledTime)) && locationValid
     }
     if (step === 3) {
-      return paymentMethod === 'cash' || (paymentMethod === 'stripe' && paymentGateway.isActive)
+      return (paymentMethod === 'cash' && paymentGateway.cashEnabled !== false) || (paymentMethod === 'stripe' && paymentGateway.isActive)
     }
     return false
   }
@@ -522,6 +531,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                           <p style={{ fontSize: 12, color: '#b45309', margin: '4px 0 0 0' }}>
                             Earn points with every order and redeem rewards
                           </p>
+                          <button
+                            onClick={() => setShowLoyaltyModal(true)}
+                            style={{ marginTop: 8, padding: '4px 8px', background: 'transparent', color: '#d97706', border: '1px solid #d97706', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Learn More
+                          </button>
                         </div>
                       )
                     )}
@@ -938,7 +953,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                 )}
                 {discountAmount > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
-                    <span style={{ color: '#059669' }}>Loyalty Discount</span>
+                    <span style={{ color: '#059669' }}>Loyalty Discount{redeemedReward ? ` (${redeemedReward.name})` : ''}</span>
                     <span style={{ color: '#059669' }}>-${discountAmount.toFixed(2)}</span>
                   </div>
                 )}
@@ -950,6 +965,74 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
             </div>
           </div>
         </div>
+
+        {/* Loyalty Info Modal */}
+        {showLoyaltyModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+            <div style={{ background: 'white', borderRadius: 12, maxWidth: 500, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Gift size={24} style={{ color: '#d97706' }} />
+                  Loyalty Program
+                </h2>
+                <button
+                  onClick={() => setShowLoyaltyModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                >
+                  <X size={24} style={{ color: '#666' }} />
+                </button>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.6, margin: '0 0 12px 0' }}>
+                  Earn points with every order and redeem them for exclusive rewards!
+                </p>
+                <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>
+                    How it works:
+                  </div>
+                  <ul style={{ fontSize: 13, color: '#b45309', margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
+                    <li>Earn <strong>{loyaltyConfig?.pointsPerDollar || 1} point</strong> for every $1 spent</li>
+                    <li>Points are automatically added to your account after each order</li>
+                    <li>Redeem points for discounts and free items</li>
+                    <li>No expiration on your points</li>
+                  </ul>
+                </div>
+
+                {loyaltyConfig?.rewards?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
+                      Available Rewards:
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {loyaltyConfig.rewards.map(reward => (
+                        <div key={reward.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>{reward.name}</div>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>{reward.pointsRequired} points</div>
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#059669' }}>
+                            {reward.discountType === 'percentage' 
+                              ? `${reward.discountValue}% OFF`
+                              : `$${reward.discountValue.toFixed(2)} OFF`
+                            }
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowLoyaltyModal(false)}
+                style={{ width: '100%', padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <Footer />
     </CMSProvider>

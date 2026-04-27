@@ -71,6 +71,7 @@ model Client {
   customers       Customer[]
   loyaltyConfig   LoyaltyConfig?
   rewards         Reward[]
+  bookings        Booking[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -131,6 +132,7 @@ model Location {
   menuCategories     String[] @default([])
   servicesAvailable  String[] @default([])
   orders             Order[]
+  bookings           Booking[]
 
   // Single primary per client enforced in API routes
   @@index([clientId])
@@ -548,6 +550,7 @@ model Order {
   pointsEarned          Int            @default(0)
   pointsUsed            Int            @default(0)
   rewardUsed            Json?
+  discountAmount        Float          @default(0)
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
 
@@ -607,4 +610,28 @@ model ActivityLog {
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model Booking {
+  id              String   @id @default(cuid())
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id])
+  locationId      String?
+  location        Location? @relation(fields: [locationId], references: [id])
+  customerName    String
+  customerEmail   String?
+  customerPhone   String?
+  partySize       Int
+  bookingDate     DateTime
+  bookingTime     String
+  status          String   @default("pending") // "pending", "confirmed", "cancelled"
+  notes           String?
+  confirmationMethod String // "email", "phone"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([locationId])
+  @@index([bookingDate])
+  @@index([status])
 }

@@ -6,7 +6,7 @@ import { CMSProvider } from '../../contexts/CMSContext'
 import { LoyaltyProvider } from '../../contexts/LoyaltyContext'
 import { Header } from '../../components/theme-d1/Header'
 import { Footer } from '../../components/theme-d1/Footer'
-import { Check, CheckCircle, Clock, Package, XCircle, Loader2, Receipt, Mail, Phone, User, Calendar, Star, Gift } from 'lucide-react'
+import { Check, CheckCircle, Clock, Package, XCircle, Loader2, Receipt, Mail, Phone, User, Calendar, Star, Gift, Printer, Download, X } from 'lucide-react'
 
 export async function getServerSideProps({ query }) {
   const { id } = query
@@ -21,9 +21,168 @@ export async function getServerSideProps({ query }) {
 const statusConfig = {
   new: { label: 'Order Received', icon: Clock, color: '#f59e0b', description: 'Your order has been received and is being prepared.' },
   preparing: { label: 'Preparing', icon: Package, color: '#3b82f6', description: 'Your order is being prepared.' },
+  almost_ready: { label: 'Almost Ready', icon: Clock, color: '#8b5cf6', description: 'Your order is almost ready!' },
+  packing: { label: 'Packing', icon: Package, color: '#06b6d4', description: 'Your order is being packed.' },
   ready: { label: 'Ready for Pickup', icon: CheckCircle, color: '#10b981', description: 'Your order is ready for pickup!' },
   completed: { label: 'Completed', icon: CheckCircle, color: '#10b981', description: 'Your order has been completed.' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: '#ef4444', description: 'Your order has been cancelled.' }
+}
+
+// Printable Receipt Component
+function PrintableReceipt({ order, data }) {
+  const siteName = data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''
+  const logo = data?.colours?.logoLight || data?.colours?.logoDark || null
+  const abn = data?.settings?.abn || ''
+  const primaryLocation = data?.locations?.find(l => l.isPrimary) || data?.locations?.[0] || {}
+  
+  // Build full address from location
+  const addressParts = [
+    primaryLocation?.address,
+    primaryLocation?.suburb,
+    primaryLocation?.state,
+    primaryLocation?.postcode
+  ].filter(Boolean)
+  const fullAddress = addressParts.join(', ') || data?.settings?.address || ''
+  
+  const phone = primaryLocation?.phone || data?.settings?.phone || ''
+  const items = Array.isArray(order.items) ? order.items : []
+  const statusInfo = statusConfig[order.status] || statusConfig.new
+
+  return (
+    <div id="printable-receipt" style={{
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      lineHeight: '1.4',
+      width: '100%',
+      maxWidth: '700px',
+      margin: '0 auto',
+      padding: '20px',
+      background: 'white',
+      color: 'black',
+      display: 'none',
+      boxSizing: 'border-box'
+    }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        {logo && (
+          <img
+            src={logo}
+            alt={siteName}
+            style={{ maxWidth: '200px', maxHeight: '100px', margin: '0 auto 10px', display: 'block' }}
+          />
+        )}
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px', textTransform: 'uppercase' }}>{siteName}</h2>
+        {fullAddress && <p style={{ margin: '4px 0', fontSize: '12px' }}>{fullAddress}</p>}
+        {phone && <p style={{ margin: '4px 0', fontSize: '12px' }}>Phone: {phone}</p>}
+        {abn && <p style={{ margin: '4px 0', fontSize: '12px' }}>ABN: {abn}</p>}
+      </div>
+
+      <div style={{ borderTop: '2px solid black', borderBottom: '2px solid black', padding: '12px 0', marginBottom: '20px', textAlign: 'center' }}>
+        <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>
+          ORDER RECEIPT
+        </div>
+        <div style={{ fontSize: '14px' }}>
+          Order #: {order.orderNumber}
+        </div>
+        <div style={{ fontSize: '14px' }}>
+          {new Date(order.createdAt).toLocaleString()}
+        </div>
+      </div>
+
+      {/* Customer Info */}
+      <div style={{ marginBottom: '16px', fontSize: '14px' }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>CUSTOMER:</div>
+        <div>{order.customerName}</div>
+        {order.customerPhone && <div>{order.customerPhone}</div>}
+      </div>
+
+      {/* Order Type */}
+      <div style={{ marginBottom: '16px', fontSize: '14px' }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>ORDER TYPE:</div>
+        <div style={{ textTransform: 'capitalize' }}>{order.orderType}</div>
+        <div>Pickup: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>
+      </div>
+
+      {/* Items */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '8px', borderBottom: '2px solid black', paddingBottom: '8px', fontSize: '16px' }}>ITEMS:</div>
+        {items.map((item, index) => (
+          <div key={index} style={{ marginBottom: '12px', fontSize: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>{item.quantity}x {item.name}</span>
+              <span>${(item.price * item.quantity).toFixed(2)}</span>
+            </div>
+            {item.options && item.options.length > 0 && (
+              <div style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
+                {item.options.map((opt, i) => <div key={i}>+ {opt}</div>)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Totals */}
+      <div style={{ borderTop: '2px solid black', paddingTop: '12px', marginBottom: '16px', fontSize: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <span>Subtotal:</span>
+          <span>${order.subtotal.toFixed(2)}</span>
+        </div>
+        {order.taxAmount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span>Tax:</span>
+            <span>${order.taxAmount.toFixed(2)}</span>
+          </div>
+        )}
+        {order.deliveryFee > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span>Delivery Fee:</span>
+            <span>${order.deliveryFee.toFixed(2)}</span>
+          </div>
+        )}
+        {order.discountAmount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span>Discount{order.rewardUsed?.name ? ` (${order.rewardUsed.name})` : ''}:</span>
+            <span>-${order.discountAmount.toFixed(2)}</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', marginTop: '12px', borderTop: '2px solid black', paddingTop: '12px' }}>
+          <span>TOTAL:</span>
+          <span>${order.total.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Payment Info */}
+      <div style={{ marginBottom: '16px', fontSize: '14px' }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>PAYMENT:</div>
+        <div style={{ textTransform: 'capitalize' }}>{order.paymentMethod}</div>
+        <div style={{ textTransform: 'capitalize' }}>Status: {order.paymentStatus}</div>
+      </div>
+
+      {/* Loyalty Points */}
+      {(order.pointsEarned > 0 || order.pointsUsed > 0) && (
+        <div style={{ marginBottom: '16px', padding: '12px', background: '#f5f5f5', fontSize: '14px' }}>
+          {order.pointsEarned > 0 && <div>Points Earned: +{order.pointsEarned}</div>}
+          {order.pointsUsed > 0 && <div>Points Redeemed: -{order.pointsUsed}</div>}
+        </div>
+      )}
+
+      {/* Special Instructions */}
+      {order.note && (
+        <div style={{ marginBottom: '16px', fontSize: '14px' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>SPECIAL INSTRUCTIONS:</div>
+          <div>{order.note}</div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ textAlign: 'center', marginTop: '20px', paddingTop: '20px', borderTop: '2px dashed black', fontSize: '14px' }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '18px' }}>THANK YOU FOR YOUR ORDER!</div>
+        <div>Status: {statusInfo.label}</div>
+        <div style={{ marginTop: '8px' }}>{siteName}</div>
+        {phone && <div>{phone}</div>}
+      </div>
+    </div>
+  )
 }
 
 export default function OrderStatusPage({ data, orderId }) {
@@ -31,6 +190,7 @@ export default function OrderStatusPage({ data, orderId }) {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
 
   const fetchOrder = async () => {
     try {
@@ -106,10 +266,47 @@ export default function OrderStatusPage({ data, orderId }) {
   const StatusIcon = statusInfo.icon
   const items = Array.isArray(order.items) ? order.items : []
 
+  const handleDownloadReceipt = () => {
+    const printableReceipt = document.getElementById('printable-receipt')
+    if (printableReceipt) {
+      printableReceipt.style.display = 'block'
+      window.print()
+      printableReceipt.style.display = 'none'
+    }
+  }
+
   return (
     <CMSProvider data={data}>
       <Head>
         <title>Order #{order.orderNumber} - {siteName}</title>
+        <style>{`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            #printable-receipt, #printable-receipt * {
+              visibility: visible;
+            }
+            #printable-receipt {
+              display: block !important;
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              max-width: 100%;
+              margin: 0;
+              padding: 20px;
+              box-sizing: border-box;
+            }
+            @page {
+              margin: 0;
+              size: auto;
+            }
+            @page :left, @page :right {
+              margin: 0;
+            }
+          }
+        `}</style>
       </Head>
       <Header />
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '40px 24px' }}>
@@ -129,12 +326,14 @@ export default function OrderStatusPage({ data, orderId }) {
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
           <h3 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 16px' }}>Order Progress</h3>
           <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
-            {['new', 'preparing', 'ready', 'completed'].map((status, index) => {
-              const isComplete = ['completed', 'ready'].includes(order.status) ||
-                                  (order.status === 'preparing' && index <= 1) ||
-                                  (order.status === 'new' && index === 0)
+            {['new', 'preparing', 'packing', 'ready'].map((status, index) => {
+              const statusOrder = ['new', 'preparing', 'almost_ready', 'packing', 'ready', 'completed']
+              const currentIndex = statusOrder.indexOf(order.status)
+              const displayOrder = ['new', 'preparing', 'packing', 'ready']
+              const displayIndex = displayOrder.indexOf(status)
+              const isComplete = currentIndex >= statusOrder.indexOf(status)
               const isActive = order.status === status
-              const StatusIcon = statusConfig[status].icon
+              const StatusIcon = statusConfig[status]?.icon || Clock
 
               return (
                 <div key={status} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative' }}>
@@ -153,7 +352,7 @@ export default function OrderStatusPage({ data, orderId }) {
                   }}>
                     {isComplete ? <Check size={16} /> : <StatusIcon size={16} />}
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{status}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{status.replace('_', ' ')}</div>
                 </div>
               )
             })}
@@ -239,6 +438,12 @@ export default function OrderStatusPage({ data, orderId }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
                   <span style={{ color: '#666' }}>Delivery Fee</span>
                   <span>${order.deliveryFee.toFixed(2)}</span>
+                </div>
+              )}
+              {order.discountAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
+                  <span style={{ color: '#666' }}>Discount{order.rewardUsed?.name ? ` (${order.rewardUsed.name})` : ''}</span>
+                  <span style={{ color: '#10b981' }}>-${order.discountAmount.toFixed(2)}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 700, marginTop: 12 }}>
@@ -362,14 +567,162 @@ export default function OrderStatusPage({ data, orderId }) {
             Return Home
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => setShowReceiptModal(true)}
             style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
           >
             <Receipt size={16} />
-            Print Receipt
+            View Receipt
           </button>
         </div>
       </div>
+
+      {/* Receipt Modal */}
+      {showReceiptModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            maxWidth: '700px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowReceiptModal(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 8,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10
+              }}
+            >
+              <X size={24} />
+            </button>
+            
+            <div style={{ padding: '40px' }}>
+              <div id="modal-receipt" style={{ fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.4' }}>
+                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px', textTransform: 'uppercase' }}>
+                    {data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''}
+                  </h2>
+                  {data?.locations?.[0]?.address && <p style={{ margin: '4px 0', fontSize: '12px' }}>{data.locations[0].address}</p>}
+                  {data?.locations?.[0]?.phone && <p style={{ margin: '4px 0', fontSize: '12px' }}>Phone: {data.locations[0].phone}</p>}
+                  {data?.settings?.abn && <p style={{ margin: '4px 0', fontSize: '12px' }}>ABN: {data.settings.abn}</p>}
+                </div>
+
+                <div style={{ borderTop: '2px solid black', borderBottom: '2px solid black', padding: '12px 0', marginBottom: '20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>ORDER RECEIPT</div>
+                  <div style={{ fontSize: '14px' }}>Order #: {order.orderNumber}</div>
+                  <div style={{ fontSize: '14px' }}>{new Date(order.createdAt).toLocaleString()}</div>
+                </div>
+
+                <div style={{ marginBottom: '16px', fontSize: '14px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>CUSTOMER:</div>
+                  <div>{order.customerName}</div>
+                  {order.customerPhone && <div>{order.customerPhone}</div>}
+                </div>
+
+                <div style={{ marginBottom: '16px', fontSize: '14px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>ORDER TYPE:</div>
+                  <div style={{ textTransform: 'capitalize' }}>{order.orderType}</div>
+                  <div>Pickup: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '8px', borderBottom: '2px solid black', paddingBottom: '8px', fontSize: '16px' }}>ITEMS:</div>
+                  {items.map((item, index) => (
+                    <div key={index} style={{ marginBottom: '12px', fontSize: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{item.quantity}x {item.name}</span>
+                        <span>${(item.price * item.quantity).toFixed(2)}</span>
+                      </div>
+                      {item.options && item.options.length > 0 && (
+                        <div style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
+                          {item.options.map((opt, i) => <div key={i}>+ {opt}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ borderTop: '2px solid black', paddingTop: '12px', marginBottom: '16px', fontSize: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span>Subtotal:</span>
+                    <span>${order.subtotal.toFixed(2)}</span>
+                  </div>
+                  {order.taxAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span>Tax:</span>
+                      <span>${order.taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.deliveryFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span>Delivery Fee:</span>
+                      <span>${order.deliveryFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.discountAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span>Discount{order.rewardUsed?.name ? ` (${order.rewardUsed.name})` : ''}:</span>
+                      <span>-${order.discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', marginTop: '12px', borderTop: '2px solid black', paddingTop: '12px' }}>
+                    <span>TOTAL:</span>
+                    <span>${order.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '16px', fontSize: '14px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>PAYMENT:</div>
+                  <div style={{ textTransform: 'capitalize' }}>{order.paymentMethod}</div>
+                  <div style={{ textTransform: 'capitalize' }}>Status: {order.paymentStatus}</div>
+                </div>
+
+                <div style={{ textAlign: 'center', marginTop: '20px', paddingTop: '20px', borderTop: '2px dashed black', fontSize: '14px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '18px' }}>THANK YOU FOR YOUR ORDER!</div>
+                  <div>Status: {statusInfo.label}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, marginTop: '24px', justifyContent: 'center' }}>
+                <button
+                  onClick={handleDownloadReceipt}
+                  style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <Download size={16} />
+                  Download / Print
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Receipt (hidden by default, shown during print) */}
+      <PrintableReceipt order={order} data={data} />
+
       <Footer />
     </CMSProvider>
   )
