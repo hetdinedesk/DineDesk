@@ -4,8 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 
-const FALLBACK_IMG = 'https://images.unsplash.com/photo-1755811248324-3c9b7c8865fc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=200&q=60';
-
 export default function CartDrawer() {
   const router = useRouter()
   const {
@@ -77,14 +75,16 @@ return (
                   {items.map(item => (
                     <div key={item.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
                       <div className="flex gap-4">
-                        {/* Image */}
-                        <div className="w-20 h-20 rounded-md overflow-hidden flex-shrink-0">
-                          <img
-                            src={item.image || FALLBACK_IMG}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                        {/* Image - only show if exists in CMS */}
+                        {item.image && (
+                          <div className="w-20 h-20 rounded-md overflow-hidden flex-shrink-0">
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
 
                         {/* Details */}
                         <div className="flex-1 min-w-0">

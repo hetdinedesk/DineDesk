@@ -42,9 +42,6 @@ class FallbackAdapter {
 
     // TODO: Implement actual email sending
     // This would use nodemailer or similar service
-    console.log('Sending order email to:', this.fallbackEmail)
-    console.log('Subject:', emailSubject)
-    console.log('Content:', emailContent)
 
     return {
       orderId: order.id,
@@ -106,8 +103,6 @@ ${order.notes || 'None'}
 
     // TODO: Implement actual printer integration
     // This would use thermal printer libraries or print services
-    console.log('Sending order to printer')
-    console.log('Content:', printContent)
 
     return {
       orderId: order.id,

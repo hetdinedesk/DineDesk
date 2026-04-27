@@ -1,6 +1,7 @@
 import { replaceShortcodes } from '../lib/shortcodes'
+import BookingButton from './BookingButton'
 
-export default function LocationsSection({ data={}, booking={} }) {
+export default function LocationsSection({ data={}, booking={}, clientId }) {
   const locations  = data.client?.locations || []
   if (locations.length === 0) return null
 
@@ -104,15 +105,18 @@ export default function LocationsSection({ data={}, booking={} }) {
                 <div style={{ padding:'0 22px 20px', display:'flex', gap:10 }}>
                   {/* Book button — controlled by showOnLocations */}
                   {booking.showOnLocations !== false && (
-                    <a href={bookUrl}
+                    <BookingButton
+                      booking={{ ...booking, clientId }}
+                      locations={locations}
                       style={{ flex:1, padding:'10px', borderRadius:8,
                         background:ctaBg, color:ctaText, fontWeight:700,
                         fontSize:13, textDecoration:'none', textAlign:'center',
-                        transition:'opacity 0.15s' }}
+                        transition:'opacity 0.15s', cursor:'pointer', border:'none' }}
                       onMouseEnter={e => e.currentTarget.style.opacity='0.85'}
-                      onMouseLeave={e => e.currentTarget.style.opacity='1'}>
+                      onMouseLeave={e => e.currentTarget.style.opacity='1'}
+                    >
                       {booking.bookLabel || 'Book a Table'}
-                    </a>
+                    </BookingButton>
                   )}
                   <a href={`https://maps.google.com/?q=${encodeURIComponent(loc.address || loc.name)}`}
                     target="_blank" rel="noreferrer"

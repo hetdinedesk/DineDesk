@@ -10,8 +10,6 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const fs = require('fs')
 const path = require('path')
 
-console.log('✅ Clients route file loaded')
-
 // Generate short random ID (8 characters)
 const generateShortId = () => {
   return Math.random().toString(36).substring(2, 10)
@@ -52,9 +50,6 @@ if (isR2Configured()) {
       secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY
     }
   })
-  console.log('✅ Cloudflare R2 storage configured')
-} else {
-  console.log('⚠️  Cloudflare R2 not configured — using local storage fallback')
 }
 
 // Ensure local uploads directory exists
@@ -93,7 +88,6 @@ function setCachedExport(clientId, data) {
 // ═══════════════════════════════════════════════════════════════
 
 router.get('/:id/export', async (req, res) => {
-  console.log('📥 Export route called for ID:', req.params.id)
   try {
     const id = req.params.id
 
@@ -111,6 +105,8 @@ router.get('/:id/export', async (req, res) => {
           name: true,
           domain: true,
           status: true,
+          email: true,
+          colours: true,
           locations: {
             select: {
               id: true,
@@ -384,13 +380,6 @@ const placeId = cfg?.reviews?.googlePlaceId
 
 // Use Config settings for reviews visibility - not homeSections
 const reviewsConfig = cfg?.reviews || {}
-console.log('[REVIEWS] Config settings:', {
-  placeId: placeId,
-  enableHeader: reviewsConfig.enableHeader,
-  enableFooter: reviewsConfig.enableFooter,
-  enableFloating: reviewsConfig.enableFloating,
-  showReviewsCarousel: reviewsConfig.showReviewsCarousel
-})
 
 // Validate place ID format (Google Place IDs should start with "ChI" and be 27+ characters long)
   const isValidPlaceId = (placeId) => {
@@ -408,14 +397,11 @@ console.log('[REVIEWS] Config settings:', {
 
   if (shouldFetchGoogleReviews) {
   try {
-    console.log('[GOOGLE API] Fetching reviews for place ID:', placeId)
     const gRes = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,reviews&key=${process.env.GOOGLE_PLACES_API_KEY}`
     )
     const gData = await gRes.json()
-    console.log('[GOOGLE API] Response status:', gData.status, 'error:', gData.error_message)
     if (gData.result) {
-      console.log('[GOOGLE API] Place name:', gData.result.name, 'Rating:', gData.result.rating, 'Total reviews:', gData.result.user_ratings_total)
       googlePlaceData = {
         rating:       gData.result.rating,
         totalReviews: gData.result.user_ratings_total,
@@ -433,14 +419,13 @@ console.log('[REVIEWS] Config settings:', {
           photo:  r.profile_photo_url,
         }))
         .slice(0, 10) // Limit to max 10 reviews
-      console.log('[GOOGLE API] Fetched', googleReviews.length, 'reviews (max 10)')
       finalReviews = googleReviews;
     }
   } catch (err) {
     console.error('[GOOGLE API] Error fetching Google reviews:', err)
   }
 } else if (placeId && !isValidPlaceId(placeId)) {
-  console.log('[GOOGLE API] Invalid Place ID format:', placeId);
+  // Invalid Place ID format
 }
 
 const exportData = {
@@ -541,11 +526,6 @@ router.use('/:id/payments',   require('./payments'))
 // ═══════════════════════════════════════════════════════════════
 router.use(authenticateToken)
 
-// Debug logger for client routes
-router.use((req, res, next) => {
-  console.log(`[CLIENT ROUTE] ${req.method} ${req.url}`)
-  next()
-})
 
 // Role-based access: Only SUPER_ADMIN and MANAGER can create/update/delete clients
 // EDITOR can only view assigned clients (handled in individual routes)
@@ -2061,13 +2041,11 @@ router.get('/:id/specials-config', async (req, res) => {
 
 router.put('/:id/specials-config', async (req, res) => {
   try {
-    console.log('[SPECIALS CONFIG SAVE] Request body:', req.body)
     const config = await prisma.specialsConfig.upsert({
       where: { clientId: req.params.id },
       create: { ...req.body, clientId: req.params.id },
       update: req.body
     })
-    console.log('[SPECIALS CONFIG SAVE] Successfully saved:', config)
     exportCache.delete(req.params.id)
     res.json(config)
   } catch (err) {
@@ -2089,7 +2067,6 @@ router.get('/:id/config', async (req, res) => {
 router.put('/:id/config', async (req, res) => {
   try {
     const clientId = req.params.id
-    console.log('[CONFIG SAVE] Received request for client:', clientId)
     
     // Check if client exists first to avoid foreign key errors on upsert
     const client = await prisma.client.findUnique({ where: { id: clientId } })
@@ -2098,17 +2075,12 @@ router.put('/:id/config', async (req, res) => {
       return res.status(404).json({ error: 'Client not found' })
     }
 
-    console.log('[CONFIG SAVE] Request body keys:', Object.keys(req.body))
-    console.log('[CONFIG SAVE] Request body:', JSON.stringify(req.body, null, 2))
-    
     // Validate request body
     const validation = validateSiteConfig(req.body)
     if (!validation.valid) {
       console.error('[CONFIG SAVE] Validation failed:', validation.errors)
       return res.status(400).json({ error: 'Validation failed', details: validation.errors })
     }
-
-    console.log('[CONFIG SAVE] Validation passed')
 
     // Increment version if not explicitly provided
     const updateData = validation.data
@@ -2120,17 +2092,32 @@ router.put('/:id/config', async (req, res) => {
       updateData.version = (existing?.version || 0) + 1
     }
 
-    console.log('[CONFIG SAVE] Upserting with version:', updateData.version)
-    console.log('[CONFIG SAVE] Colours being saved:', JSON.stringify(updateData.colours, null, 2))
+    // Merge with existing config to preserve fields not being updated
+    const existing = await prisma.siteConfig.findUnique({
+      where: { clientId }
+    })
+
+    // Build update data by merging existing with new data
+    // Use Prisma's set to properly handle JSON fields
+    const updateDataWithVersion = { ...updateData }
+
+    // For each field in updateData, use it directly; for others, keep existing
+    const updateObject = {}
+    const allFields = ['settings', 'colours', 'analytics', 'shortcodes', 'homepage', 'posConfig', 'reviews', 'booking', 'notes', 'header', 'footer', 'headerCtas', 'social', 'ordering', 'netlify', 'version']
+
+    for (const field of allFields) {
+      if (updateDataWithVersion[field] !== undefined) {
+        updateObject[field] = updateDataWithVersion[field]
+      } else if (existing && existing[field] !== undefined) {
+        updateObject[field] = existing[field]
+      }
+    }
 
     const config = await prisma.siteConfig.upsert({
       where:  { clientId },
-      update: updateData,
-      create: { clientId, ...updateData }
+      update: updateObject,
+      create: { clientId, ...updateObject }
     })
-
-    console.log('[CONFIG SAVE] Successfully saved config')
-    console.log('[CONFIG SAVE] Saved colours:', JSON.stringify(config.colours, null, 2))
 
     // Clear export cache for this client
     exportCache.delete(clientId)
@@ -2174,7 +2161,6 @@ router.post('/:clientId/images', upload.single('file'), async (req, res) => {
         }))
 
         const url = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`
-        console.log(`📤 Uploaded to R2: ${key}`)
         return res.json({ url, storage: 'r2' })
       } catch (r2Error) {
         console.error('R2 upload failed, falling back to local:', r2Error.message)
@@ -2195,7 +2181,6 @@ router.post('/:clientId/images', upload.single('file'), async (req, res) => {
     // Return URL using PUBLIC_API_URL for consistency across environments
     const publicUrl = process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`
     const url = `${publicUrl}/uploads/${key}`
-    console.log(`📤 Uploaded locally: ${key} → ${localPath}`)
     res.json({ url, storage: 'local' })
 
   } catch (err) {
@@ -2328,25 +2313,16 @@ router.post('/:id/netlify/create', async (req, res) => {
     
     const { siteName, customDomain, baseName } = generateSiteDetails(client)
 
-    console.log('🚀 Creating Netlify site:', siteName)
-    console.log('🌐 Custom Domain:', customDomain)
-    console.log('📋 Template:', template)
-    console.log('🔗 API URL:', apiUrl)
-    console.log('👤 Client:', client.name, '| ID:', client.id)
-
     // 1 — Create the Netlify site (retry with random suffix if name is taken)
-    console.log('⏳ Step 1/7: Creating Netlify site...')
     let netlifyData = null
     let finalSiteName = siteName
     const maxNameRetries = 5
     for (let attempt = 0; attempt < maxNameRetries; attempt++) {
       const suffix = Math.random().toString(36).substring(2, 10) // 8 random chars
       const tryName = attempt === 0 ? siteName : `${siteName}-${suffix}`
-      console.log(`   🔄 Attempt ${attempt + 1}/${maxNameRetries}: Creating site "${tryName}"...`)
       try {
         netlifyData = await netlifyService.createSite(tryName, null)
         finalSiteName = tryName
-        console.log(`   ✅ Success on attempt ${attempt + 1}`)
         break
       } catch (nameErr) {
         const msg = (nameErr.message || '').toLowerCase()
@@ -2367,14 +2343,11 @@ router.post('/:id/netlify/create', async (req, res) => {
         throw nameErr // last attempt or non-name error — bubble up
       }
     }
-    console.log('✅ Site created:', netlifyData.id, '| Name:', finalSiteName)
 
     // 1.5 — Link the GitHub repo via API to enable builds
     let repoLinked = false
     try {
-      console.log('⏳ Step 1.5/7: Linking GitHub repository...')
       await netlifyService.linkRepoToSite(netlifyData.id)
-      console.log('✅ Repository linked successfully')
       repoLinked = true
     } catch (err) {
       console.warn('⚠️  Could not link repository via API:', err.message)
@@ -2382,7 +2355,6 @@ router.post('/:id/netlify/create', async (req, res) => {
     }
 
     // 2 — Set env vars so the build knows which client/template to use
-    console.log('⏳ Step 2/7: Setting environment variables...')
     let envVarsSet = false
     try {
       await netlifyService.setEnvVars(netlifyData.id, {
@@ -2392,7 +2364,6 @@ router.post('/:id/netlify/create', async (req, res) => {
         SITE_TEMPLATE:              template,
         NEXT_PUBLIC_CMS_API_URL:    apiUrl,
       })
-      console.log('🔧 Environment variables set successfully')
       envVarsSet = true
     } catch (err) {
       console.warn('⚠️  Environment variables could not be set automatically:', err.message)
@@ -2406,32 +2377,25 @@ router.post('/:id/netlify/create', async (req, res) => {
     }
 
     // 3 — Add custom domain to the site
-    console.log('⏳ Step 3/7: Configuring custom domain:', customDomain)
     try {
       await netlifyService.addDomain(netlifyData.id, customDomain)
-      console.log('✅ Custom domain added successfully')
     } catch (err) {
       console.warn('⚠️  Could not add custom domain:', err.message)
       console.warn('   You can manually add it later in Netlify dashboard')
     }
 
     // 4 — Create a build hook named "CMS Deploy"
-    console.log('⏳ Step 4/7: Creating build hook...')
     const hookRes = await require('axios').post(
       `https://api.netlify.com/api/v1/sites/${netlifyData.id}/build_hooks`,
       { title: 'CMS Deploy', branch: process.env.SITE_TEMPLATE_REPO_BRANCH || 'main' },
       { headers: { Authorization: 'Bearer ' + process.env.NETLIFY_TOKEN } }
     )
     const buildHook = hookRes.data.url
-    console.log('🪝 Build hook created')
 
     // 5 — Trigger first build
-    console.log('⏳ Step 5/7: Triggering first build...')
     await netlifyService.triggerDeploy(buildHook)
-    console.log('⚡ First build triggered')
 
     // 6 — Save everything back to config
-    console.log('⏳ Step 6/7: Saving configuration to database...')
     const existing = config?.netlify || {}
     await prisma.siteConfig.upsert({
       where:  { clientId: client.id },
@@ -2458,7 +2422,6 @@ router.post('/:id/netlify/create', async (req, res) => {
         }
       }
     })
-    console.log('💾 Configuration saved to database')
 
     log({
       action: 'NETLIFY_SITE_CREATED', entity: 'Deployment',
@@ -2468,12 +2431,6 @@ router.post('/:id/netlify/create', async (req, res) => {
     // Generate shareable preview URLs
     const netlifyAppUrl = `https://${finalSiteName}.netlify.app`
     const previewUrl = netlifyAppUrl
-    
-    console.log('🎉 Site creation complete!')
-    console.log('🌐 Netlify Preview URL:', previewUrl)
-    console.log('🏷️  Netlify App URL:', netlifyAppUrl)
-    console.log('🌐 Custom Domain:', customDomain)
-    console.log('📝 Note: Custom domain will be active once DNS propagates (5-10 minutes)')
     
     res.json({
       success:        true,
@@ -2684,15 +2641,10 @@ router.post('/:id/netlify/rebuild', async (req, res) => {
       return res.status(400).json({ error: 'No build hook configured. Please recreate the site.' })
     }
     
-    console.log('🔄 Triggering rebuild for client:', client.name)
-    console.log('🪝 Using build hook:', buildHook.substring(0, 30) + '...')
-    
     // Trigger build via webhook
     await require('axios').post(buildHook, {}, {
       headers: { 'Content-Type': 'application/json' }
     })
-    
-    console.log('✅ Rebuild triggered successfully')
     
     log({
       action: 'NETLIFY_REBUILD_TRIGGERED',
@@ -2826,7 +2778,6 @@ router.post('/:id/netlify/restore-env', async (req, res) => {
     const template = config?.template || 'dinedesk'
     const apiUrl = req.body.apiUrl || process.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
-    console.log('🔄 Restoring env vars after manual repo link...')
     await netlifyService.setEnvVars(siteId, {
       NEXT_PUBLIC_SITE_ID: client.id,
       SITE_TEMPLATE: template,
@@ -3073,13 +3024,14 @@ router.patch('/:clientId/rewards/:rewardId', authenticateToken, async (req, res)
   }
 })
 
-// DELETE /api/clients/:clientId/rewards/:rewardId - Delete reward (legacy)
+// DELETE /api/clients/:clientId/rewards/:rewardId - Soft delete reward (legacy)
 router.delete('/:clientId/rewards/:rewardId', authenticateToken, async (req, res) => {
   try {
     const { rewardId } = req.params
 
-    await prisma.reward.delete({
-      where: { id: rewardId }
+    await prisma.reward.update({
+      where: { id: rewardId },
+      data: { isActive: false }
     })
 
     res.json({ success: true })

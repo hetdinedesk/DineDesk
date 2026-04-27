@@ -46,11 +46,20 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }))
 
+// AUTOMATIC ORDER STATUS UPDATES
+// Run every minute to update order statuses based on elapsed time
+const { updateOrderStatuses } = require('./jobs/updateOrderStatus')
+setInterval(async () => {
+  await updateOrderStatuses()
+}, 60000) // 60 seconds
+
 // CORE ROUTES - LOGIN & USERS WORK
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/users', require('./routes/users'))
 app.use('/api/clients', require('./routes/clients'))
 app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories
+app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
+app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
 app.use('/api/loyalty', require('./routes/loyalty'))
 
 // GROUPS ROUTE - for organizing sites
@@ -70,9 +79,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`)
   console.log(`📱 Health: http://localhost:${PORT}/health`)
-  console.log('✅ Login fixed: /api/auth/login ready!')
-  console.log('👥 User admin: /api/users ready!')
-  console.log('📁 Groups: /api/groups ready!')
-  console.log('🔑 Site Admin http://localhost:5173/site-admin')
-  console.log('**Run Prisma seed for admin user**')
 })

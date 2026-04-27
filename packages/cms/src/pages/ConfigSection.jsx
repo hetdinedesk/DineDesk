@@ -154,7 +154,7 @@ export default function ConfigSection({ clientId }) {
         case 'reviews':        return <ReviewsConfig   {...common} />
         case 'footer':         return <FooterConfig    {...common} />
         case 'booking':        return <BookingConfig   {...common} />
-        case 'loyalty':        return <LoyaltyConfigUI {...common} />
+        case 'loyalty':        return <LoyaltyConfigUI {...common} activeKey={activeKey} />
         case 'netlify':        return <NetlifyConfig   {...common} client={client} />
         default: return <div style={{color:C.t3}}>Coming soon.</div>
       }
@@ -4189,48 +4189,64 @@ function FooterConfig({ clientId, config, setHasUnsavedChanges }) {
   )
 }
 
-// ── Booking & Ordering Config ───────────────────────────────────────────
+// ── Booking Config ───────────────────────────────────────────
 function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
   const qc = useQueryClient()
-  const [tab,   setTab]   = useState('booking')
-  const [f,     setF]     = useState(config.booking || {})
-    const savedFRef = useRef(config.booking || {})
+  const numericFields = ['minParty', 'maxParty', 'advanceNotice', 'maxDaysAhead', 'slotInterval']
+  const convertBooking = (booking) => {
+    const converted = {}
+    for (const [k, v] of Object.entries(booking || {})) {
+      converted[k] = numericFields.includes(k) && typeof v === 'string' && v !== '' ? Number(v) : v
+    }
+    if (converted.enabled === undefined) {
+      converted.enabled = false
+    }
+    return converted
+  }
+  const [f,     setF]     = useState(convertBooking(config.booking))
+  const savedFRef = useRef(convertBooking(config.booking))
 
-  useEffect(() => { 
-    setF(config.booking || {})
-    savedFRef.current = config.booking || {}
+  useEffect(() => {
+    const converted = convertBooking(config.booking)
+    setF(converted)
+    savedFRef.current = converted
     setHasUnsavedChanges(false)
   }, [config, setHasUnsavedChanges])
 
   useEffect(() => {
     const saved = savedFRef.current
-    const hasChanges = tab !== 'booking' || JSON.stringify(f) !== JSON.stringify(saved)
+    const hasChanges = JSON.stringify(f) !== JSON.stringify(saved)
     setHasUnsavedChanges(hasChanges)
-  }, [tab, f, setHasUnsavedChanges])
+  }, [f, setHasUnsavedChanges])
 
-  const s = (k, v) => setF(p => ({...p, [k]: v}))
+  const s = (k, v) => {
+    const numericFields = ['minParty', 'maxParty', 'advanceNotice', 'maxDaysAhead', 'slotInterval']
+    const value = numericFields.includes(k) ? (v === '' ? '' : Number(v)) : v
+    setF(p => ({...p, [k]: value}))
+  }
 
   const mutation = useMutation({
-    mutationFn: () => saveConfig(clientId, { booking: f }),
-    onSuccess: () => {
+    mutationFn: () => {
+      const bookingData = convertBooking(f)
+      console.log('[Booking Save] Sending booking data:', JSON.stringify(bookingData, null, 2))
+      return saveConfig(clientId, { booking: bookingData })
+    },
+    onSuccess: (data) => {
+      console.log('[Booking Save] Server response:', JSON.stringify(data.booking, null, 2))
       qc.invalidateQueries(['config', clientId])
+      savedFRef.current = convertBooking(data.booking || f)
       setHasUnsavedChanges(false)
-          },
+    },
     onError: (err) => {
       console.error('[Booking Save Error]', err.response?.data || err.message)
       alert('Save failed: ' + (err.response?.data?.error || err.message))
     }
   })
 
-  const tabs = [
-    { key:'booking',  label:'Table Booking'  },
-    { key:'display',  label:'Display Options' },
-  ]
-
   const inp = (label, key, placeholder, opts={}) => (
     <div key={key}>
       <label style={{ fontSize:11, fontWeight:700, color:C.t3,
-        textTransform:'uppercase', letterSpacing:'0.06em',
+        textTransform:'uppercase', letterSpacing:'0.08em',
         display:'block', marginBottom:5 }}>{label}</label>
       <input
         value={f[key] || ''}
@@ -4287,32 +4303,39 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
   return (
     <div>
       <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
-        Booking & Ordering
+        Booking
       </h2>
       <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
-        Controls every booking and order button across the entire site.
-        Change once — updates everywhere instantly.
+        Configure how customers book tables at your restaurant.
       </p>
 
-      {/* Tabs */}
-      <div style={{ display:'flex', borderBottom:`1px solid ${C.border}`,
-        marginBottom:24 }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            style={{ padding:'9px 20px', border:'none',
-              borderBottom: tab===t.key ? `2px solid ${C.acc}` : '2px solid transparent',
-              background:'none', color: tab===t.key ? C.t0 : C.t2,
-              fontWeight: tab===t.key ? 700 : 400, fontSize:13,
-              cursor:'pointer', fontFamily:'inherit', marginBottom:-1 }}>
-            {t.label}
-          </button>
-        ))}
+      {/* Enable Booking System */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ display:'flex', alignItems:'center',
+          justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>Enable Booking System</div>
+            <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
+              Turn on to allow customers to book tables
+            </div>
+          </div>
+          <div onClick={() => s('enabled', !f.enabled)}
+            style={{ width:44, height:24, borderRadius:12, cursor:'pointer',
+              background: f.enabled ? C.acc : C.hover, flexShrink:0,
+              position:'relative',
+              border:`1px solid ${f.enabled ? C.acc : C.border2}`,
+              transition:'background 0.15s' }}>
+            <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff',
+              position:'absolute', top:2,
+              left: f.enabled ? 22 : 2, transition:'left 0.15s' }}/>
+          </div>
+        </div>
       </div>
 
-      {/* ── Table Booking ── */}
-      {tab === 'booking' && (
-        <div>
-          {/* Booking method */}
+      {f.enabled && (
+        <>
+          {/* Booking Method */}
           <div style={{ background:C.card, border:`1px solid ${C.border}`,
             borderRadius:12, padding:20, marginBottom:16 }}>
             <div style={{ fontSize:12, fontWeight:700, color:C.t3,
@@ -4320,137 +4343,119 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
               Booking Method
             </div>
             <div style={{ fontSize:12, color:C.t3, marginBottom:14 }}>
-              The site uses whichever you fill in — URL takes priority over phone.
+              Choose how customers make bookings
             </div>
 
-            {/* Platform selector */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)',
-              gap:8, marginBottom:16 }}>
-              {[
-                { key:'opentable',  label:'OpenTable'   },
-                { key:'resdiary',   label:'ResDiary'    },
-                { key:'quandoo',    label:'Quandoo'     },
-                { key:'nowbookit',  label:'NowBookIt'   },
-                { key:'custom',     label:'Custom URL'  },
-                { key:'phone',      label:'Phone Only'  },
-              ].map(p => {
-                const isSelected = (f.bookingPlatform || 'custom') === p.key
-                return (
-                  <button key={p.key}
-                    onClick={() => s('bookingPlatform', p.key)}
-                    style={{ padding:'8px', borderRadius:7, cursor:'pointer',
-                      fontFamily:'inherit', fontSize:12, fontWeight:600,
-                      border:`1px solid ${isSelected ? C.acc : C.border}`,
-                      background: isSelected ? C.accBg : 'transparent',
-                      color: isSelected ? C.acc : C.t2 }}>
-                    {p.label}
-                    {isSelected && ' ✓'}
-                  </button>
-                )
-              })}
-            </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)',
+          gap:8, marginBottom:16 }}>
+          {[
+            { key:'external',  label:'External System' },
+            { key:'email',     label:'Email Form' },
+            { key:'phone',     label:'Phone Call' },
+          ].map(p => {
+            const isSelected = (f.confirmationMethod || 'external') === p.key
+            return (
+              <button key={p.key}
+                onClick={() => s('confirmationMethod', p.key)}
+                style={{ padding:'8px', borderRadius:7, cursor:'pointer',
+                  fontFamily:'inherit', fontSize:12, fontWeight:600,
+                  border:`1px solid ${isSelected ? C.acc : C.border}`,
+                  background: isSelected ? C.accBg : 'transparent',
+                  color: isSelected ? C.acc : C.t2 }}>
+                {p.label}
+                {isSelected && ' ✓'}
+              </button>
+            )
+          })}
+        </div>
 
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              {inp('Booking URL', 'bookingUrl',
-                'https://www.opentable.com.au/...',
-                { mono: true,
-                  hint: 'Paste your OpenTable, ResDiary, Quandoo or custom booking page URL' })}
-              {inp('Phone Booking Number', 'bookingPhone',
-                '+61 3 9123 4567',
-                { hint: 'Used as fallback if no URL — clicking Book a Table will call this number' })}
-            </div>
+        {f.confirmationMethod === 'external' && (
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
+            {inp('External Booking URL', 'bookingUrl',
+              'https://www.opentable.com.au/...',
+              { mono: true,
+                hint: 'Paste your OpenTable, ResDiary, Quandoo or custom booking page URL' })}
           </div>
-
-          {/* Button labels */}
-          <div style={{ background:C.card, border:`1px solid ${C.border}`,
-            borderRadius:12, padding:20, marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-              Button Labels
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-              {inp('Book Button Text', 'bookLabel', 'e.g. Book a Table',
-                { hint: 'Shown on every booking CTA across the site' })}
-              {inp('Confirmation Message', 'bookConfirmMsg',
-                'e.g. Thanks! We\'ll see you soon.',
-                { hint: 'Shown after a booking is made (if using direct form)' })}
-            </div>
+        )}
+        {f.confirmationMethod === 'phone' && (
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
+            {inp('Phone Booking Number', 'bookingPhone',
+              '+61 3 9123 4567',
+              { hint: 'Clicking Book a Table will call this number' })}
           </div>
+        )}
+      </div>
 
-          {/* Direct booking form settings */}
-          <div style={{ background:C.card, border:`1px solid ${C.border}`,
-            borderRadius:12, padding:20, marginBottom:16 }}>
-            <div style={{ display:'flex', alignItems:'center',
-              justifyContent:'space-between', marginBottom: f.useDirectForm ? 16 : 0 }}>
-              <div>
-                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-                  textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>
-                  Direct Booking Form
-                </div>
-                <div style={{ fontSize:12, color:C.t3 }}>
-                  Use a built-in form instead of an external platform
-                </div>
-              </div>
-              <div onClick={() => s('useDirectForm', !f.useDirectForm)}
-                style={{ width:44, height:24, borderRadius:12, cursor:'pointer',
-                  background: f.useDirectForm ? C.acc : C.hover, flexShrink:0,
-                  position:'relative',
-                  border:`1px solid ${f.useDirectForm ? C.acc : C.border2}`,
-                  transition:'background 0.15s' }}>
-                <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff',
-                  position:'absolute', top:2,
-                  left: f.useDirectForm ? 22 : 2, transition:'left 0.15s' }}/>
-              </div>
-            </div>
+      {/* Restaurant Capacity */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Restaurant Capacity
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+          {inp('Maximum Tables', 'maxTables', 'e.g. 20',
+            { hint: 'Total number of tables available per location' })}
+        </div>
+      </div>
 
-            {f.useDirectForm && (
-              <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-                  {inp('Min Party Size', 'minParty', 'e.g. 1')}
-                  {inp('Max Party Size', 'maxParty', 'e.g. 20')}
-                  {inp('Advance Notice (hours)', 'advanceNotice', 'e.g. 2',
-                    { hint: 'How many hours ahead a booking can be made' })}
-                  {inp('Max Days Ahead', 'maxDaysAhead', 'e.g. 60',
-                    { hint: 'How far in advance customers can book' })}
-                  {inp('Time Slot Interval (mins)', 'slotInterval', 'e.g. 30',
-                    { hint: '30 = slots at 6:00, 6:30, 7:00 etc' })}
-                  {inp('Notification Email', 'notifyEmail',
-                    'e.g. bookings@restaurant.com',
-                    { hint: 'Where booking notifications are sent' })}
-                </div>
-              </div>
-            )}
+      {/* Booking Form Settings (for email method) */}
+      {f.confirmationMethod === 'email' && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`,
+          borderRadius:12, padding:20, marginBottom:16 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+            textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+            Booking Form Settings
           </div>
-
-          <SaveRow/>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+            {inp('Min Party Size', 'minParty', 'e.g. 1')}
+            {inp('Max Party Size', 'maxParty', 'e.g. 20')}
+            {inp('Advance Notice (hours)', 'advanceNotice', 'e.g. 2',
+              { hint: 'How many hours ahead a booking can be made' })}
+            {inp('Max Days Ahead', 'maxDaysAhead', 'e.g. 60',
+              { hint: 'How far in advance customers can book' })}
+            {inp('Time Slot Interval (mins)', 'slotInterval', 'e.g. 30',
+              { hint: '30 = slots at 6:00, 6:30, 7:00 etc' })}
+          </div>
+          <div style={{ marginTop:14 }}>
+            {inp('Notification Email', 'notifyEmail',
+              'e.g. bookings@restaurant.com',
+              { hint: 'Where booking notifications are sent' })}
+          </div>
         </div>
       )}
 
-      {/* ── Display Options ── */}
-      {tab === 'display' && (
-        <div>
-          <div style={{ background:C.card, border:`1px solid ${C.border}`,
-            borderRadius:12, padding:20, marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-              Show / Hide Booking Elements
-            </div>
-            {toggle('Show Book Button in Header',
-              'showInHeader', 'CTA button in the site header')}
-            {toggle('Show Book Button in Utility Belt',
-              'showInUtility', 'Quick book link in the top bar')}
-            {toggle('Show Book Button in Hero',
-              'showInHero', 'CTA on the homepage hero section')}
-            {toggle('Show Book Button on Location Cards',
-              'showOnLocations', 'Book button on each location card')}
-            {toggle('Show Book Button in Footer',
-              'showInFooter', 'CTA in the site footer')}
-            {toggle('Show Order Online Button',
-              'showOrderBtn', 'Show or hide the Order Online button globally')}
-          </div>
-
-          <SaveRow/>
+      {/* Button Labels */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Button Labels
         </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+          {inp('Book Button Text', 'bookLabel', 'e.g. Book a Table',
+            { hint: 'Shown on booking buttons across the site' })}
+          {inp('Confirmation Message', 'bookConfirmMsg',
+            'e.g. Thanks! We\'ll see you soon.',
+            { hint: 'Shown after a booking is submitted' })}
+        </div>
+      </div>
+
+      {/* Display Options */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:12, padding:20, marginBottom:16 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+          Display Options
+        </div>
+        {toggle('Show Book Button in Navigation Bar',
+          'showInNav', 'Display booking button in the site navigation')}
+        {toggle('Show Book Button on Location Cards',
+          'showOnLocations', 'Display booking button on each location card')}
+      </div>
+
+      <SaveRow/>
+        </>
       )}
     </div>
   )
@@ -5606,7 +5611,7 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
 }
 
 // ── Loyalty Configuration ───────────────────────────────────────────────
-function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges }) {
+function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges, activeKey }) {
   const qc = useQueryClient()
   const [loyaltyConfig, setLoyaltyConfig] = useState(config.loyaltyConfig || {
     enabled: false,
@@ -5662,6 +5667,13 @@ function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges }) {
   useEffect(() => {
     fetchLoyaltyConfig()
   }, [clientId])
+
+  // Fetch fresh data when navigating to loyalty section
+  useEffect(() => {
+    if (activeKey === 'loyalty') {
+      fetchLoyaltyConfig()
+    }
+  }, [activeKey])
 
   const handleSave = async () => {
     setLoading(true)

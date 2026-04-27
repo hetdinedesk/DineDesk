@@ -75,9 +75,7 @@ class APIAdapter {
     // - Square: POST /v2/orders
     // - Lightspeed: POST /orders
     // - Toast: POST /orders
-    
-    console.log('Sending order to POS API:', formattedOrder)
-    
+
     // Simulate successful response
     return {
       id: `POS-${Date.now()}`,

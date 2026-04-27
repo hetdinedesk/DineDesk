@@ -153,7 +153,6 @@ router.post('/webhook', async (req, res) => {
             status: 'new' // Keep as new until restaurant acknowledges
           }
         })
-        console.log(`Order ${orderId} payment succeeded`)
       }
     }
 
@@ -169,7 +168,6 @@ router.post('/webhook', async (req, res) => {
             paymentStatus: 'failed'
           }
         })
-        console.log(`Order ${orderId} payment failed`)
       }
     }
 

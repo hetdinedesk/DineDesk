@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Clock, Tag, Calendar, Plus, Check } from 'lucide-react';
+import { Clock, Tag, Calendar, Plus, Check, Gift, Phone } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 
 const SPECIAL_IMAGE = 'https://images.unsplash.com/photo-1759283084358-0565ea8e2885?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aW5lJTIwcGFpcmluZyUyMGRpbm5lcnxlbnwxfHx8fDE3NzQ4NDc3ODh8MA&ixlib=rb-4.1.0&q=80&w=1080';
@@ -12,6 +12,10 @@ export default function SpecialsPage({ data, page, banner }) {
   const { specials, shortcodes, contentPages, ordering } = useCMS();
   const { addItem, isEnabled: orderingEnabled } = useCart();
   const [addedItems, setAddedItems] = useState({});
+
+  // Get loyalty config from data instead of hook
+  const loyaltyConfig = data?.loyaltyConfig;
+  const isLoyaltyEnabled = loyaltyConfig?.enabled || false;
 
   const specialsPage = (contentPages || []).find(p => p.slug === 'specials' || p.pageType === 'specials');
   const pageTitle = replaceShortcodes(specialsPage?.title || 'Current Specials', shortcodes);
@@ -124,6 +128,38 @@ export default function SpecialsPage({ data, page, banner }) {
           </svg>
         </div>
       </div>
+
+      {/* Loyalty Banner - Shows when loyalty is enabled */}
+      {isLoyaltyEnabled && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl shadow-lg p-6 md:p-8 border border-amber-200"
+          >
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Gift className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">
+                    Earn Points on Every Order!
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Earn {loyaltyConfig?.pointsPerDollar || 1} point{loyaltyConfig?.pointsPerDollar !== 1 ? 's' : ''} per $1 spent • Redeem for rewards
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-amber-200">
+                <Phone className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-medium text-amber-900">Points saved with phone number</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Active Specials */}

@@ -115,6 +115,8 @@ const reviewsSchema = z.object({
 }).optional()
 
 const bookingSchema = z.object({
+  enabled: z.boolean().optional(),
+  confirmationMethod: z.string().optional(),
   bookingUrl: optionalUrl,
   bookingPhone: z.string().optional(),
   bookLabel: z.string().optional(),
@@ -131,22 +133,24 @@ const bookingSchema = z.object({
   showOnLocations: z.boolean().optional(),
   showInFooter: z.boolean().optional(),
   showOrderBtn: z.boolean().optional(),
+  showInNav: z.boolean().optional(),
   useDirectForm: z.boolean().optional(),
-  minParty: z.number().optional(),
-  maxParty: z.number().optional(),
-  advanceNotice: z.number().optional(),
-  maxDaysAhead: z.number().optional(),
-  slotInterval: z.number().optional(),
+  minParty: z.union([z.number(), z.string()]).optional(),
+  maxParty: z.union([z.number(), z.string()]).optional(),
+  maxTables: z.union([z.number(), z.string()]).optional(),
+  advanceNotice: z.union([z.number(), z.string()]).optional(),
+  maxDaysAhead: z.union([z.number(), z.string()]).optional(),
+  slotInterval: z.union([z.number(), z.string()]).optional(),
   notifyEmail: optionalEmail,
   pickupEnabled: z.boolean().optional(),
   deliveryEnabled: z.boolean().optional(),
   dineInEnabled: z.boolean().optional(),
   pickupTime: z.string().optional(),
-  minOrder: z.number().optional(),
-  deliveryFee: z.number().optional(),
+  minOrder: z.union([z.number(), z.string()]).optional(),
+  deliveryFee: z.union([z.number(), z.string()]).optional(),
   deliveryTime: z.string().optional(),
-  freeDeliveryOver: z.number().optional(),
-}).optional()
+  freeDeliveryOver: z.union([z.number(), z.string()]).optional(),
+}).catchall(z.any()).optional().passthrough()
 
 const shortcodesSchema = z.object({
   _overrides: z.record(z.string()).optional(),
@@ -235,6 +239,7 @@ function validateSiteConfig(data) {
     const errors = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
     return { valid: false, errors }
   }
+
   return { valid: true, data: result.data }
 }
 

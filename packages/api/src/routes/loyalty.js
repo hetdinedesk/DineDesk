@@ -283,13 +283,14 @@ router.patch('/rewards/:rewardId', authenticateToken, async (req, res) => {
   }
 })
 
-// DELETE /api/clients/:id/loyalty/rewards/:rewardId - Delete reward (auth required)
+// DELETE /api/clients/:id/loyalty/rewards/:rewardId - Soft delete reward (auth required)
 router.delete('/rewards/:rewardId', authenticateToken, async (req, res) => {
   try {
     const { rewardId } = req.params
 
-    await prisma.reward.delete({
-      where: { id: rewardId }
+    await prisma.reward.update({
+      where: { id: rewardId },
+      data: { isActive: false }
     })
 
     res.json({ success: true })

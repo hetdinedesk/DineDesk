@@ -26,11 +26,8 @@ async function geocodeAddress(addressParts) {
   const fullAddress = parts.join(', ')
 
   if (!address || !city) {
-    console.log('[Geocoding] Skipping: address and city are required', { address, city })
     return null
   }
-
-  console.log('[Geocoding] Attempting to geocode:', fullAddress)
 
   try {
     const params = new URLSearchParams({
@@ -53,14 +50,12 @@ async function geocodeAddress(addressParts) {
 
     if (data && data.length > 0) {
       const result = data[0]
-      console.log('[Geocoding] Success:', result.display_name, '→', result.lat, result.lon)
       return {
         lat: result.lat,
         lng: result.lon
       }
     }
 
-    console.log('[Geocoding] No results found for:', fullAddress)
     return null
   } catch (err) {
     console.error('[Geocoding] Error:', err.message, err.code)

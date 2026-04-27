@@ -1,11 +1,11 @@
 import { replaceShortcodes } from '../lib/shortcodes'
+import BookingButton from './BookingButton'
 
-export default function BannerStrip({ banners=[], booking={}, data={} }) {
+export default function BannerStrip({ banners=[], booking={}, data={}, clientId, locations=[] }) {
   if (banners.length === 0) return null
 
   const shortcodes = data.shortcodes || {}
   const colours    = data.colours    || {}
-  const bookUrl    = booking.bookingUrl || '#book'
   const sc         = (text) => replaceShortcodes(text || '', shortcodes)
 
   return (
@@ -30,15 +30,18 @@ export default function BannerStrip({ banners=[], booking={}, data={} }) {
       ))}
 
       {/* Book CTA */}
-      <a href={bookUrl}
+      <BookingButton
+        booking={{ ...booking, clientId }}
+        locations={locations}
         style={{ marginLeft:'auto',
           background:'rgba(255,255,255,0.2)', color:'#fff',
           padding:'6px 20px', borderRadius:20,
           fontSize:13, fontWeight:700, textDecoration:'none',
           flexShrink:0, whiteSpace:'nowrap',
-          border:'1px solid rgba(255,255,255,0.3)' }}>
+          border:'1px solid rgba(255,255,255,0.3)', cursor:'pointer' }}
+      >
         {booking.bookLabel || 'Book Now'} →
-      </a>
+      </BookingButton>
     </div>
   )
 }

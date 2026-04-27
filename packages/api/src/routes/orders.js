@@ -282,7 +282,6 @@ router.post('/', async (req, res) => {
       // Send to POS asynchronously
       orderRouter.sendOrder(posOrder)
         .then(result => {
-          console.log('Order sent to POS:', result)
           // Update order with POS order ID if successful
           if (result.success && result.posOrderId) {
             prisma.order.update({

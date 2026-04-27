@@ -127,9 +127,14 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
 
   useEffect(() => {
     const newPOSForm = { ...defaultPOSForm, ...(config.posConfig || {}) }
+    // Only pre-fill fallbackEmail if it's not already set in config and client email exists
+    // Don't overwrite if user has already set a value
+    if (!config.posConfig?.fallbackEmail && config.client?.email) {
+      newPOSForm.fallbackEmail = config.client.email
+    }
     setPOSForm(newPOSForm)
     posSavedRef.current = newPOSForm
-  }, [config.posConfig])
+  }, [config.posConfig, config.client?.email])
 
   const mutation = useMutation({
     mutationFn: () => saveConfig(clientId, { ordering: form, notifications: notificationsForm, posConfig: posForm }),
@@ -635,6 +640,18 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
                 />
               </div>
             )}
+
+            <div style={{ marginTop:12 }}>
+              <label style={labelStyle}>Order Confirmation Email</label>
+              <input
+                type='email'
+                value={posForm.fallbackEmail || ''}
+                onChange={e => updatePOS('fallbackEmail', e.target.value)}
+                style={inputStyle}
+                placeholder='orders@yourrestaurant.com'
+              />
+              <p style={hintStyle}>Email address where order confirmations will be sent. Leave empty to use the restaurant's default email.</p>
+            </div>
           </div>
 
           {posForm.posType === 'api' && (

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BarChart3, MousePointerClick, FileText, ArrowLeftRight, FileBarChart, Trash2, Copy } from 'lucide-react'
+import { LayoutDashboard, BarChart3, MousePointerClick, FileText, ArrowLeftRight, FileBarChart, Trash2, Copy, ShoppingCart } from 'lucide-react'
 import { getAnalytics } from '../api/analytics'
 import { getMenuItems } from '../api/menuItems'
 import { getPages } from '../api/pages'
 import { getSpecials } from '../api/specials'
+import { getOrders, updateOrderStatus } from '../api/orders'
 import { C } from '../theme'
 import { API } from '../api/utils'
 import { useMediaQuery } from '../Components/Layout'
@@ -13,6 +14,7 @@ import { useMediaQuery } from '../Components/Layout'
 const DASH_NAV = [
   { key: 'overview', label: 'Overview', Icon: LayoutDashboard },
   { key: 'analytics', label: 'Analytics', Icon: BarChart3 },
+  { key: 'orders', label: 'Orders', Icon: ShoppingCart },
   { key: 'engagements', label: 'Engagements', Icon: MousePointerClick },
   { key: 'content', label: 'Content', Icon: FileText },
   { key: 'traffic', label: 'Traffic', Icon: ArrowLeftRight },
@@ -76,7 +78,10 @@ export default function DashboardSection({ clientId, onDeleteSite, subNav, setSu
         {subNav === 'overview' && (
           <OverviewTab clientId={clientId} period={period} onDeleteSite={onDeleteSite}/>
         )}
-        {!['analytics','overview'].includes(subNav) && (
+        {subNav === 'orders' && (
+          <OrdersTab clientId={clientId}/>
+        )}
+        {!['analytics','overview','orders'].includes(subNav) && (
           <PlaceholderTab label={DASH_NAV.find(d => d.key===subNav)?.label}/>
         )}
       </div>
@@ -370,6 +375,314 @@ function OverviewTab({ clientId, period, onDeleteSite }) {
                     fontFamily:'inherit' }}>
                   Yes, Delete Permanently
                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Orders Tab ────────────────────────────────────────────────
+function OrdersTab({ clientId }) {
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedOrder, setSelectedOrder] = useState(null)
+  const queryClient = useQueryClient()
+
+  const { data: orders = [], isLoading, error } = useQuery({
+    queryKey: ['orders', clientId, statusFilter],
+    queryFn: () => getOrders(clientId, statusFilter === 'all' ? null : statusFilter),
+    staleTime: 1000 * 60 * 2
+  })
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    try {
+      await updateOrderStatus(orderId, newStatus)
+      queryClient.invalidateQueries(['orders', clientId])
+    } catch (err) {
+      alert('Failed to update order status: ' + err.message)
+    }
+  }
+
+  const statusColors = {
+    new: '#00D4FF',
+    preparing: '#FFA500',
+    almost_ready: '#FFD700',
+    packing: '#9370DB',
+    ready: '#00FF00',
+    completed: '#008000',
+    cancelled: '#FF0000'
+  }
+
+  const statusLabels = {
+    new: 'New',
+    preparing: 'Preparing',
+    almost_ready: 'Almost Ready',
+    packing: 'Packing',
+    ready: 'Ready',
+    completed: 'Completed',
+    cancelled: 'Cancelled'
+  }
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—'
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-AU', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  return (
+    <div>
+      <h2 style={{ margin:'0 0 20px', fontSize:17, fontWeight:700, color:C.t0 }}>Order History</h2>
+
+      {/* Status filter */}
+      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+        {['all', 'completed', 'cancelled'].map(status => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            style={{
+              padding:'6px 12px',
+              border:`1px solid ${statusFilter === status ? C.acc : C.border}`,
+              background: statusFilter === status ? C.acc : 'transparent',
+              color: statusFilter === status ? '#fff' : C.t2,
+              fontSize:12,
+              fontWeight: statusFilter === status ? 600 : 400,
+              borderRadius:6,
+              cursor:'pointer',
+              fontFamily:'inherit',
+              textTransform:'capitalize'
+            }}
+          >
+            {status === 'all' ? 'All Orders' : statusLabels[status] || status}
+          </button>
+        ))}
+      </div>
+
+      {/* Loading state */}
+      {isLoading && (
+        <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10, padding:40, textAlign:'center' }}>
+          <div style={{ fontSize:13, color:C.t3 }}>Loading orders...</div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {!isLoading && error && (
+        <div style={{ background:'#1A0A00', border:`1px solid ${C.amber}40`, borderRadius:10, padding:'20px 24px', fontSize:14, color:C.amber }}>
+          ● Failed to load orders: {error.message}
+        </div>
+      )}
+
+      {/* Orders table */}
+      {!isLoading && !error && (
+        <>
+          {orders.length === 0 ? (
+            <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10, padding:40, textAlign:'center' }}>
+              <div style={{ fontSize:13, color:C.t3 }}>No orders found</div>
+            </div>
+          ) : (
+            <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:10, overflow:'hidden' }}>
+              {/* Table header */}
+              <div style={{ display:'grid', gridTemplateColumns:'80px 100px 1fr 120px 140px 100px', gap:12, padding:'12px 16px', borderBottom:`1px solid ${C.border}`, fontSize:12, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                <div>Order #</div>
+                <div>Date</div>
+                <div>Customer</div>
+                <div>Type</div>
+                <div>Status</div>
+                <div>Total</div>
+              </div>
+
+              {/* Table rows */}
+              {orders.map((order, index) => (
+                <div
+                  key={order.id}
+                  onClick={() => setSelectedOrder(order)}
+                  style={{
+                    display:'grid',
+                    gridTemplateColumns:'80px 100px 1fr 120px 140px 100px',
+                    gap:12,
+                    padding:'14px 16px',
+                    borderBottom: index < orders.length - 1 ? `1px solid ${C.border}20` : 'none',
+                    fontSize:13,
+                    cursor:'pointer',
+                    transition:'background 0.15s',
+                    ':hover': { background: C.active }
+                  }}
+                >
+                  <div style={{ fontWeight:600, color:C.t0 }}>#{order.orderNumber}</div>
+                  <div style={{ color:C.t2 }}>{formatDate(order.createdAt)}</div>
+                  <div style={{ color:C.t0 }}>
+                    <div style={{ fontWeight:500 }}>{order.customerName}</div>
+                    <div style={{ fontSize:11, color:C.t3 }}>{order.customerPhone}</div>
+                  </div>
+                  <div style={{ textTransform:'capitalize', color:C.t2 }}>{order.orderType}</div>
+                  <div>
+                    <span style={{
+                      background: `${statusColors[order.status]}20`,
+                      color: statusColors[order.status],
+                      padding:'3px 8px',
+                      borderRadius:4,
+                      fontSize:11,
+                      fontWeight:600,
+                      textTransform:'capitalize'
+                    }}>
+                      {statusLabels[order.status] || order.status}
+                    </span>
+                  </div>
+                  <div style={{ fontWeight:600, color:C.t0 }}>${order.total?.toFixed(2) || '0.00'}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <div style={{
+          position:'fixed',
+          top:0, left:0, right:0, bottom:0,
+          background:'rgba(0,0,0,0.7)',
+          display:'flex',
+          alignItems:'center',
+          justifyContent:'center',
+          zIndex:1000,
+          padding:20
+        }} onClick={() => setSelectedOrder(null)}>
+          <div
+            style={{
+              background:C.panel,
+              border:`1px solid ${C.border}`,
+              borderRadius:12,
+              maxWidth:600,
+              width:'100%',
+              maxHeight:'90vh',
+              overflow:'auto',
+              padding:24
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+              <div>
+                <h3 style={{ margin:0, fontSize:18, fontWeight:700, color:C.t0 }}>
+                  Order #{selectedOrder.orderNumber}
+                </h3>
+                <div style={{ fontSize:13, color:C.t3, marginTop:4 }}>
+                  {formatDate(selectedOrder.createdAt)}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                style={{
+                  background:'transparent',
+                  border:'none',
+                  color:C.t3,
+                  fontSize:20,
+                  cursor:'pointer',
+                  padding:4
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Customer Info */}
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Customer</div>
+              <div style={{ fontSize:14, color:C.t0 }}>{selectedOrder.customerName}</div>
+              <div style={{ fontSize:13, color:C.t2 }}>{selectedOrder.customerEmail}</div>
+              <div style={{ fontSize:13, color:C.t2 }}>{selectedOrder.customerPhone}</div>
+            </div>
+
+            {/* Order Items */}
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Items</div>
+              {selectedOrder.items?.map((item, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:i < selectedOrder.items.length - 1 ? `1px solid ${C.border}20` : 'none' }}>
+                  <div>
+                    <div style={{ fontSize:14, color:C.t0 }}>{item.name}</div>
+                    <div style={{ fontSize:12, color:C.t3 }}>Qty: {item.quantity}</div>
+                  </div>
+                  <div style={{ fontSize:14, fontWeight:600, color:C.t0 }}>
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Totals */}
+            <div style={{ marginBottom:20, padding:'16px', background:C.page, borderRadius:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                <span style={{ fontSize:13, color:C.t2 }}>Subtotal</span>
+                <span style={{ fontSize:14, color:C.t0 }}>${selectedOrder.subtotal?.toFixed(2) || '0.00'}</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                <span style={{ fontSize:13, color:C.t2 }}>Tax</span>
+                <span style={{ fontSize:14, color:C.t0 }}>${selectedOrder.taxAmount?.toFixed(2) || '0.00'}</span>
+              </div>
+              {selectedOrder.deliveryFee > 0 && (
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                  <span style={{ fontSize:13, color:C.t2 }}>Delivery Fee</span>
+                  <span style={{ fontSize:14, color:C.t0 }}>${selectedOrder.deliveryFee?.toFixed(2) || '0.00'}</span>
+                </div>
+              )}
+              {selectedOrder.discountAmount > 0 && (
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                  <span style={{ fontSize:13, color:C.t2 }}>Discount</span>
+                  <span style={{ fontSize:14, color:C.green }}>-${selectedOrder.discountAmount?.toFixed(2) || '0.00'}</span>
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8, borderTop:`1px solid ${C.border}` }}>
+                <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Total</span>
+                <span style={{ fontSize:18, fontWeight:800, color:C.acc }}>${selectedOrder.total?.toFixed(2) || '0.00'}</span>
+              </div>
+            </div>
+
+            {/* Status Update */}
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Update Status</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {['completed', 'cancelled'].map(status => (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      handleStatusChange(selectedOrder.id, status)
+                      setSelectedOrder(null)
+                    }}
+                    disabled={selectedOrder.status === status}
+                    style={{
+                      padding:'6px 12px',
+                      border:`1px solid ${selectedOrder.status === status ? statusColors[status] : C.border}`,
+                      background: selectedOrder.status === status ? `${statusColors[status]}20` : 'transparent',
+                      color: selectedOrder.status === status ? statusColors[status] : C.t2,
+                      fontSize:12,
+                      fontWeight: selectedOrder.status === status ? 600 : 400,
+                      borderRadius:6,
+                      cursor: selectedOrder.status === status ? 'default' : 'pointer',
+                      fontFamily:'inherit',
+                      opacity: selectedOrder.status === status ? 0.5 : 1,
+                      textTransform:'capitalize'
+                    }}
+                  >
+                    {statusLabels[status]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Notes */}
+            {selectedOrder.note && (
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:C.t3, textTransform:'uppercase', marginBottom:8 }}>Notes</div>
+                <div style={{ fontSize:13, color:C.t0, background:C.page, padding:12, borderRadius:8 }}>
+                  {selectedOrder.note}
+                </div>
               </div>
             )}
           </div>

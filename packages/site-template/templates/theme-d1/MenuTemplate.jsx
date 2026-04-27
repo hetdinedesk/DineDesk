@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Search, Plus, Check } from 'lucide-react';
+import { Search, Plus, Check, Gift, Phone } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 
 // Image URLs
@@ -23,6 +23,10 @@ export default function MenuPage({ data, page, banner }) {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [addedItems, setAddedItems] = useState({});
+
+  // Get loyalty config from data instead of hook
+  const loyaltyConfig = data?.loyaltyConfig;
+  const isLoyaltyEnabled = loyaltyConfig?.enabled || false;
 
   const menuPage = (contentPages || []).find(p => p.slug === 'menu' || p.pageType === 'menu');
   const pageTitle = replaceShortcodes(menuPage?.title || 'Our Menu', shortcodes);
@@ -48,6 +52,12 @@ export default function MenuPage({ data, page, banner }) {
       return item.isAvailable && matchesCategory && matchesSearch;
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  // Filter out categories that have no available items
+  const categoriesWithItems = activeCategories.filter((category) => {
+    const categoryItems = filteredItems.filter((item) => item.categoryId === category.id);
+    return categoryItems.length > 0;
+  });
 
   const getItemImage = (item) => {
     if (item.image) return item.image;
@@ -140,6 +150,38 @@ export default function MenuPage({ data, page, banner }) {
         </div>
       </div>
 
+      {/* Loyalty Banner - Shows when loyalty is enabled */}
+      {isLoyaltyEnabled && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl shadow-lg p-6 md:p-8 border border-amber-200"
+          >
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Gift className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">
+                    Earn Points on Every Order!
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Earn {loyaltyConfig?.pointsPerDollar || 1} point{loyaltyConfig?.pointsPerDollar !== 1 ? 's' : ''} per $1 spent • Redeem for rewards
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-amber-200">
+                <Phone className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-medium text-amber-900">Points saved with phone number</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Search and Filter */}
         <div className="mb-8 space-y-4">
@@ -184,9 +226,9 @@ export default function MenuPage({ data, page, banner }) {
         </div>
 
         {/* Menu Items by Category */}
-        {activeCategories.map((category) => {
+        {categoriesWithItems.map((category) => {
           const categoryItems = filteredItems.filter((item) => item.categoryId === category.id);
-          if (categoryItems.length === 0 && selectedCategory) return null;
+          if (categoryItems.length === 0) return null;
 
           return (
             <motion.div

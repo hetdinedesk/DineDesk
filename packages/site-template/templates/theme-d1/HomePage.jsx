@@ -62,7 +62,8 @@ function HomePageContent() {
     { id: 'promos', type: 'promos', visible: true, order: 1 },
     { id: 'specials', type: 'specials', visible: true, order: 2 },
     { id: 'featured', type: 'featured', visible: true, order: 3 },
-    { id: 'reviews', type: 'reviews', visible: true, order: 4 }
+    { id: 'loyalty', type: 'loyalty', visible: true, order: 4 },
+    { id: 'reviews', type: 'reviews', visible: true, order: 5 }
   ];
 
   // Map component type to render function
@@ -470,11 +471,12 @@ function LoyaltyBannerSection() {
   const router = useRouter();
   const siteId = getSiteId(router);
 
-  if (!isLoyaltyEnabled || !loyaltyConfig?.rewards?.length) {
+  if (!isLoyaltyEnabled) {
     return null;
   }
 
-  const firstReward = loyaltyConfig.rewards[0];
+  const hasRewards = loyaltyConfig?.rewards?.length > 0;
+  const firstReward = hasRewards ? loyaltyConfig.rewards[0] : null;
 
   return (
     <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-amber-50 to-emerald-50">
@@ -499,13 +501,15 @@ function LoyaltyBannerSection() {
               <p className="text-gray-600 text-lg mb-6">
                 Join our loyalty program and earn {loyaltyConfig.pointsPerDollar} point{loyaltyConfig.pointsPerDollar !== 1 ? 's' : ''} for every dollar spent. Redeem points for exclusive rewards!
               </p>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 bg-amber-100 px-4 py-2 rounded-full">
-                  <Star className="w-5 h-5 text-amber-600" />
-                  <span className="font-semibold text-amber-900">{firstReward.pointsRequired} pts</span>
-                  <span className="text-amber-700">= {firstReward.discountType === 'percentage' ? `${firstReward.discountValue}% OFF` : `$${firstReward.discountValue.toFixed(2)} OFF`}</span>
+              {hasRewards && (
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2 bg-amber-100 px-4 py-2 rounded-full">
+                    <Star className="w-5 h-5 text-amber-600" />
+                    <span className="font-semibold text-amber-900">{firstReward.pointsRequired} pts</span>
+                    <span className="text-amber-700">= {firstReward.discountType === 'percentage' ? `${firstReward.discountValue}% OFF` : `$${firstReward.discountValue.toFixed(2)} OFF`}</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <Link
               href={withSiteParam('/menu', siteId)}

@@ -196,7 +196,6 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
   try {
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
-      console.log('[EMAIL] No SMTP configured, skipping customer email')
       return { success: false, message: 'SMTP not configured' }
     }
 
@@ -210,8 +209,6 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
       subject: `Order #${order.orderNumber} Confirmed - ${clientName}`,
       html
     })
-
-    console.log(`[EMAIL] Customer receipt sent to ${order.customerEmail}`)
     return { success: true, message: 'Customer receipt sent' }
   } catch (err) {
     console.error('[EMAIL] Failed to send customer receipt:', err)
@@ -231,7 +228,6 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
   try {
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
-      console.log('[EMAIL] No SMTP configured, skipping restaurant email')
       return { success: false, message: 'SMTP not configured' }
     }
 
@@ -246,7 +242,6 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
       html
     })
 
-    console.log(`[EMAIL] Restaurant notification sent to ${restaurantEmail}`)
     return { success: true, message: 'Restaurant notification sent' }
   } catch (err) {
     console.error('[EMAIL] Failed to send restaurant notification:', err)

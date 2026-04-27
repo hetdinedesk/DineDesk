@@ -212,14 +212,6 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
   const paymentGateway = data?.paymentGateway || {}
 
-  // Debug logging
-  console.log('[LOYALTY DEBUG]', {
-    isLoyaltyEnabled,
-    loyaltyConfig,
-    dataLoyaltyConfig: data?.loyaltyConfig,
-    customer
-  })
-
   const [step, setStep] = useState(1) // 1: Info, 2: Pickup, 3: Payment
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -581,15 +573,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                             return (
                               <button
                                 key={reward.id}
-                                onClick={async () => {
-                                  const result = await redeemReward(reward.id)
-                                  if (result) {
-                                    setRedeemedReward(reward)
-                                    setDiscountAmount(reward.discountType === 'percentage' 
-                                      ? total * (reward.discountValue / 100)
-                                      : reward.discountValue
-                                    )
-                                  }
+                                onClick={() => {
+                                  setRedeemedReward(reward)
+                                  setDiscountAmount(reward.discountType === 'percentage' 
+                                    ? total * (reward.discountValue / 100)
+                                    : reward.discountValue
+                                  )
                                 }}
                                 disabled={!canRedeem}
                                 style={{
@@ -946,10 +935,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     <span>${ordering.deliveryFee.toFixed(2)}</span>
                   </div>
                 )}
-                {discountAmount > 0 && (
+                {redeemedReward && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
-                    <span style={{ color: '#059669' }}>Loyalty Discount{redeemedReward ? ` (${redeemedReward.name})` : ''}</span>
-                    <span style={{ color: '#059669' }}>-${discountAmount.toFixed(2)}</span>
+                    <span style={{ color: '#059669' }}>Loyalty Discount ({redeemedReward.name})</span>
+                    <span style={{ color: '#059669' }}>{discountAmount > 0 ? `-$${discountAmount.toFixed(2)}` : '$0.00'}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 700, marginTop: 12 }}>

@@ -25,10 +25,7 @@ async function createSite(name, domain = null) {
   while (attempts < maxRetries) {
     attempts++
     try {
-      console.log('🔵 Netlify API Request: POST /sites')
-      console.log('📦 Payload:', JSON.stringify(payload, null, 2))
       const res = await netlify.post('/sites', payload)
-      console.log('✅ Netlify Response:', res.status)
       return res.data
     } catch (err) {
       console.error('❌ Netlify createSite error:', err.message)
@@ -41,7 +38,6 @@ async function createSite(name, domain = null) {
         const delay = Math.min(retryAfter * 1000, 30000) // Cap at 30 seconds
 
         if (attempts < maxRetries) {
-          console.log(`⏳ Rate limited. Waiting ${delay/1000}s before retry ${attempts}/${maxRetries}...`)
           await new Promise(resolve => setTimeout(resolve, delay))
           continue
         } else {
@@ -84,12 +80,8 @@ async function getDeploys(siteId) {
 // Strategy: use site-level build_settings.env (works on ALL plans),
 // then try account-level API as upgrade path
 async function setEnvVars(siteId, envVars) {
-  console.log('🔵 Setting environment variables for site', siteId)
-  console.log('🔧 Env vars:', JSON.stringify(envVars, null, 2))
-
   // Primary method: PATCH /sites/{id} with build_settings.env — works on all plans
   try {
-    console.log('   Using site-level build_settings.env (works on all plans)...')
     // First get existing env so we don't overwrite them
     const siteRes = await netlify.get(`/sites/${siteId}`)
     const existingEnv = siteRes.data?.build_settings?.env || {}
@@ -98,11 +90,9 @@ async function setEnvVars(siteId, envVars) {
     await netlify.patch(`/sites/${siteId}`, {
       build_settings: { env: mergedEnv }
     })
-    console.log('✅ All environment variables set via build_settings')
     return { success: true, count: Object.keys(envVars).length }
   } catch (err) {
     console.warn('⚠️  build_settings method failed:', err.message)
-    console.warn('   Falling back to account-level env vars API...')
   }
 
   // Fallback: account-level env vars API (requires Pro+ plan)
@@ -112,15 +102,12 @@ async function setEnvVars(siteId, envVars) {
     if (!accountSlug) throw new Error('Could not determine account slug')
 
     for (const [key, value] of Object.entries(envVars)) {
-      console.log(`   Setting env var: ${key} = ${String(value).substring(0, 10)}...`)
       await netlify.post(`/accounts/${accountSlug}/env`, {
         key, value,
         scope: { type: 'sites', resources: [siteId] },
         context: 'all'
       })
-      console.log(`   ✅ ${key} set`)
     }
-    console.log('✅ All environment variables set via account API')
     return { success: true, count: Object.keys(envVars).length }
   } catch (err) {
     console.error('❌ setEnvVars error:', err.message)
@@ -267,14 +254,11 @@ async function linkRepoToSite(siteId, branchOverride = null) {
     throw new Error('SITE_TEMPLATE_REPO is not set. Add it to your .env (e.g. SITE_TEMPLATE_REPO=owner/dinedesk).')
   }
 
-  console.log(`🔗 Linking repo: ${repoPath}, branch: ${branch}, baseDir: ${baseDir}`)
-
   // Preserve existing env vars before updating repo config (Netlify UI resets them on relink)
   let existingEnv = {}
   try {
     const siteRes = await netlify.get(`/sites/${siteId}`)
     existingEnv = siteRes.data?.build_settings?.env || {}
-    console.log(`📦 Preserving ${Object.keys(existingEnv).length} existing env vars`)
   } catch (err) {
     console.warn('⚠️  Could not fetch existing env vars:', err.message)
   }
@@ -297,7 +281,6 @@ async function linkRepoToSite(siteId, branchOverride = null) {
       await netlify.patch(`/sites/${siteId}`, {
         build_settings: { env: existingEnv }
       })
-      console.log('✅ Environment variables restored after repo link')
     } catch (err) {
       console.warn('⚠️  Could not restore env vars after repo link:', err.message)
     }

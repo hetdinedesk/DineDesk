@@ -1,8 +1,9 @@
 import { replaceShortcodes } from '../lib/shortcodes'
 import { useCMS } from '../contexts/CMSContext'
+import BookingButton from './BookingButton'
 
 export default function UtilityBelt() {
-  const { rawSettings: settings, rawBooking: booking, rawData: data, siteConfig, reviews: cmsReviews } = useCMS()
+  const { rawSettings: settings, rawBooking: booking, rawData: data, siteConfig, reviews: cmsReviews, clientId } = useCMS()
   const header       = data.header     || {}
   const reviews      = data.reviews    || {}
   const shortcodes   = data.shortcodes || {}
@@ -98,10 +99,15 @@ export default function UtilityBelt() {
         {booking.orderLabel || 'Order Online'}
       </a>
     ),
-    'reservations': (utilityItems.reservations !== false && booking.showInUtility !== false) && (
-      <a key="reservations" href={bookUrl} className="bg-[var(--color-cta-bg,#C8823A)] text-[var(--color-cta-text,#fff)] px-3.5 py-1 rounded-full font-bold hover:opacity-90 transition-opacity">
+    'reservations': (utilityItems.reservations !== false && booking.showInNav !== false) && (
+      <BookingButton
+        key="reservations"
+        booking={{ ...booking, clientId }}
+        locations={data.client?.locations || []}
+        className="bg-[var(--color-cta-bg,#C8823A)] text-[var(--color-cta-text,#fff)] px-3.5 py-1 rounded-full font-bold hover:opacity-90 transition-opacity"
+      >
         {booking.bookLabel || 'Book a Table'}
-      </a>
+      </BookingButton>
     )
   }
 

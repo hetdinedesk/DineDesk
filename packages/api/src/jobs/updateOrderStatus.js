@@ -27,8 +27,6 @@ function parsePrepTime(prepTimeString) {
  */
 async function updateOrderStatuses() {
   try {
-    console.log('[ORDER STATUS] Starting automatic status update...')
-
     // Get all active orders (not completed or cancelled)
     const activeOrders = await prisma.order.findMany({
       where: {
@@ -51,7 +49,7 @@ async function updateOrderStatuses() {
       const ordering = order.client.siteConfig?.ordering || {}
       const prepTimeString = ordering.estimatedPrepTime || '15-25 min'
       const prepTimeMinutes = parsePrepTime(prepTimeString)
-      
+
       const orderCreatedAt = new Date(order.createdAt)
       const now = new Date()
       const elapsedMinutes = (now - orderCreatedAt) / (1000 * 60)
@@ -76,12 +74,9 @@ async function updateOrderStatuses() {
           where: { id: order.id },
           data: { status: newStatus }
         })
-        console.log(`[ORDER STATUS] Order #${order.orderNumber} updated: ${order.status} → ${newStatus} (${percentageElapsed.toFixed(0)}% elapsed)`)
         updatedCount++
       }
     }
-
-    console.log(`[ORDER STATUS] Completed. Updated ${updatedCount} orders.`)
     return { success: true, updatedCount }
   } catch (error) {
     console.error('[ORDER STATUS] Error updating order statuses:', error)
