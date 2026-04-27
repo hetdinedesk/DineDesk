@@ -103,7 +103,7 @@ router.get('/:id/export', async (req, res) => {
       return res.json(cached)
     }
 
-    const [client, menuCategories, menuItems, specials, pages, banners, footerSections, unassignedFooterLinks, cfg, navigationItems, homeSections, promoTiles, promoConfig, featuredConfig, welcomeContent, teamDepartments, specialsConfig, homepageLayout, customTextBlocks, paymentGateway, legalDocs] = await Promise.all([
+    const [client, menuCategories, menuItems, specials, pages, banners, footerSections, unassignedFooterLinks, cfg, navigationItems, homeSections, promoTiles, promoConfig, featuredConfig, welcomeContent, teamDepartments, specialsConfig, homepageLayout, customTextBlocks, paymentGateway, legalDocs, loyaltyConfig] = await Promise.all([
       prisma.client.findUnique({
         where: { id },
         select: {
@@ -362,7 +362,16 @@ router.get('/:id/export', async (req, res) => {
       prisma.legalDoc.findMany({
         where: { clientId: id, isActive: true },
         orderBy: { id: 'asc' }
-      })
+      }),
+      prisma.loyaltyConfig.findUnique({
+        where: { clientId: id },
+        include: {
+          rewards: {
+            where: { isActive: true },
+            orderBy: { pointsRequired: 'asc' }
+          }
+        }
+      }).catch(() => null) // Handle missing loyalty config gracefully
     ])
     
     if (!client) return res.status(404).json({ error: 'Client not found' })
@@ -465,6 +474,11 @@ const exportData = {
   footer:     cfg?.footer     || {},
   social:     cfg?.social     || {},
   ordering:   cfg?.ordering   || { enabled: false },
+  loyaltyConfig: loyaltyConfig ? {
+    enabled: loyaltyConfig.enabled,
+    pointsPerDollar: loyaltyConfig.pointsPerDollar,
+    rewards: loyaltyConfig.rewards || []
+  } : { enabled: false, pointsPerDollar: 1, rewards: [] },
   paymentGateway: paymentGateway ? {
     id: paymentGateway.id,
     provider: paymentGateway.provider,
@@ -1474,10 +1488,15 @@ router.get('/:id/specials', async (req, res) => {
 
 router.post('/:id/specials', async (req, res) => {
   try {
+    const clientId = req.params.id
     const { price, ...rest } = req.body
     const special = await prisma.special.create({
-      data: { ...rest, clientId: req.params.id, price: price ? parseFloat(price) : null }
+      data: { ...rest, clientId, price: price ? parseFloat(price) : null }
     })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json(special)
   } catch (err) {
     console.error('Create special error:', err.message)
@@ -1487,10 +1506,15 @@ router.post('/:id/specials', async (req, res) => {
 
 router.put('/:id/specials/:specId', async (req, res) => {
   try {
+    const clientId = req.params.id
     const special = await prisma.special.update({
       where: { id: req.params.specId },
       data: req.body
     })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json(special)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1499,7 +1523,12 @@ router.put('/:id/specials/:specId', async (req, res) => {
 
 router.delete('/:id/specials/:specId', async (req, res) => {
   try {
+    const clientId = req.params.id
     await prisma.special.delete({ where: { id: req.params.specId } })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1612,6 +1641,10 @@ router.post('/:id/pages', async (req, res) => {
       })
       return created
     })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json(page)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1620,11 +1653,16 @@ router.post('/:id/pages', async (req, res) => {
 
 router.put('/:id/pages/:pageId', async (req, res) => {
   try {
+    const clientId = req.params.id
     const data = pickPageData(req.body)
     const page = await prisma.page.update({
       where: { id: req.params.pageId },
       data
     })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json(page)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1633,10 +1671,15 @@ router.put('/:id/pages/:pageId', async (req, res) => {
 
 router.delete('/:id/pages/:pageId', async (req, res) => {
   try {
+    const clientId = req.params.id
     const pageId = req.params.pageId
     await prisma.navigationItem.deleteMany({ where: { pageId } })
     await prisma.footerLink.deleteMany({ where: { pageId } })
     await prisma.page.delete({ where: { id: pageId } })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1655,9 +1698,10 @@ router.get('/:id/banners', async (req, res) => {
 
 router.post('/:id/banners', async (req, res) => {
   try {
+    const clientId = req.params.id
     // Get current max sortOrder for this client
     const maxSortOrder = await prisma.banner.findFirst({
-      where: { clientId: req.params.id },
+      where: { clientId },
       orderBy: { sortOrder: 'desc' },
       select: { sortOrder: true }
     })
@@ -1665,10 +1709,14 @@ router.post('/:id/banners', async (req, res) => {
     const banner = await prisma.banner.create({
       data: {
         ...req.body,
-        clientId: req.params.id,
+        clientId,
         sortOrder: req.body.sortOrder ?? (maxSortOrder ? maxSortOrder.sortOrder + 1 : 0)
       }
     })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json(banner)
   } catch (err) {
     console.error('Create banner error:', err.message)
@@ -1678,10 +1726,15 @@ router.post('/:id/banners', async (req, res) => {
 
 router.put('/:id/banners/:bannerId', async (req, res) => {
   try {
+    const clientId = req.params.id
     const banner = await prisma.banner.update({
       where: { id: req.params.bannerId },
       data: req.body
     })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json(banner)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1690,7 +1743,12 @@ router.put('/:id/banners/:bannerId', async (req, res) => {
 
 router.delete('/:id/banners/:bannerId', async (req, res) => {
   try {
+    const clientId = req.params.id
     await prisma.banner.delete({ where: { id: req.params.bannerId } })
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
+
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1699,6 +1757,7 @@ router.delete('/:id/banners/:bannerId', async (req, res) => {
 
 router.put('/:id/banners/reorder', async (req, res) => {
   try {
+    const clientId = req.params.id
     const { bannerIds } = req.body
     if (!Array.isArray(bannerIds)) {
       return res.status(400).json({ error: 'bannerIds must be an array' })
@@ -1713,6 +1772,9 @@ router.put('/:id/banners/reorder', async (req, res) => {
         })
       )
     )
+
+    // Clear export cache so preview sites get fresh data
+    exportCache.delete(clientId)
 
     res.json({ success: true })
   } catch (err) {
