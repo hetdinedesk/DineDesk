@@ -311,11 +311,6 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         discountAmount
       }
 
-      console.log('[CHECKOUT DEBUG] Sending order data:', {
-        orderData,
-        cartTotals: { subtotal, taxAmount, total, discountAmount, totalWithDiscount }
-      })
-
       // For Stripe, create order first then PaymentIntent
       if (paymentMethod === 'stripe') {
         const response = await fetch(`${CMS_API_URL}/clients/${clientId}/orders`, {

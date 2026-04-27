@@ -19,9 +19,6 @@ async function getNextOrderNumber(clientId) {
 
 // POST - Create order
 router.post('/', async (req, res) => {
-  console.log('[ORDER] Create order request received')
-  console.log('[ORDER] Request body:', JSON.stringify(req.body, null, 2))
-
   try {
     const clientId = getClientId(req)
     const {
@@ -99,25 +96,15 @@ router.post('/', async (req, res) => {
       priceMap[dbSpecial.id] = parseFloat(dbSpecial.price) || 0
     }
 
-    console.log('[ORDER DEBUG] Price verification:', {
-      itemIds,
-      dbItemsFound: dbItems.length,
-      dbSpecialsFound: dbSpecials.length,
-      priceMap,
-      submittedItems: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity }))
-    })
-
     let verifiedSubtotal = 0
     const verifiedItems = items.map(item => {
       const realPrice = priceMap[item.id]
       const qty = parseInt(item.quantity) || 1
       if (realPrice !== undefined) {
-        console.log('[ORDER DEBUG] Item found in DB:', item.id, item.name, 'DB price:', realPrice, 'Submitted price:', item.price)
         verifiedSubtotal += realPrice * qty
         return { ...item, price: realPrice }
       }
       // Item not found in either table — use submitted price
-      console.log('[ORDER DEBUG] Item NOT found in DB, using submitted price:', item.id, item.name, item.price)
       verifiedSubtotal += (parseFloat(item.price) || 0) * qty
       return item
     })
@@ -127,18 +114,6 @@ router.post('/', async (req, res) => {
     const verifiedTaxAmount = Math.round(verifiedSubtotal * taxRate * 100) / 100
     const verifiedDeliveryFee = orderType === 'delivery' ? parseFloat(deliveryFee || 0) : 0
     const verifiedTotal = Math.round((verifiedSubtotal + verifiedTaxAmount + verifiedDeliveryFee - discountAmount) * 100) / 100
-
-    console.log('[ORDER DEBUG] Final calculated totals:', {
-      verifiedSubtotal,
-      verifiedTaxAmount,
-      verifiedDeliveryFee,
-      discountAmount,
-      verifiedTotal,
-      submittedSubtotal: subtotal,
-      submittedTax: taxAmount,
-      submittedTotal: total,
-      taxRate: ordering.taxRate
-    })
 
     const orderNumber = await getNextOrderNumber(clientId)
 
