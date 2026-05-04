@@ -213,6 +213,28 @@ const notesSchema = z.object({
   stock: z.string().optional(),
 }).optional()
 
+const notificationsSchema = z.object({
+  smtpHost: z.string().optional(),
+  smtpPort: z.string().optional(),
+  smtpUser: z.string().optional(),
+  smtpPassword: z.string().optional(),
+  smtpFrom: z.string().optional(),
+  sendCustomerReceipt: z.boolean().optional(),
+  sendRestaurantNotification: z.boolean().optional(),
+}).optional()
+
+const posConfigSchema = z.object({
+  posType: z.string().optional(),
+  posName: z.string().optional(),
+  apiKey: z.string().optional(),
+  apiSecret: z.string().optional(),
+  locationId: z.string().optional(),
+  webhookUrl: z.string().optional(),
+  fallbackEmail: z.string().optional(),
+  fallbackMethod: z.string().optional(),
+  autoConfirm: z.boolean().optional(),
+}).optional()
+
 // Main SiteConfig update schema
 const siteConfigUpdateSchema = z.object({
   version: z.number().int().positive().optional(),
@@ -230,6 +252,8 @@ const siteConfigUpdateSchema = z.object({
   netlify: netlifySchema,
   notes: notesSchema,
   ordering: orderingSchema,
+  notifications: notificationsSchema,
+  posConfig: posConfigSchema,
 }).partial()
 
 // Validation function
@@ -254,4 +278,6 @@ module.exports = {
   reviewsSchema,
   bookingSchema,
   analyticsSchema,
+  notificationsSchema,
+  posConfigSchema,
 }

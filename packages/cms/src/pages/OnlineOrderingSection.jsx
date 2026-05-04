@@ -123,7 +123,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
     const newNotificationsForm = { ...defaultNotificationsForm, ...(config.notifications || {}) }
     setNotificationsForm(newNotificationsForm)
     notificationsSavedRef.current = newNotificationsForm
-  }, [config.notifications])
+  }, [config.notifications, clientId])
 
   useEffect(() => {
     const newPOSForm = { ...defaultPOSForm, ...(config.posConfig || {}) }
@@ -140,6 +140,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
     mutationFn: () => saveConfig(clientId, { ordering: form, notifications: notificationsForm, posConfig: posForm }),
     onSuccess: (data) => {
       qc.setQueryData(['config', clientId], data)
+      qc.invalidateQueries(['config', clientId])
       savedRef.current = { ...form }
       notificationsSavedRef.current = { ...notificationsForm }
       posSavedRef.current = { ...posForm }
