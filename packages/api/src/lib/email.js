@@ -281,6 +281,9 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
 
     const html = generateCustomerReceiptHtml(order, clientName, clientData, locationData)
 
+    console.log('[EMAIL] Attempting to send customer receipt to:', order.customerEmail)
+    console.log('[EMAIL] From:', fromEmail)
+    
     await emailTransporter.sendMail({
       from: fromEmail,
       to: order.customerEmail,
@@ -321,6 +324,9 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
     
     const html = generateRestaurantNotificationHtml(order, clientName)
 
+    console.log('[EMAIL] Attempting to send restaurant notification to:', restaurantEmail)
+    console.log('[EMAIL] From:', fromEmail)
+    
     await emailTransporter.sendMail({
       from: fromEmail,
       to: restaurantEmail,
