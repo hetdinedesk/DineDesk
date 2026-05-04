@@ -280,6 +280,8 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
     // Try SendGrid first
     if (notificationConfig.sendgridApiKey) {
       console.log('[EMAIL] Using SendGrid for customer receipt')
+      console.log('[EMAIL] SendGrid API key present:', !!notificationConfig.sendgridApiKey)
+      console.log('[EMAIL] SendGrid from email:', notificationConfig.sendgridFrom || notificationConfig.smtpFrom)
       return await sendSendGridEmail(order, clientName, 'customer', notificationConfig, clientData, locationData)
     }
     
@@ -340,6 +342,8 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
     // Try SendGrid first
     if (notificationConfig.sendgridApiKey) {
       console.log('[EMAIL] Using SendGrid for restaurant notification')
+      console.log('[EMAIL] SendGrid API key present:', !!notificationConfig.sendgridApiKey)
+      console.log('[EMAIL] SendGrid from email:', notificationConfig.sendgridFrom || notificationConfig.smtpFrom)
       return await sendSendGridEmail(order, clientName, 'restaurant', notificationConfig, {}, {}, restaurantEmail)
     }
     
