@@ -11,16 +11,21 @@ function getTransporter(config) {
   
   if (config.smtpHost && config.smtpUser && config.smtpPassword) {
     console.log('[EMAIL] Creating SMTP transporter...')
+    // Force port 465 with SSL for cloud platforms like Railway
+    const port = config.smtpPort === '465' ? 465 : 465
     const transporter = nodemailer.createTransport({
       host: config.smtpHost,
-      port: config.smtpPort || 587,
-      secure: config.smtpPort === '465',
+      port: port,
+      secure: true, // Use SSL
       auth: {
         user: config.smtpUser,
         pass: config.smtpPassword
+      },
+      tls: {
+        rejectUnauthorized: false // Allow self-signed certificates
       }
     })
-    console.log('[EMAIL] Transporter created successfully')
+    console.log('[EMAIL] Transporter created successfully on port', port, 'with SSL')
     return transporter
   }
   console.log('[EMAIL] Missing SMTP credentials, returning null')
