@@ -3,6 +3,23 @@ const sgMail = require('@sendgrid/mail')
 
 let transporter = null
 
+// Railway-optimized SendGrid configuration
+function getRailwaySendGridConfig() {
+  // Check if running on Railway (NODE_ENV=production or Railway-specific env vars)
+  const isRailway = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT !== undefined
+  
+  if (isRailway && process.env.SENDGRID_API_KEY) {
+    console.log('[EMAIL] Using Railway SendGrid configuration')
+    return {
+      sendgridApiKey: process.env.SENDGRID_API_KEY,
+      sendgridFrom: process.env.SENDGRID_FROM_EMAIL,
+      useSendGrid: process.env.USE_SENDGRID_DEFAULT === 'true'
+    }
+  }
+  
+  return null
+}
+
 function getTransporter(config) {
   console.log('[EMAIL] getTransporter called')
   console.log('[EMAIL] smtpHost:', config.smtpHost)
@@ -277,12 +294,19 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
   }
 
   try {
-    // Try SendGrid first
-    if (notificationConfig.sendgridApiKey) {
-      console.log('[EMAIL] Using SendGrid for customer receipt')
+    // Try SendGrid from client CMS config first (per-client configuration)
+    if (notificationConfig.sendgridApiKey && notificationConfig.useSendGrid) {
+      console.log('[EMAIL] Using client SendGrid configuration for customer receipt')
       console.log('[EMAIL] SendGrid API key present:', !!notificationConfig.sendgridApiKey)
       console.log('[EMAIL] SendGrid from email:', notificationConfig.sendgridFrom || notificationConfig.smtpFrom)
       return await sendSendGridEmail(order, clientName, 'customer', notificationConfig, clientData, locationData)
+    }
+    
+    // Fallback to Railway SendGrid config (if client doesn't have their own)
+    const railwayConfig = getRailwaySendGridConfig()
+    if (railwayConfig && railwayConfig.sendgridApiKey) {
+      console.log('[EMAIL] Using Railway SendGrid configuration as fallback for customer receipt')
+      return await sendSendGridEmail(order, clientName, 'customer', railwayConfig, clientData, locationData)
     }
     
     // Fallback to SMTP
@@ -339,12 +363,19 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
   }
 
   try {
-    // Try SendGrid first
-    if (notificationConfig.sendgridApiKey) {
-      console.log('[EMAIL] Using SendGrid for restaurant notification')
+    // Try SendGrid from client CMS config first (per-client configuration)
+    if (notificationConfig.sendgridApiKey && notificationConfig.useSendGrid) {
+      console.log('[EMAIL] Using client SendGrid configuration for restaurant notification')
       console.log('[EMAIL] SendGrid API key present:', !!notificationConfig.sendgridApiKey)
       console.log('[EMAIL] SendGrid from email:', notificationConfig.sendgridFrom || notificationConfig.smtpFrom)
       return await sendSendGridEmail(order, clientName, 'restaurant', notificationConfig, {}, {}, restaurantEmail)
+    }
+    
+    // Fallback to Railway SendGrid config (if client doesn't have their own)
+    const railwayConfig = getRailwaySendGridConfig()
+    if (railwayConfig && railwayConfig.sendgridApiKey) {
+      console.log('[EMAIL] Using Railway SendGrid configuration as fallback for restaurant notification')
+      return await sendSendGridEmail(order, clientName, 'restaurant', railwayConfig, {}, {}, restaurantEmail)
     }
     
     // Fallback to SMTP

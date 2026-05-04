@@ -92,7 +92,15 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
     useSendGrid: false
   }
 
-  const [notificationsForm, setNotificationsForm] = useState({ ...defaultNotificationsForm, ...(config.notifications || {}) })
+  // Track if form has been modified by user to prevent overwriting
+  const [isNotificationsFormDirty, setIsNotificationsFormDirty] = useState(false)
+  
+  // Initialize with a function to ensure we don't lose data during initial load
+  const [notificationsForm, setNotificationsForm] = useState(() => {
+    const initialData = config.notifications || {}
+    const form = { ...defaultNotificationsForm, ...initialData }
+    return form
+  })
   const notificationsSavedRef = useRef({ ...defaultNotificationsForm, ...(config.notifications || {}) })
 
   const defaultPOSForm = {
@@ -123,12 +131,22 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   }, [paymentConfig.config])
 
   useEffect(() => {
-    console.log('[CMS] Notifications config from API:', config.notifications)
-    const newNotificationsForm = { ...defaultNotificationsForm, ...(config.notifications || {}) }
-    console.log('[CMS] New notifications form:', newNotificationsForm)
-    setNotificationsForm(newNotificationsForm)
-    notificationsSavedRef.current = newNotificationsForm
-  }, [config.notifications])
+    // Don't update if user has modified the form
+    if (isNotificationsFormDirty) {
+      return
+    }
+    
+    // Update form only when API has actual data and form hasn't been modified by user
+    if (config.notifications && Object.keys(config.notifications).length > 0) {
+      const newNotificationsForm = { ...defaultNotificationsForm, ...config.notifications }
+      setNotificationsForm(newNotificationsForm)
+      notificationsSavedRef.current = newNotificationsForm
+    } else if (config.notifications && Object.keys(config.notifications).length === 0) {
+      // Handle case where API returns empty object but we need to preserve defaults
+      setNotificationsForm(defaultNotificationsForm)
+      notificationsSavedRef.current = defaultNotificationsForm
+    }
+  }, [config.notifications, isNotificationsFormDirty])
 
   useEffect(() => {
     const newPOSForm = { ...defaultPOSForm, ...(config.posConfig || {}) }
@@ -143,16 +161,24 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
 
   const mutation = useMutation({
     mutationFn: () => {
-      console.log('[CMS] Saving notifications form:', notificationsForm)
-      return saveConfig(clientId, { ordering: form, notifications: notificationsForm, posConfig: posForm })
+      // Ensure boolean values are properly serialized
+      const notificationsToSave = {
+        ...notificationsForm,
+        useSendGrid: Boolean(notificationsForm.useSendGrid),
+        sendCustomerReceipt: Boolean(notificationsForm.sendCustomerReceipt),
+        sendRestaurantNotification: Boolean(notificationsForm.sendRestaurantNotification)
+      }
+      return saveConfig(clientId, { ordering: form, notifications: notificationsToSave, posConfig: posForm })
     },
     onSuccess: (data) => {
-      console.log('[CMS] Save successful, data:', data)
+      // Update the cache with the saved data to prevent unnecessary refetch
       qc.setQueryData(['config', clientId], data)
-      qc.invalidateQueries(['config', clientId])
+      // Update refs to match saved state
       savedRef.current = { ...form }
       notificationsSavedRef.current = { ...notificationsForm }
       posSavedRef.current = { ...posForm }
+      // Reset dirty flag after successful save
+      setIsNotificationsFormDirty(false)
     }
   })
 
@@ -172,7 +198,10 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
 
   const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
   const updatePayment = (key, val) => setPaymentForm(prev => ({ ...prev, [key]: val }))
-  const updateNotifications = (key, val) => setNotificationsForm(prev => ({ ...prev, [key]: val }))
+  const updateNotifications = (key, val) => {
+    setIsNotificationsFormDirty(true)
+    setNotificationsForm(prev => ({ ...prev, [key]: val }))
+  }
   const updatePOS = (key, val) => setPOSForm(prev => ({ ...prev, [key]: val }))
 
   const hasChanges = JSON.stringify(form) !== JSON.stringify(savedRef.current)

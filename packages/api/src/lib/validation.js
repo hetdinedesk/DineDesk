@@ -221,6 +221,10 @@ const notificationsSchema = z.object({
   smtpFrom: z.string().optional(),
   sendCustomerReceipt: z.boolean().optional(),
   sendRestaurantNotification: z.boolean().optional(),
+  // SendGrid fields
+  sendgridApiKey: z.string().optional(),
+  sendgridFrom: z.string().optional(),
+  useSendGrid: z.boolean().optional(),
 }).optional()
 
 const posConfigSchema = z.object({

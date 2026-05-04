@@ -2057,7 +2057,6 @@ router.put('/:id/specials-config', async (req, res) => {
 router.get('/:id/config', async (req, res) => {
   try {
     const config = await prisma.siteConfig.findUnique({ where: { clientId: req.params.id } })
-    console.log(`[API] Retrieved config for client ${req.params.id}:`, JSON.stringify(config?.notifications || {}, null, 2))
     res.json(config || {})
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -2066,7 +2065,6 @@ router.get('/:id/config', async (req, res) => {
 
 router.put('/:id/config', async (req, res) => {
   try {
-    console.log('[API] Config update request body:', JSON.stringify(req.body, null, 2))
     const clientId = req.params.id
     
     // Check if client exists first to avoid foreign key errors on upsert
@@ -2108,31 +2106,17 @@ router.put('/:id/config', async (req, res) => {
 
     for (const field of allFields) {
       if (updateDataWithVersion[field] !== undefined) {
-        console.log(`[API] Setting ${field} from updateData`)
-        if (field === 'notifications') {
-          console.log(`[API] Notifications data being set:`, JSON.stringify(updateDataWithVersion[field], null, 2))
-        }
         updateObject[field] = updateDataWithVersion[field]
       } else if (existing && existing[field] !== undefined) {
-        console.log(`[API] Keeping ${field} from existing config`)
-        if (field === 'notifications') {
-          console.log(`[API] Existing notifications data:`, JSON.stringify(existing[field], null, 2))
-        }
         updateObject[field] = existing[field]
-      } else {
-        console.log(`[API] ${field} not found in updateData or existing`)
       }
     }
-
-    console.log('[API] Final update object:', JSON.stringify(updateObject, null, 2))
     
     const config = await prisma.siteConfig.upsert({
       where:  { clientId },
       update: updateObject,
       create: { clientId, ...updateObject }
     })
-
-    console.log('[API] Saved config from database:', JSON.stringify(config, null, 2))
 
     // Clear export cache for this client
     exportCache.delete(clientId)
