@@ -126,7 +126,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
     const newNotificationsForm = { ...defaultNotificationsForm, ...(config.notifications || {}) }
     setNotificationsForm(newNotificationsForm)
     notificationsSavedRef.current = newNotificationsForm
-  }, [config.notifications, clientId])
+  }, [config.notifications])
 
   useEffect(() => {
     const newPOSForm = { ...defaultPOSForm, ...(config.posConfig || {}) }
