@@ -2107,9 +2107,13 @@ router.put('/:id/config', async (req, res) => {
 
     for (const field of allFields) {
       if (updateDataWithVersion[field] !== undefined) {
+        console.log(`[API] Setting ${field} from updateData`)
         updateObject[field] = updateDataWithVersion[field]
       } else if (existing && existing[field] !== undefined) {
+        console.log(`[API] Keeping ${field} from existing config`)
         updateObject[field] = existing[field]
+      } else {
+        console.log(`[API] ${field} not found in updateData or existing`)
       }
     }
 
