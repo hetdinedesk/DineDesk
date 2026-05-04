@@ -2065,6 +2065,7 @@ router.get('/:id/config', async (req, res) => {
 
 router.put('/:id/config', async (req, res) => {
   try {
+    console.log('[API] Config update request body:', JSON.stringify(req.body, null, 2))
     const clientId = req.params.id
     
     // Check if client exists first to avoid foreign key errors on upsert

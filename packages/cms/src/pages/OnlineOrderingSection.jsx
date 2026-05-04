@@ -123,7 +123,9 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   }, [paymentConfig.config])
 
   useEffect(() => {
+    console.log('[CMS] Notifications config from API:', config.notifications)
     const newNotificationsForm = { ...defaultNotificationsForm, ...(config.notifications || {}) }
+    console.log('[CMS] New notifications form:', newNotificationsForm)
     setNotificationsForm(newNotificationsForm)
     notificationsSavedRef.current = newNotificationsForm
   }, [config.notifications])
@@ -140,8 +142,12 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   }, [config.posConfig, config.client?.email])
 
   const mutation = useMutation({
-    mutationFn: () => saveConfig(clientId, { ordering: form, notifications: notificationsForm, posConfig: posForm }),
+    mutationFn: () => {
+      console.log('[CMS] Saving notifications form:', notificationsForm)
+      return saveConfig(clientId, { ordering: form, notifications: notificationsForm, posConfig: posForm })
+    },
     onSuccess: (data) => {
+      console.log('[CMS] Save successful, data:', data)
       qc.setQueryData(['config', clientId], data)
       qc.invalidateQueries(['config', clientId])
       savedRef.current = { ...form }
