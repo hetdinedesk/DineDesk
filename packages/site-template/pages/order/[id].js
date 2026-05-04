@@ -2,6 +2,7 @@ import Head from 'next/head'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { getSiteData, CMS_API_URL } from '../../lib/api'
+import { buildThemeCSS } from '../../lib/theme'
 import { CMSProvider } from '../../contexts/CMSContext'
 import { LoyaltyProvider } from '../../contexts/LoyaltyContext'
 import { Header as ThemeD1Header } from '../../components/theme-d1/Header'
@@ -52,6 +53,12 @@ const statusConfig = {
 // Printable Receipt Component
 function PrintableReceipt({ order, data }) {
   const siteName = data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''
+
+  // Generate theme CSS
+  const settings = data?.settings || {}
+  const colours = data?.colours || {}
+  const themeCSS = buildThemeCSS(colours, settings)
+
   const logo = data?.colours?.logoLight || data?.colours?.logoDark || null
   const abn = data?.settings?.abn || ''
   const primaryLocation = data?.locations?.find(l => l.isPrimary) || data?.locations?.[0] || {}
@@ -247,11 +254,18 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
   const siteName = data?.settings?.displayName || data?.settings?.restaurantName || data?.client?.name || ''
 
+  // Generate theme CSS
+  const settings = data?.settings || {}
+  const colours = data?.colours || {}
+  const themeCSS = buildThemeCSS(colours, settings)
+
   if (loading) {
     return (
       <CMSProvider data={data}>
         <Head>
           <title>Order Status - {siteName}</title>
+          {/* Theme CSS */}
+          {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }}/>}
         </Head>
         <div className="min-h-screen bg-[var(--color-accent)]">
           <Header />
@@ -269,6 +283,8 @@ export default function OrderStatusPage({ data, orderId, template }) {
       <CMSProvider data={data}>
         <Head>
           <title>Order Not Found - {siteName}</title>
+          {/* Theme CSS */}
+          {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }}/>}
         </Head>
         <div className="min-h-screen bg-[var(--color-accent)]">
           <Header />
@@ -341,6 +357,9 @@ export default function OrderStatusPage({ data, orderId, template }) {
             }
           }
         `}</style>
+        
+        {/* Theme CSS */}
+        {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }}/>}
       </Head>
       <style jsx>{`
         :global(.font-heading) {

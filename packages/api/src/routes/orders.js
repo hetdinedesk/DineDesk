@@ -220,6 +220,7 @@ router.post('/', async (req, res) => {
 
     // Get notification config from site config
     const notificationConfig = client.siteConfig?.notifications || {}
+    console.log('[ORDER] Notification config:', JSON.stringify(notificationConfig, null, 2))
 
     // Get location data if locationId is provided
     let locationData = {}

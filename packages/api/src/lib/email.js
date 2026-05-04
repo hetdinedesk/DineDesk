@@ -251,13 +251,19 @@ function generateEnquiryEmailHtml(enquiry, clientName, clientData = {}) {
 }
 
 async function sendOrderConfirmation(order, clientName, notificationConfig, clientData = {}, locationData = {}) {
+  console.log('[EMAIL] sendOrderConfirmation called')
+  console.log('[EMAIL] sendCustomerReceipt:', notificationConfig?.sendCustomerReceipt)
+  console.log('[EMAIL] notificationConfig:', JSON.stringify(notificationConfig, null, 2))
+  
   if (!notificationConfig?.sendCustomerReceipt) {
+    console.log('[EMAIL] Customer receipt disabled, skipping')
     return { success: false, message: 'Customer receipt disabled' }
   }
 
   try {
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
+      console.log('[EMAIL] SMTP not configured')
       return { success: false, message: 'SMTP not configured' }
     }
 
@@ -271,6 +277,7 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
       subject: `Order #${order.orderNumber} Confirmed - ${clientName}`,
       html
     })
+    console.log('[EMAIL] Customer receipt sent successfully')
     return { success: true, message: 'Customer receipt sent' }
   } catch (err) {
     console.error('[EMAIL] Failed to send customer receipt:', err)
@@ -279,17 +286,24 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
 }
 
 async function sendRestaurantNotification(order, clientName, notificationConfig, restaurantEmail) {
+  console.log('[EMAIL] sendRestaurantNotification called')
+  console.log('[EMAIL] sendRestaurantNotification:', notificationConfig?.sendRestaurantNotification)
+  console.log('[EMAIL] restaurantEmail:', restaurantEmail)
+  
   if (!notificationConfig?.sendRestaurantNotification) {
+    console.log('[EMAIL] Restaurant notification disabled, skipping')
     return { success: false, message: 'Restaurant notification disabled' }
   }
 
   if (!restaurantEmail) {
+    console.log('[EMAIL] No restaurant email configured')
     return { success: false, message: 'No restaurant email configured' }
   }
 
   try {
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
+      console.log('[EMAIL] SMTP not configured')
       return { success: false, message: 'SMTP not configured' }
     }
 
@@ -303,7 +317,7 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
       subject: `🔔 New Order #${order.orderNumber} - ${clientName}`,
       html
     })
-
+    console.log('[EMAIL] Restaurant notification sent successfully')
     return { success: true, message: 'Restaurant notification sent' }
   } catch (err) {
     console.error('[EMAIL] Failed to send restaurant notification:', err)
