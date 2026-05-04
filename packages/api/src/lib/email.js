@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer')
+const sgMail = require('@sendgrid/mail')
 
 let transporter = null
 
@@ -276,7 +277,14 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
   }
 
   try {
-    // Try SMTP first
+    // Try SendGrid first
+    if (notificationConfig.sendgridApiKey) {
+      console.log('[EMAIL] Using SendGrid for customer receipt')
+      return await sendSendGridEmail(order, clientName, 'customer', notificationConfig, clientData, locationData)
+    }
+    
+    // Fallback to SMTP
+    console.log('[EMAIL] No SendGrid key, trying SMTP')
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
       console.log('[EMAIL] SMTP not configured, using fallback')
@@ -329,7 +337,14 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
   }
 
   try {
-    // Try SMTP first
+    // Try SendGrid first
+    if (notificationConfig.sendgridApiKey) {
+      console.log('[EMAIL] Using SendGrid for restaurant notification')
+      return await sendSendGridEmail(order, clientName, 'restaurant', notificationConfig, {}, {}, restaurantEmail)
+    }
+    
+    // Fallback to SMTP
+    console.log('[EMAIL] No SendGrid key, trying SMTP')
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
       console.log('[EMAIL] SMTP not configured, using fallback')
@@ -363,6 +378,45 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
   } catch (err) {
     console.error('[EMAIL] Failed to send restaurant notification:', err)
     return { success: false, message: err.message }
+  }
+}
+
+// SendGrid email function
+async function sendSendGridEmail(order, clientName, type, notificationConfig, clientData = {}, locationData = {}, restaurantEmail = null) {
+  console.log('[EMAIL] Using SendGrid for:', type)
+  
+  if (!notificationConfig.sendgridApiKey) {
+    console.log('[EMAIL] SendGrid API key not configured')
+    return sendFallbackEmail(order, clientName, type, clientData, locationData, restaurantEmail)
+  }
+
+  try {
+    sgMail.setApiKey(notificationConfig.sendgridApiKey)
+    
+    const toEmail = type === 'customer' ? order.customerEmail : restaurantEmail
+    const subject = type === 'customer' 
+      ? `Order #${order.orderNumber} Confirmed - ${clientName}`
+      : `🔔 New Order #${order.orderNumber} - ${clientName}`
+    
+    const html = type === 'customer' 
+      ? generateCustomerReceiptHtml(order, clientName, clientData, locationData)
+      : generateRestaurantNotificationHtml(order, clientName)
+
+    const msg = {
+      to: toEmail,
+      from: notificationConfig.sendgridFrom || notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`,
+      subject: subject,
+      html: html
+    }
+
+    console.log('[EMAIL] Sending via SendGrid to:', toEmail)
+    await sgMail.send(msg)
+    console.log('[EMAIL] SendGrid email sent successfully')
+    
+    return { success: true, message: 'Email sent via SendGrid' }
+  } catch (err) {
+    console.error('[EMAIL] SendGrid failed:', err.message)
+    return sendFallbackEmail(order, clientName, type, clientData, locationData, restaurantEmail)
   }
 }
 

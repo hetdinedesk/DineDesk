@@ -86,7 +86,10 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
     smtpPassword: '',
     smtpFrom: '',
     sendCustomerReceipt: true,
-    sendRestaurantNotification: true
+    sendRestaurantNotification: true,
+    sendgridApiKey: '',
+    sendgridFrom: '',
+    useSendGrid: false
   }
 
   const [notificationsForm, setNotificationsForm] = useState({ ...defaultNotificationsForm, ...(config.notifications || {}) })
@@ -562,6 +565,54 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
               />
               <p style={hintStyle}>Email address that will send notifications</p>
             </div>
+          </div>
+
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              <Zap size={16} style={{ color:C.acc }} />
+              <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>SendGrid Configuration</span>
+            </div>
+
+            <p style={{ fontSize:12, color:C.t3, marginBottom:12 }}>
+              Use SendGrid for reliable email delivery. Recommended for cloud platforms like Railway.
+            </p>
+
+            <ToggleSwitch
+              label='Use SendGrid (Recommended)'
+              checked={notificationsForm.useSendGrid || false}
+              onChange={() => updateNotifications('useSendGrid', !notificationsForm.useSendGrid)}
+            />
+            <p style={{ fontSize:12, color:C.t3, margin:'4px 0 12px' }}>
+              Enable SendGrid for reliable email delivery on cloud platforms
+            </p>
+
+            {(notificationsForm.useSendGrid || false) && (
+              <>
+                <div style={{ marginBottom:12 }}>
+                  <label style={labelStyle}>SendGrid API Key</label>
+                  <input
+                    type='password'
+                    value={notificationsForm.sendgridApiKey || ''}
+                    onChange={e => updateNotifications('sendgridApiKey', e.target.value)}
+                    style={inputStyle}
+                    placeholder='SG.xxxxxx...'
+                  />
+                  <p style={hintStyle}>Get your API key from SendGrid dashboard</p>
+                </div>
+
+                <div style={{ marginBottom:12 }}>
+                  <label style={labelStyle}>SendGrid From Email</label>
+                  <input
+                    type='email'
+                    value={notificationsForm.sendgridFrom || ''}
+                    onChange={e => updateNotifications('sendgridFrom', e.target.value)}
+                    style={inputStyle}
+                    placeholder='noreply@yourrestaurant.com'
+                  />
+                  <p style={hintStyle}>Must be verified in your SendGrid account</p>
+                </div>
+              </>
+            )}
           </div>
 
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
