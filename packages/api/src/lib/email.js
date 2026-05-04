@@ -284,14 +284,24 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
     console.log('[EMAIL] Attempting to send customer receipt to:', order.customerEmail)
     console.log('[EMAIL] From:', fromEmail)
     
-    await emailTransporter.sendMail({
-      from: fromEmail,
-      to: order.customerEmail,
-      subject: `Order #${order.orderNumber} Confirmed - ${clientName}`,
-      html
-    })
-    console.log('[EMAIL] Customer receipt sent successfully')
-    return { success: true, message: 'Customer receipt sent' }
+    try {
+      await Promise.race([
+        emailTransporter.sendMail({
+          from: fromEmail,
+          to: order.customerEmail,
+          subject: `Order #${order.orderNumber} Confirmed - ${clientName}`,
+          html
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Email sending timeout after 30 seconds')), 30000)
+        )
+      ])
+      console.log('[EMAIL] Customer receipt sent successfully')
+      return { success: true, message: 'Customer receipt sent' }
+    } catch (err) {
+      console.error('[EMAIL] Failed to send customer receipt:', err)
+      throw err
+    }
   } catch (err) {
     console.error('[EMAIL] Failed to send customer receipt:', err)
     return { success: false, message: err.message }
@@ -327,14 +337,24 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
     console.log('[EMAIL] Attempting to send restaurant notification to:', restaurantEmail)
     console.log('[EMAIL] From:', fromEmail)
     
-    await emailTransporter.sendMail({
-      from: fromEmail,
-      to: restaurantEmail,
-      subject: `🔔 New Order #${order.orderNumber} - ${clientName}`,
-      html
-    })
-    console.log('[EMAIL] Restaurant notification sent successfully')
-    return { success: true, message: 'Restaurant notification sent' }
+    try {
+      await Promise.race([
+        emailTransporter.sendMail({
+          from: fromEmail,
+          to: restaurantEmail,
+          subject: `🔔 New Order #${order.orderNumber} - ${clientName}`,
+          html
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Email sending timeout after 30 seconds')), 30000)
+        )
+      ])
+      console.log('[EMAIL] Restaurant notification sent successfully')
+      return { success: true, message: 'Restaurant notification sent' }
+    } catch (err) {
+      console.error('[EMAIL] Failed to send restaurant notification:', err)
+      throw err
+    }
   } catch (err) {
     console.error('[EMAIL] Failed to send restaurant notification:', err)
     return { success: false, message: err.message }
