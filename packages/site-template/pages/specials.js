@@ -2,11 +2,48 @@ import Head from 'next/head'
 import { getSiteData } from '../lib/api'
 import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
+import { useState, useEffect } from 'react'
+import { Suspense } from 'react'
 
-// Theme-specific imports
-import { Header } from '../components/theme-d1/Header'
-import { Footer } from '../components/theme-d1/Footer'
-import SpecialsTemplate from '../templates/theme-d1/SpecialsTemplate'
+// Dynamic theme loading
+function DynamicSpecialsTemplate({ themeKey, data, page, banner }) {
+  const [Header, setHeader] = useState(null)
+  const [Footer, setFooter] = useState(null)
+  const [SpecialsTemplate, setSpecialsTemplate] = useState(null)
+
+  useEffect(() => {
+    const theme = themeKey || 'theme-d1'
+    
+    Promise.all([
+      import(`../components/${theme}/Header`),
+      import(`../components/${theme}/Footer`),
+      import(`../templates/${theme}/SpecialsTemplate`)
+    ]).then(([headerModule, footerModule, templateModule]) => {
+      setHeader(() => headerModule.Header)
+      setFooter(() => footerModule.Footer)
+      setSpecialsTemplate(() => templateModule.default)
+    }).catch(() => {
+      // Fallback to theme-d1
+      Promise.all([
+        import('../components/theme-d1/Header'),
+        import('../components/theme-d1/Footer'),
+        import('../templates/theme-d1/SpecialsTemplate')
+      ]).then(([headerModule, footerModule, templateModule]) => {
+        setHeader(() => headerModule.Header)
+        setFooter(() => footerModule.Footer)
+        setSpecialsTemplate(() => templateModule.default)
+      })
+    })
+  }, [themeKey])
+
+  return (
+    <>
+      {Header && <Header />}
+      {SpecialsTemplate && <SpecialsTemplate data={data} page={page} banner={banner} />}
+      {Footer && <Footer />}
+    </>
+  )
+}
 
 export async function getServerSideProps({ query }) {
   // Reject literal string "undefined" as invalid site ID
@@ -48,9 +85,9 @@ export default function Page({ data, template }) {
         {desc && <meta property="og:description" content={sc(desc)} />}
         {ogImage && <meta property="og:image" content={ogImage} />}
       </Head>
-      <Header />
-      <SpecialsTemplate data={data} page={page} banner={banner} />
-      <Footer />
+      <Suspense fallback={<div>Loading...</div>}>
+        <DynamicSpecialsTemplate themeKey={template} data={data} page={page} banner={banner} />
+      </Suspense>
     </CMSProvider>
   )
 }

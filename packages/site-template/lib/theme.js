@@ -13,7 +13,7 @@ export function buildThemeCSS(colours, settings={}) {
     ctaBg:      colours.ctaBg      || '#C8823A',
     ctaText:    colours.ctaText    || '#ffffff',
     accentBg:   colours.accentBg   || '#F7F2EA',
-    utilityBeltBg: colours.utilityBeltBg || colours.primary || '#C8823A',
+    utilityBeltBg: colours.utilityBeltBg || colours.primary,
     utilityBeltText: colours.utilityBeltText || '#ffffff',
   }
 

@@ -1,0 +1,164 @@
+/* Theme D3 Bloom Cafe Base Styles */
+:root {
+  /* Bloom color scheme */
+  --bloom-cream: #F8F6F3;
+  --bloom-sage: #7D8471;
+  --bloom-dark: #2C2C2C;
+  --bloom-moss: #4A5D4A;
+  --bloom-clay: #8B7355;
+  --bloom-sand: #E8E4DC;
+
+  /* Default theme colors - overridden by CMS data via buildThemeCSS */
+  --color-primary: #7D8471;
+  --color-secondary: #2C2C2C;
+  --color-accent: #F8F6F3;
+  --color-header-bg: #F8F6F3;
+  --color-header-text: #2C2C2C;
+  --font-heading: 'Playfair Display', serif;
+
+  /* Base colors */
+  --background: #F8F6F3;
+  --foreground: #2C2C2C;
+  --card: #ffffff;
+  --card-foreground: #2C2C2C;
+  --muted: #E8E4DC;
+  --muted-foreground: #8B7355;
+  --border: rgba(44, 44, 44, 0.1);
+  --input: #E8E4DC;
+  --ring: #7D8471;
+  --radius: 2rem;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: #334155;
+  --ring: #d4af37;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Bloom-specific utility classes - Connected to CMS theme colors */
+.bg-bloom-cream { background-color: var(--color-accent); }
+.bg-bloom-sage { background-color: var(--color-primary); }
+.bg-bloom-dark { background-color: var(--color-secondary); }
+.bg-bloom-moss { background-color: var(--color-primary); filter: brightness(0.9); }
+.bg-bloom-clay { background-color: var(--color-secondary); opacity: 0.7; }
+.bg-bloom-sand { background-color: var(--color-accent); opacity: 0.8; }
+
+.text-bloom-cream { color: var(--color-accent); }
+.text-bloom-sage { color: var(--color-primary); }
+.text-bloom-dark { color: var(--color-secondary); }
+.text-bloom-moss { color: var(--color-primary); filter: brightness(0.9); }
+.text-bloom-clay { color: var(--color-secondary); opacity: 0.7; }
+.text-bloom-sand { color: var(--color-accent); opacity: 0.8; }
+
+.border-bloom-cream { border-color: var(--color-accent); }
+.border-bloom-sage { border-color: var(--color-primary); }
+.border-bloom-dark { border-color: var(--color-secondary); }
+.border-bloom-moss { border-color: var(--color-primary); }
+.border-bloom-clay { border-color: var(--color-secondary); }
+.border-bloom-sand { border-color: var(--color-accent); }
+
+/* Bloom shadow */
+.bloom-shadow {
+  box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
+}
+
+/* Bloom button styles */
+.btn-bloom {
+  font-family: var(--font-heading, serif);
+  font-weight: 600;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  border-radius: 9999px;
+  transition: all 0.5s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-bloom.btn-sage {
+  background-color: var(--color-primary);
+  color: var(--color-accent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.btn-bloom.btn-sage:hover {
+  background-color: var(--color-secondary);
+  transform: translateY(-2px);
+}
+
+.btn-bloom.btn-outline {
+  background-color: transparent;
+  color: var(--color-secondary);
+  border: 2px solid var(--color-secondary);
+}
+
+.btn-bloom.btn-outline:hover {
+  background-color: var(--color-secondary);
+  color: var(--color-accent);
+}
+
+/* Bloom animations */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.05; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 4s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 1s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.8s ease-out;
+}
+
+/* Bloom typography */
+.heading-xl {
+  font-family: var(--font-heading, serif);
+  font-size: clamp(3rem, 8vw, 8rem);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+}

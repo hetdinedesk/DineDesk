@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { MapPin, Phone, Mail, Clock, Navigation } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
-import * as DOMPurify from 'dompurify';
+import DOMPurify from 'dompurify';
 
 // Clean HTML content - strip complex structures, keep basic text elements
 const cleanPageContent = (html) => {
@@ -225,6 +225,17 @@ function LocationMapSection({ locations, restaurantName }) {
 export default function CustomTemplate({ data, page, banner }) {
   const { locations, shortcodes, restaurant } = useCMS();
 
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    subject: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null); // 'success' | 'error' | null
+
   // Use the page passed from CMS, or fallback to finding it
   const contactPage = page;
   const primaryLocation = locations.find((loc) => loc.isPrimary && loc.isActive) || locations[0];
@@ -247,6 +258,48 @@ export default function CustomTemplate({ data, page, banner }) {
 
   // Get banner from page data or passed prop
   const pageBanner = banner || (contactPage?.bannerId ? data?.banners?.find(b => b.id === contactPage.bannerId) : null);
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_CMS_API_URL || process.env.CMS_API_URL;
+      const response = await fetch(`${apiUrl}/enquiries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          clientId: data?.client?.id
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSubmitStatus('success');
+        setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+      } else {
+        setSubmitStatus('error');
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      setSubmitStatus('error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.id]: e.target.value
+    });
+  };
 
   return (
     <div className="min-h-screen">
@@ -323,16 +376,16 @@ export default function CustomTemplate({ data, page, banner }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Main Content Area */}
-        <div className={`grid gap-12 ${showEnquiryForm ? 'grid-cols-1 lg:grid-cols-2 items-start' : 'grid-cols-1 max-w-6xl mx-auto'}`}>
+        <div className={`grid gap-12 ${showEnquiryForm ? 'grid-cols-1 lg:grid-cols-2 items-stretch' : 'grid-cols-1'}`}>
           {/* Content Column - Only shows CMS content, no auto location info */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex flex-col"
+            className={`flex flex-col ${showEnquiryForm ? 'h-full' : ''}`}
           >
-            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-10 lg:p-14">
+            <div className={`bg-white rounded-2xl shadow-xl ${showEnquiryForm ? 'p-6 sm:p-10 lg:p-14 h-full flex flex-col' : 'p-6 sm:p-8 lg:p-10'}`}>
               <div
-                className="prose prose-lg sm:prose-xl max-w-none text-gray-800 leading-relaxed flex-1"
+                className={`prose prose-lg sm:prose-xl max-w-none text-gray-800 leading-relaxed ${showEnquiryForm ? 'flex-1' : ''}`}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cleanPageContent(content)) }}
               />
             </div>
@@ -348,7 +401,20 @@ export default function CustomTemplate({ data, page, banner }) {
               <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-6">
                 Send Us a Message
               </h2>
-              <form className="space-y-4">
+              
+              {submitStatus === 'success' && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+                  Thank you! Your message has been sent successfully.
+                </div>
+              )}
+              
+              {submitStatus === 'error' && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+                  Sorry, there was an error sending your message. Please try again.
+                </div>
+              )}
+              
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                     Name *
@@ -357,7 +423,10 @@ export default function CustomTemplate({ data, page, banner }) {
                     type="text"
                     id="name"
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)]"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)] disabled:opacity-50"
                     placeholder="Your name"
                   />
                 </div>
@@ -370,7 +439,10 @@ export default function CustomTemplate({ data, page, banner }) {
                     type="email"
                     id="email"
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)]"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)] disabled:opacity-50"
                     placeholder="your@email.com"
                   />
                 </div>
@@ -382,7 +454,10 @@ export default function CustomTemplate({ data, page, banner }) {
                   <input
                     type="tel"
                     id="phone"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)]"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)] disabled:opacity-50"
                     placeholder="(555) 123-4567"
                   />
                 </div>
@@ -395,7 +470,10 @@ export default function CustomTemplate({ data, page, banner }) {
                     type="text"
                     id="subject"
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)]"
+                    value={formData.subject}
+                    onChange={handleInputChange}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)] disabled:opacity-50"
                     placeholder="How can we help?"
                   />
                 </div>
@@ -408,16 +486,20 @@ export default function CustomTemplate({ data, page, banner }) {
                     id="message"
                     required
                     rows={5}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)] resize-none"
+                    value={formData.message}
+                    onChange={handleInputChange}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)] resize-none disabled:opacity-50"
                     placeholder="Tell us more..."
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-[var(--color-secondary)] text-white py-3 rounded-lg font-semibold hover:bg-opacity-90 transition-all transform hover:scale-105"
+                  disabled={isSubmitting}
+                  className="w-full bg-[var(--color-secondary)] text-white py-3 rounded-lg font-semibold hover:bg-opacity-90 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  Send Message
+                  {isSubmitting ? 'Sending...' : 'Send Message'}
                 </button>
 
                 <p className="text-sm text-gray-500 text-center">

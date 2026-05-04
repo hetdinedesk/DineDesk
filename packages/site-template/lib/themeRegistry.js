@@ -19,13 +19,54 @@ export const THEME_REGISTRY = {
       ctaBg: '#C8823A',
       ctaText: '#ffffff',
       accentBg: '#F7F2EA',
+      utilityBeltBg: '#C8823A',
+      utilityBeltText: '#ffffff',
     },
     features: ['Utility belt', 'Dynamic sections', 'Reviews carousel', 'Responsive header'],
     targetBusinessTypes: ['Full-service restaurants', 'Cafes', 'Fine dining']
+  },
+  'theme-d2': {
+    name: 'Cafe Theme (D2)',
+    description: 'Warm, elegant cafe theme with rounded corners and serif typography',
+    templatePath: '../templates/theme-d2',
+    componentPath: '../components/theme-d2',
+    defaultColors: {
+      primary: '#C8823A',
+      secondary: '#1C2B1A',
+      accentBg: '#F7F2EA',
+      headerBg: '#ffffff',
+      headerText: '#1A1A1A',
+      navBg: '#1C2B1A',
+      navText: '#ffffff',
+      bodyBg: '#F7F2EA',
+      bodyText: '#1C2B1A',
+      ctaBg: '#C8823A',
+      ctaText: '#ffffff',
+    },
+    features: ['Utility belt', 'Banner carousel', 'Promo tiles', 'Reviews carousel', 'Responsive header', 'Rounded corners', 'Serif typography'],
+    targetBusinessTypes: ['Coffee shops', 'Artisan cafes', 'Bakeries', 'Brunch spots']
+  },
+  'theme-d3': {
+    name: 'Cafe Theme (D3)',
+    description: 'Alternative cafe theme with unique styling',
+    templatePath: '../templates/theme-d3',
+    componentPath: '../components/theme-d3',
+    defaultColors: {
+      primary: '#C8823A',
+      secondary: '#1C2B1A',
+      accentBg: '#F7F2EA',
+      headerBg: '#ffffff',
+      headerText: '#1A1A1A',
+      navBg: '#1C2B1A',
+      navText: '#ffffff',
+      bodyBg: '#F7F2EA',
+      bodyText: '#1C2B1A',
+      ctaBg: '#C8823A',
+      ctaText: '#ffffff',
+    },
+    features: ['Utility belt', 'Banner carousel', 'Promo tiles', 'Reviews carousel', 'Responsive header'],
+    targetBusinessTypes: ['Coffee shops', 'Artisan cafes', 'Bakeries', 'Brunch spots']
   }
-  // Future themes can be added here:
-  // 'theme-d2': { ... },
-  // 'theme-minimal': { ... }
 }
 
 export function getThemeConfig(themeKey = 'theme-d1') {

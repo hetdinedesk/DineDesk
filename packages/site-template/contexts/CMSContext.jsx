@@ -39,6 +39,7 @@ function adaptCMSData(data) {
     ordering = {},
     _homeBanner = null,
     _homePage = null,
+    themeKey = 'theme-d1',
   } = data || {};
 
   // Normalize hours to always be an array of { day, open, close, closed }
@@ -423,12 +424,27 @@ function adaptCMSData(data) {
     reviews: mappedReviews,
     headerCtas: mappedHeaderCtas,
     booking: {
+      enabled: booking.enabled === true,
+      confirmationMethod: booking.confirmationMethod || 'email',
+      bookingUrl: booking.bookingUrl || '',
+      bookingPhone: booking.bookingPhone || '',
       url: booking.bookingUrl || '',
-      label: booking.bookLabel || 'Book Table',
-      showInHeader: booking.showInHeader === true,
+      label: booking.bookLabel || 'Book a Table',
+      bookLabel: booking.bookLabel || 'Book a Table',
+      bookConfirmMsg: booking.bookConfirmMsg || 'Booking submitted successfully!',
+      showInNav: booking.showInNav !== false,
+      showInHeader: booking.showInHeader !== false,
+      showOnLocations: booking.showOnLocations !== false,
       orderUrl: booking.orderUrl || '',
       orderLabel: booking.orderLabel || 'Order Online',
       showOrderBtn: booking.showOrderBtn === true,
+      minParty: booking.minParty || 1,
+      maxParty: booking.maxParty || 20,
+      advanceNotice: booking.advanceNotice || 2,
+      maxDaysAhead: booking.maxDaysAhead || 60,
+      slotInterval: booking.slotInterval || 30,
+      notifyEmail: booking.notifyEmail || '',
+      maxTables: booking.maxTables || 20,
     },
     // Add raw data for UtilityBelt
     rawSettings: settings,
@@ -462,6 +478,7 @@ function adaptCMSData(data) {
     googleReviewUrl: siteConfig.googleReviews?.placeId 
       ? `https://search.google.com/local/writereview?placeid=${siteConfig.googleReviews.placeId}` 
       : null,
+    themeKey: themeKey || 'theme-d1',
   }
 }
 
@@ -487,7 +504,7 @@ export const CMSProvider = ({ data, children }) => {
       document.documentElement.style.setProperty('--color-cta-bg', colours.ctaBg || '#C8823A');
       document.documentElement.style.setProperty('--color-cta-text', colours.ctaText || '#ffffff');
       document.documentElement.style.setProperty('--color-accent-bg', colours.accentBg || '#F7F2EA');
-      document.documentElement.style.setProperty('--color-utility-belt-bg', colours.utilityBeltBg || colours.primary || '#C8823A');
+      document.documentElement.style.setProperty('--color-utility-belt-bg', colours.utilityBeltBg || colours.primary);
       document.documentElement.style.setProperty('--color-utility-belt-text', colours.utilityBeltText || '#ffffff');
       
       // Also update the branding object for backward compatibility

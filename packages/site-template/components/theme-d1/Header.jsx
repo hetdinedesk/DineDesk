@@ -6,6 +6,7 @@ import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UtilityBelt } from './UtilityBelt';
+import BookingButton from '../BookingButton';
 
 export const Header = () => {
   const { navigation, siteConfig, restaurant, booking, rawData } = useCMS();
@@ -95,7 +96,9 @@ export const Header = () => {
   const headerTextColor = isTransparent 
     ? '#ffffff' // White text on semi-transparent overlay
     : scrolled
-      ? 'var(--color-header-text)' // Normal text when scrolled
+      ? isDark 
+        ? '#ffffff' // White text when scrolled in dark theme (dark background)
+        : 'var(--color-header-text)' // Normal text when scrolled in light theme
       : isDark 
         ? '#ffffff' 
         : 'var(--color-header-text)';
@@ -103,7 +106,7 @@ export const Header = () => {
 
   // Pass down all necessary props
   const props = { 
-    navigation, siteConfig, restaurant, booking, activeNavItems, router, 
+    navigation, siteConfig, restaurant, booking, rawData, activeNavItems, router, 
     mobileMenuOpen, setMobileMenuOpen, scrolled, 
     headerType, isTransparent, headerTheme, isDark, 
     displayLogo, headerBg, headerTextColor, headerPositionClass,
@@ -143,8 +146,8 @@ const getNavUrl = (item, children = []) => {
 const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, isDark }) => {
   const [open, setOpen] = useState(false);
   const isActive = router.asPath === item.url || children.some(c => router.asPath === c.url);
-  const linkCls = `text-sm font-medium tracking-wide transition-colors relative group ${isActive ? 'text-[var(--color-secondary)]' : 'hover:text-[var(--color-secondary)]'}`;
-  const underline = <span className={`absolute -bottom-1 left-0 w-0 h-0.5 bg-[var(--color-secondary)] transition-all group-hover:w-full ${isActive ? 'w-full' : ''}`} />;
+  const linkCls = `text-sm font-medium tracking-wide transition-colors relative group`;
+  const underline = <span className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all group-hover:w-full ${isActive ? 'w-full' : ''}`} style={{ backgroundColor: 'var(--color-secondary)' }} />;
 
   // Redirect to first child page when heading is clicked
   const firstChildUrl = children.length > 0 ? (children[0].url || '#') : (item.url || '#');
@@ -174,7 +177,7 @@ const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, 
         </Link>
         {/* Dropdown trigger for accessing other pages */}
         <button
-          className={`ml-1 p-1 transition-colors ${isActive ? 'text-[var(--color-secondary)]' : 'hover:text-[var(--color-secondary)]'}`}
+          className="ml-1 p-1 transition-colors"
           style={{ color: isActive ? 'var(--color-secondary)' : headerTextColor, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
           onClick={(e) => { e.preventDefault(); setOpen(!open); }}
         >
@@ -211,7 +214,7 @@ const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, 
 };
 
 const StandardHeader = (props) => {
-  const { mobileMenuOpen, setMobileMenuOpen, displayLogo, restaurant, booking, isDark, headerBg, headerTextColor, headerPositionClass, activeNavItems, navigation, router, withSiteParam, orderingEnabled, totalItems, toggleCart } = props;
+  const { mobileMenuOpen, setMobileMenuOpen, displayLogo, restaurant, booking, rawData, isDark, headerBg, headerTextColor, headerPositionClass, activeNavItems, navigation, router, withSiteParam, orderingEnabled, totalItems, toggleCart } = props;
   return (
     <div className={headerPositionClass}>
       <UtilityBelt isDark={isDark} />
@@ -260,13 +263,14 @@ const StandardHeader = (props) => {
                   {booking.orderLabel || 'Order Online'}
                 </Link>
               )}
-              {booking?.showInHeader && booking?.url && (
-                <Link 
-                  href={withSiteParam(booking.url) || '#'} 
+              {booking?.showInHeader && (
+                <BookingButton
+                  booking={{ ...booking, clientId: rawData?.client?.id }}
+                  locations={rawData?.client?.locations || []}
                   className="px-4 py-2 rounded-md text-sm font-bold transition-all bg-[var(--color-secondary)] text-white hover:opacity-90"
                 >
-                  {booking.label || 'Book Table'}
-                </Link>
+                  {booking.bookLabel || 'Book a Table'}
+                </BookingButton>
               )}
               {orderingEnabled && (
                 <button
@@ -365,13 +369,14 @@ const StandardHeader = (props) => {
                         {booking.orderLabel || 'Order Online'}
                       </Link>
                     )}
-                    {booking?.showInHeader && booking?.url && (
-                      <Link
-                        href={withSiteParam(booking.url) || '#'}
-                        className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-secondary)] text-white"
+                    {booking?.showInHeader && (
+                      <BookingButton
+                        booking={{ ...booking, clientId: rawData?.client?.id }}
+                        locations={rawData?.client?.locations || []}
+                        className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-secondary)] text-white hover:opacity-90"
                       >
-                        {booking.label || 'Book Table'}
-                      </Link>
+                        {booking.bookLabel || 'Book a Table'}
+                      </BookingButton>
                     )}
                   </div>
                 )}
@@ -384,7 +389,7 @@ const StandardHeader = (props) => {
   );
 };
 
-const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaurant, navigation, booking, isDark, headerBg, headerTextColor, headerPositionClass, withSiteParam, orderingEnabled, totalItems, toggleCart }) => {
+const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaurant, navigation, booking, rawData, isDark, headerBg, headerTextColor, headerPositionClass, withSiteParam, orderingEnabled, totalItems, toggleCart }) => {
   const router = useRouter();
   // Filter headings: only show if they have at least one child page
   const childrenMap = buildChildrenMap(navigation);
@@ -455,6 +460,17 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
                 >
                   {booking.orderLabel || 'Order Online'}
                 </Link>
+              )}
+              {booking?.showInHeader && (
+                <BookingButton
+                  booking={{ ...booking, clientId: rawData?.client?.id }}
+                  locations={rawData?.client?.locations || []}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                    isDark ? 'bg-white text-gray-900 hover:bg-gray-100' : 'bg-gray-900 text-white hover:bg-gray-800'
+                  }`}
+                >
+                  {booking.bookLabel || 'Book a Table'}
+                </BookingButton>
               )}
               {orderingEnabled && (
                 <button
@@ -570,14 +586,15 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
                           {booking.orderLabel || 'Order Online'}
                         </Link>
                       )}
-                      {booking?.showInHeader && booking?.url && (
-                        <Link
-                          href={withSiteParam(booking.url) || '#'}
-                          onClick={() => setMobileMenuOpen(false)}
+                      {booking?.showInHeader && (
+                        <BookingButton
+                          booking={{ ...booking, clientId: rawData?.client?.id }}
+                          locations={rawData?.client?.locations || []}
                           className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-secondary)] text-white hover:opacity-90"
+                          onClick={() => setMobileMenuOpen(false)}
                         >
-                          {booking.label || 'Book Table'}
-                        </Link>
+                          {booking.bookLabel || 'Book a Table'}
+                        </BookingButton>
                       )}
                     </div>
                   )}
@@ -591,7 +608,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
   );
 };
 
-const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaurant, navigation, booking, isDark, headerBg, headerTextColor, headerPositionClass, withSiteParam, orderingEnabled, totalItems, toggleCart }) => {
+const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaurant, navigation, booking, rawData, isDark, headerBg, headerTextColor, headerPositionClass, withSiteParam, orderingEnabled, totalItems, toggleCart }) => {
   const router = useRouter();
   // Filter headings: only show if they have at least one child page
   const childrenMap = buildChildrenMap(navigation);
@@ -735,14 +752,15 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
                           {booking.orderLabel || 'Order Online'}
                         </Link>
                       )}
-                      {booking?.showInHeader && booking?.url && (
-                        <Link
-                          href={withSiteParam(booking.url) || '#'}
+                      {booking?.showInHeader && (
+                        <BookingButton
+                          booking={{ ...booking, clientId: rawData?.client?.id }}
+                          locations={rawData?.client?.locations || []}
+                          className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-primary)] text-white hover:opacity-90"
                           onClick={() => setMobileMenuOpen(false)}
-                          className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-secondary)] text-white hover:opacity-90"
                         >
-                          {booking.label || 'Book Table'}
-                        </Link>
+                          {booking.bookLabel || 'Book a Table'}
+                        </BookingButton>
                       )}
                     </div>
                   )}

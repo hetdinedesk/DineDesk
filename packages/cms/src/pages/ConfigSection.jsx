@@ -1887,67 +1887,60 @@ const THEMES = [
                 utilityBeltBg:'#C8823A', utilityBeltText:'#ffffff' }
   },
   {
-    key:   'cafe-d1',
-    label: 'Cafe (D1)',
-    target: 'Coffee shops, Artisan cafes, Bakeries',
-    sellAngle: 'Warm, elegant, and artisanal',
-    style: 'Premium cafe theme with elegant typography and smooth animations',
+    key:   'theme-d2',
+    label: 'Cafe Theme (D2)',
+    target: 'Coffee shops, Artisan cafes, Bakeries, Brunch spots',
+    sellAngle: 'Warm, elegant cafe theme with rounded corners and serif typography',
+    style: 'Premium cafe theme with elegant typography, rounded corners, and smooth animations',
+    features: ['Utility belt', 'Banner carousel', 'Promo tiles', 'Reviews carousel', 'Responsive header', 'Rounded corners', 'Serif typography'],
+    hasSeparateNav: false,
+    defaults: { primary:'#C8823A', secondary:'#1C2B1A', headerBg:'#ffffff',
+                headerText:'#1A1A1A', navBg:'#1C2B1A', navText:'#ffffff',
+                bodyBg:'#F7F2EA', bodyText:'#1C2B1A',
+                ctaBg:'#C8823A', ctaText:'#ffffff', accentBg:'#F7F2EA',
+                utilityBeltBg:'#C8823A', utilityBeltText:'#ffffff' }
+  },
+  {
+    key:   'theme-d3',
+    label: 'Cafe Theme (D3)',
+    target: 'Coffee shops, Artisan cafes, Bakeries, Brunch spots',
+    sellAngle: 'Alternative cafe theme with unique styling',
+    style: 'Cafe theme with alternative styling approach',
     features: ['Utility belt', 'Banner carousel', 'Promo tiles', 'Reviews carousel', 'Responsive header'],
     hasSeparateNav: false,
-    defaults: { primary:'#1A0F0A', secondary:'#C68642', headerBg:'#FAF7F2',
-                headerText:'#1A0F0A', navBg:'#1A0F0A', navText:'#ffffff',
-                bodyBg:'#FAF7F2', bodyText:'#1A0F0A',
-                ctaBg:'#C68642', ctaText:'#ffffff', accentBg:'#FAF7F2',
-                utilityBeltBg:'#1A0F0A', utilityBeltText:'#ffffff' }
-  },
-  {
-    key:   'theme-v2',
-    label: 'Classic Bistro',
-    target: 'Traditional venues',
-    sellAngle: 'Timeless and elegant',
-    style: 'Classic layout with separate header and navigation',
-    features: ['Separate header and navigation'],
-    hasSeparateNav: true, // Separate header and navigation
-    comingSoon: true,
-    defaults: { primary:'#D4AF37', secondary:'#0A0A0A' }
-  },
-  {
-    key:   'theme-v3',
-    label: 'Urban Minimal',
-    target: 'Trendy spots',
-    sellAngle: 'Sleek and modern',
-    style: 'Minimalist layout with separate header and navigation',
-    features: ['Separate header and navigation'],
-    hasSeparateNav: true, // Separate header and navigation
-    comingSoon: true,
-    defaults: { primary:'#1A1A1A', secondary:'#ffffff' }
+    defaults: { primary:'#C8823A', secondary:'#1C2B1A', headerBg:'#ffffff',
+                headerText:'#1A1A1A', navBg:'#1C2B1A', navText:'#ffffff',
+                bodyBg:'#F7F2EA', bodyText:'#1C2B1A',
+                ctaBg:'#C8823A', ctaText:'#ffffff', accentBg:'#F7F2EA',
+                utilityBeltBg:'#C8823A', utilityBeltText:'#ffffff' }
   }
 ]
 
 const COLOUR_GROUPS = [
-  { section:'Utility Belt', fields:[
-    { key:'utilityBeltBg',    label:'Utility Belt Background' },
-    { key:'utilityBeltText',  label:'Utility Belt Text'       },
+  { section:'Utility Belt', hint:'Top bar with contact info and social links', fields:[
+    { key:'utilityBeltBg',    label:'Background', hint:'The top strip behind phone/email/social icons' },
+    { key:'utilityBeltText',  label:'Text & Icons', hint:'Phone number, email, and social icons' },
   ]},
-  { section:'Header',     fields:[
-    { key:'headerBg',    label:'Header Background' },
-    { key:'headerText',  label:'Header Text'       },
+  { section:'Header', hint:'Logo area at the top of every page', fields:[
+    { key:'headerBg',    label:'Background', hint:'Area behind your logo' },
+    { key:'headerText',  label:'Logo & Menu', hint:'Your logo and main navigation links' },
   ]},
-  { section:'Navigation', fields:[
-    { key:'navBg',       label:'Nav Background'   },
-    { key:'navText',     label:'Nav Text'          },
+  { section:'Navigation Bar', hint:'Menu bar below the header (on some themes)', fields:[
+    { key:'navBg',       label:'Background', hint:'Menu bar background color' },
+    { key:'navText',     label:'Menu Items', hint:'Navigation links text color' },
   ]},
-  { section:'Brand',      fields:[
-    { key:'primary',     label:'Primary Colour'   },
-    { key:'secondary',   label:'Secondary Colour' },
+  { section:'Accent Colors', hint:'Main brand colors used throughout the site', fields:[
+    { key:'primary',     label:'Primary Accent', hint:'Buttons, links, icons, highlights, and key elements' },
+    { key:'secondary',   label:'Dark/Headings', hint:'Footer background, hero sections, headings, and dark areas' },
   ]},
-  { section:'Body',       fields:[
-    { key:'bodyBg',      label:'Page Background'  },
-    { key:'bodyText',    label:'Body Text'        },
+  { section:'Page Background', hint:'Main page and content card colors', fields:[
+    { key:'bodyBg',      label:'Page Background', hint:'The overall page background (may be overridden by theme)' },
+    { key:'accentBg',    label:'Content Cards', hint:'Footer text, featured sections, cards, and light backgrounds' },
   ]},
-  { section:'Buttons',    fields:[
-    { key:'ctaBg',       label:'Button Background' },
-    { key:'ctaText',     label:'Button Text'       },
+  { section:'Text & Buttons', hint:'Main text and call-to-action buttons', fields:[
+    { key:'bodyText',    label:'Main Text', hint:'Paragraphs and general content text (may be overridden by theme)' },
+    { key:'ctaBg',       label:'Button Background', hint:'Call-to-action buttons like "Book Now", "Order Online"' },
+    { key:'ctaText',     label:'Button Text', hint:'Text inside buttons' },
   ]},
 ]
 
@@ -2233,14 +2226,21 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
               <div key={group.section} style={{ background:C.card,
                 border:`1px solid ${C.border}`, borderRadius:12,
                 padding:20, marginBottom:16 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-                  textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-                  {group.section}
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                    {group.section}
+                  </div>
+                  {group.hint && (
+                    <div style={{ fontSize:11, color:C.t3, marginTop:3, fontStyle:'italic' }}>
+                      {group.hint}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                  {group.fields.map(({ key, label }) => {
+                  {group.fields.map(({ key, label, hint }) => {
                     // Check if this field should be disabled
-                    const isNavigationField = group.section === 'Navigation'
+                    const isNavigationField = group.section === 'Navigation Bar'
                     const isDisabled = isNavigationField && !hasSeparateNav
                     
                     return (
@@ -2308,10 +2308,17 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
                           onFocus={e => !isDisabled && (e.target.style.borderColor = C.acc)}
                           onBlur={e  => !isDisabled && (e.target.style.borderColor = C.border)}
                         />
-                        <span style={{ fontSize:13, color: isDisabled ? C.t3 : C.t1 }}>
-                          {label}
-                          {isDisabled && ' (Combined with Header)'}
-                        </span>
+                        <div style={{ display:'flex', flexDirection:'column', gap:2, flex:1 }}>
+                          <span style={{ fontSize:13, color: isDisabled ? C.t3 : C.t1 }}>
+                            {label}
+                            {isDisabled && ' (Combined with Header)'}
+                          </span>
+                          {hint && !isDisabled && (
+                            <span style={{ fontSize:10, color:C.t3, fontStyle:'italic', lineHeight:1.3 }}>
+                              {hint}
+                            </span>
+                          )}
+                        </div>
                         <div style={{ 
                           width:28, 
                           height:28, 
@@ -2345,7 +2352,7 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
               {/* Utility Belt Preview - On Top */}
               {isUtilityBeltEnabled && (
                 <div style={{ 
-                  background: colours.utilityBeltBg || colours.primary || '#C8823A',
+                  background: colours.utilityBeltBg || colours.primary,
                   padding:'4px 14px',
                   display:'flex',
                   alignItems:'center',
@@ -2457,9 +2464,23 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
                 </div>
               </div>
 
-              <div style={{ background: colours.navBg || '#1C2B1A', padding:'10px 14px' }}>
-                <div style={{ fontSize:9, textAlign:'center',
-                  color: (colours.navText || '#ffffff') + '80' }}>
+              {/* Footer Preview - Uses Dark/Headings for bg, Content Cards for text */}
+              <div style={{ background: colours.secondary || '#1C2B1A', padding:'12px 14px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                  <div style={{ width:20, height:20, borderRadius:'50%',
+                    background: (colours.accentBg || '#F7F2EA') + '20' }}>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:600,
+                    color: colours.accentBg || '#F7F2EA' }}>Restaurant Name</span>
+                </div>
+                <div style={{ display:'flex', gap:12, marginBottom:8 }}>
+                  <span style={{ fontSize:9, color: (colours.accentBg || '#F7F2EA') + '60' }}>Home</span>
+                  <span style={{ fontSize:9, color: (colours.accentBg || '#F7F2EA') + '60' }}>Menu</span>
+                  <span style={{ fontSize:9, color: (colours.accentBg || '#F7F2EA') + '60' }}>Contact</span>
+                </div>
+                <div style={{ fontSize:8, textAlign:'center',
+                  color: (colours.accentBg || '#F7F2EA') + '40', paddingTop:8,
+                  borderTop:`1px solid ${(colours.accentBg || '#F7F2EA')}10` }}>
                   © 2025 Restaurant Name · All rights reserved
                 </div>
               </div>

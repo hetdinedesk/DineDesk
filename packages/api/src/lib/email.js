@@ -188,6 +188,68 @@ function generateRestaurantNotificationHtml(order, clientName) {
   `
 }
 
+function generateEnquiryEmailHtml(enquiry, clientName, clientData = {}) {
+  const primaryColor = clientData.colours?.primary || '#2563eb'
+  const logoUrl = clientData.logo || ''
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: ${primaryColor}; padding: 30px 20px; border-radius: 8px 8px 0 0; text-align: center; color: white; }
+        .header h1 { margin: 0 0 8px; color: white; }
+        .header p { margin: 0; color: rgba(255,255,255,0.9); }
+        .logo { max-width: 120px; max-height: 60px; margin-bottom: 16px; }
+        .content { background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
+        .info-box { background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #e5e7eb; }
+        .info-label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+        .message-box { background: ${primaryColor}10; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${primaryColor}; }
+        .footer { text-align: center; color: #666; font-size: 14px; margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 0 0 8px 8px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          ${logoUrl ? `<img src="${logoUrl}" alt="${clientName}" class="logo" />` : ''}
+          <h1>📬 New Enquiry</h1>
+          <p>Website Contact Form</p>
+        </div>
+        <div class="content">
+          <div class="info-box">
+            <div class="info-label">From</div>
+            <div style="font-weight: 600; font-size: 16px;">${enquiry.name}</div>
+            <div style="color: #666; margin-top: 4px;">${enquiry.email}</div>
+            ${enquiry.phone ? `<div style="color: #666; margin-top: 4px;">${enquiry.phone}</div>` : ''}
+          </div>
+
+          <div class="info-box">
+            <div class="info-label">Subject</div>
+            <div style="font-weight: 600;">${enquiry.subject}</div>
+          </div>
+
+          <div class="message-box">
+            <div class="info-label">Message</div>
+            <div style="white-space: pre-wrap; line-height: 1.8;">${enquiry.message}</div>
+          </div>
+
+          <div style="margin-top: 20px; font-size: 12px; color: #999;">
+            Submitted on: ${new Date().toLocaleString()}
+          </div>
+        </div>
+        <div class="footer">
+          <p style="margin: 0;">This enquiry was submitted via the ${clientName} website contact form.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
 async function sendOrderConfirmation(order, clientName, notificationConfig, clientData = {}, locationData = {}) {
   if (!notificationConfig?.sendCustomerReceipt) {
     return { success: false, message: 'Customer receipt disabled' }
@@ -249,7 +311,42 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
   }
 }
 
+async function sendEnquiryEmail(enquiry, clientName, notificationConfig, clientData = {}) {
+  if (!notificationConfig?.smtpHost || !notificationConfig?.smtpUser || !notificationConfig?.smtpPassword) {
+    return { success: false, message: 'SMTP not configured' }
+  }
+
+  try {
+    const emailTransporter = getTransporter(notificationConfig)
+    if (!emailTransporter) {
+      return { success: false, message: 'Failed to create email transporter' }
+    }
+
+    const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
+    const toEmail = clientData.email || clientData.settings?.defaultEmail || notificationConfig.smtpFrom
+
+    if (!toEmail) {
+      return { success: false, message: 'No recipient email configured' }
+    }
+
+    const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
+
+    await emailTransporter.sendMail({
+      from: fromEmail,
+      to: toEmail,
+      subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
+      html
+    })
+
+    return { success: true, message: 'Enquiry email sent' }
+  } catch (err) {
+    console.error('[EMAIL] Failed to send enquiry email:', err)
+    return { success: false, message: err.message }
+  }
+}
+
 module.exports = {
   sendOrderConfirmation,
-  sendRestaurantNotification
+  sendRestaurantNotification,
+  sendEnquiryEmail
 }

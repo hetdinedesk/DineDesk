@@ -1,8 +1,35 @@
 import Head from 'next/head'
 import { buildThemeCSS } from '../lib/theme'
 import { CartProvider } from '../contexts/CartContext'
-import CartDrawer from '../components/theme-d1/CartDrawer'
+import { useState, useEffect } from 'react'
 import '../styles/theme-d1/index.css'
+import '../styles/theme-d2/index.css'
+import '../styles/theme-d3/index.css'
+
+// Dynamic theme loading
+function ThemeLoader({ themeKey, children }) {
+  const [CartDrawer, setCartDrawer] = useState(null)
+
+  useEffect(() => {
+    const loadTheme = async () => {
+      const theme = themeKey || 'theme-d1'
+
+      // Load CartDrawer component
+      try {
+        const module = await import(`../components/${theme}/CartDrawer`)
+        setCartDrawer(() => module.default)
+      } catch (error) {
+        console.warn(`Failed to load CartDrawer for theme ${theme}, falling back to theme-d1`)
+        const module = await import('../components/theme-d1/CartDrawer')
+        setCartDrawer(() => module.default)
+      }
+    }
+
+    loadTheme()
+  }, [themeKey])
+
+  return <>{children(CartDrawer)}</>
+}
 
 export default function App({ Component, pageProps }) {
   const data      = pageProps.data     || {}
@@ -13,6 +40,7 @@ export default function App({ Component, pageProps }) {
   const isLive    = settings.indexing  === 'allowed'
   const siteName  = settings.displayName || settings.restaurantName || data.client?.name || 'Restaurant'
   const faviconUrl = settings.favicon  || null
+  const themeKey  = data.themeKey || 'theme-d1'
 
   return (
     <>
@@ -101,8 +129,14 @@ export default function App({ Component, pageProps }) {
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
       <CartProvider ordering={data.ordering}>
-        <Component {...pageProps}/>
-        <CartDrawer />
+        <ThemeLoader themeKey={themeKey}>
+          {(CartDrawer) => (
+            <>
+              <Component {...pageProps}/>
+              {CartDrawer && <CartDrawer />}
+            </>
+          )}
+        </ThemeLoader>
       </CartProvider>
     </>
   )

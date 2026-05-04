@@ -1,0 +1,47 @@
+/* Theme D1 Base Styles */
+:root {
+  /* Default theme colors - overridden by CMS data via buildThemeCSS */
+  --color-primary: #1a1a1a;
+  --color-secondary: #d4af37;
+  --color-accent: #8b4513;
+  --font-heading: 'Cormorant Garamond', serif;
+  
+  /* Base colors */
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: #f3f4f6;
+  --ring: #d4af37;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: #334155;
+  --ring: #d4af37;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}

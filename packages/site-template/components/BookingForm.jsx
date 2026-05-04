@@ -117,11 +117,9 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
   const hasMultipleLocations = locations && locations.length > 1
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Book a Table</h2>
-
+    <div className="p-6">
       {bookingConfig.bookLabel && (
-        <p className="text-gray-600 mb-6">{bookingConfig.bookLabel}</p>
+        <p className="text-gray-600 mb-6 text-sm">{bookingConfig.bookLabel}</p>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">

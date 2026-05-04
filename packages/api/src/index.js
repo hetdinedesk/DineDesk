@@ -61,6 +61,7 @@ app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:
 app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
 app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
 app.use('/api/loyalty', require('./routes/loyalty'))
+app.use('/api/enquiries', require('./routes/enquiries'))
 
 // GROUPS ROUTE - for organizing sites
 app.use('/api/groups', require('./routes/groups'))

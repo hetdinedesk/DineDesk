@@ -457,6 +457,7 @@ const exportData = {
   footer:     cfg?.footer     || {},
   social:     cfg?.social     || {},
   ordering:   cfg?.ordering   || { enabled: false },
+  themeKey:   cfg?.colours?.theme || 'theme-d1',
   loyaltyConfig: loyaltyConfig ? {
     enabled: loyaltyConfig.enabled,
     pointsPerDollar: loyaltyConfig.pointsPerDollar,
@@ -2101,7 +2102,7 @@ router.put('/:id/config', async (req, res) => {
 
     // For each field in updateData, use it directly; for others, keep existing
     const updateObject = {}
-    const allFields = ['settings', 'colours', 'analytics', 'shortcodes', 'homepage', 'posConfig', 'reviews', 'booking', 'notes', 'header', 'footer', 'headerCtas', 'social', 'ordering', 'netlify', 'version']
+    const allFields = ['settings', 'colours', 'analytics', 'shortcodes', 'homepage', 'posConfig', 'reviews', 'booking', 'notes', 'header', 'footer', 'headerCtas', 'social', 'ordering', 'notifications', 'netlify', 'version']
 
     for (const field of allFields) {
       if (updateDataWithVersion[field] !== undefined) {

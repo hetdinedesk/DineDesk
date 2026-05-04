@@ -4,10 +4,30 @@ import { useRouter } from 'next/router'
 import { getSiteData, CMS_API_URL } from '../lib/api'
 import { CMSProvider } from '../contexts/CMSContext'
 import { LoyaltyProvider, useLoyalty } from '../contexts/LoyaltyContext'
-import { Header } from '../components/theme-d1/Header'
-import { Footer } from '../components/theme-d1/Footer'
+import { Header as ThemeD1Header } from '../components/theme-d1/Header'
+import { Footer as ThemeD1Footer } from '../components/theme-d1/Footer'
+import { Header as ThemeD2Header } from '../components/theme-d2/Header'
+import { Footer as ThemeD2Footer } from '../components/theme-d2/Footer'
+import { Header as ThemeD3Header } from '../components/theme-d3/Header'
+import { Footer as ThemeD3Footer } from '../components/theme-d3/Footer'
+
+// Theme component mapping
+const THEME_COMPONENTS = {
+  'theme-v1': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'theme-d1': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'theme-d2': { Header: ThemeD2Header, Footer: ThemeD2Footer },
+  'theme-d3': { Header: ThemeD3Header, Footer: ThemeD3Footer },
+  'cafe': { Header: ThemeD3Header, Footer: ThemeD3Footer },
+  'food-truck': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'casual-family': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'modern-trendy': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'delivery': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'urban-bistro': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'noir-fine-dine': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+  'garden-fresh': { Header: ThemeD1Header, Footer: ThemeD1Footer },
+}
 import { useCart } from '../contexts/CartContext'
-import { ShoppingCart, CreditCard, DollarSign, Clock, User, Phone, Mail, Calendar, Check, X, Loader2, Gift, Star } from 'lucide-react'
+import { ShoppingCart, CreditCard, DollarSign, Clock, User, Phone, Mail, Calendar, Check, X, Loader2, Gift, Star, ArrowLeft, ArrowRight, MapPin, UtensilsCrossed, Sparkles } from 'lucide-react'
 import { loadStripe } from '@stripe/stripe-js'
 import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js'
 
@@ -17,7 +37,8 @@ export async function getServerSideProps({ query }) {
     ? rawSite
     : (process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
-  return { props: { data } }
+  const template = data?.themeKey || data?.colours?.theme || process.env.SITE_TEMPLATE || 'theme-d1'
+  return { props: { data, template } }
 }
 
 // Stripe Checkout Form Component
@@ -52,15 +73,15 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ padding: '12px', border: '1px solid #d1d5db', borderRadius: 8, marginTop: 12, background: '#f9fafb' }}>
+      <div className="p-6 border border-[var(--color-secondary)]/20 rounded-full mt-6 bg-[var(--color-accent)]">
         <CardElement
           options={{
             style: {
               base: {
                 fontSize: '16px',
-                color: '#424770',
+                color: 'var(--color-secondary)',
                 '::placeholder': {
-                  color: '#aab7c4',
+                  color: 'var(--color-secondary)',
                 },
               },
             },
@@ -68,37 +89,26 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
         />
       </div>
       {error && (
-        <div style={{ color: '#ef4444', fontSize: 13, marginTop: 8, padding: 8, background: '#fef2f2', borderRadius: 6 }}>
+        <div className="text-red-500 text-sm mt-3 p-4 bg-red-50 rounded-full">
           {error}
         </div>
       )}
       <button
         type="submit"
         disabled={!stripe || loading}
-        style={{
-          marginTop: 12,
-          padding: '12px 24px',
-          background: (!stripe || loading) ? '#94a3b8' : '#2563eb',
-          color: 'white',
-          border: 'none',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: (!stripe || loading) ? 'not-allowed' : 'pointer',
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          justifyContent: 'center'
-        }}
+        className="w-full mt-6 py-5 rounded-full text-[10px] font-bold tracking-widest uppercase text-[var(--color-accent)] transition-all duration-300 shadow-lg flex items-center justify-center gap-3 bg-[var(--color-primary)] hover:bg-[var(--color-secondary)] disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : 'Pay Now'}
+        {loading ? <Loader2 width={18} height={18} strokeWidth={2} className="animate-spin" /> : 'PAY NOW'}
       </button>
     </form>
   )
 }
 
-export default function CheckoutPage({ data }) {
+export default function CheckoutPage({ data, template }) {
+  // Get correct Header/Footer for theme - do this first before any usage
+  const normalizedTemplate = template?.replace(/\s+/g, '-') || 'theme-d1'
+  const { Header, Footer } = THEME_COMPONENTS[normalizedTemplate] || THEME_COMPONENTS['theme-d1']
+
   const router = useRouter()
   const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
   const paymentGateway = data?.paymentGateway || {}
@@ -160,23 +170,32 @@ export default function CheckoutPage({ data }) {
       <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
         <CMSProvider data={data}>
           <Head>
-            <title>Checkout - Your Cart is Empty</title>
+            <title>Checkout - {normalizedTemplate === 'theme-d1' ? 'Your Cart is Empty' : normalizedTemplate === 'theme-d2' ? 'Your Cart is Empty' : 'Your Harvest is Empty'}</title>
           </Head>
-          <Header />
-          <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <div style={{ textAlign: 'center' }}>
-              <ShoppingCart size={64} style={{ color: '#ccc', margin: '0 auto 16px' }} />
-              <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Your cart is empty</h1>
-              <p style={{ color: '#666', marginBottom: 24 }}>Add items from the menu to proceed to checkout</p>
-              <button
-                onClick={() => router.push(`/menu?site=${router.query.site}`)}
-                style={{ padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
-              >
-                Browse Menu
-              </button>
+          <div className="min-h-screen bg-[var(--color-accent)]">
+            <Header />
+            <div className="min-h-[60vh] flex items-center justify-center px-6 pt-32 pb-24">
+              <div className="text-center space-y-8">
+                <div className="w-24 h-24 bg-[var(--color-primary)]/10 rounded-full flex items-center justify-center mx-auto">
+                  <ShoppingCart width={32} height={32} strokeWidth={2} className="text-[var(--color-primary)]/40" />
+                </div>
+                <div>
+                  <h1 className="font-serif text-5xl italic text-[var(--color-secondary)] mb-4">
+                    {normalizedTemplate === 'theme-d1' ? 'Your cart is empty' : normalizedTemplate === 'theme-d2' ? 'Your cart is empty' : 'Your harvest is empty'}
+                  </h1>
+                  <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">ADD ITEMS FROM THE MENU</p>
+                </div>
+                <button
+                  onClick={() => router.push(`/menu?site=${router.query.site}`)}
+                  className="px-8 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg inline-flex items-center gap-3"
+                >
+                  <ArrowLeft width={18} height={18} strokeWidth={2} />
+                  BROWSE MENU
+                </button>
+              </div>
             </div>
+            <Footer />
           </div>
-          <Footer />
         </CMSProvider>
       </LoyaltyProvider>
     )
@@ -186,12 +205,12 @@ export default function CheckoutPage({ data }) {
 
   return (
     <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
-      <CheckoutContentWrapper data={data} siteName={siteName} router={router} />
+      <CheckoutContentWrapper data={data} siteName={siteName} router={router} Header={Header} Footer={Footer} normalizedTemplate={normalizedTemplate} />
     </LoyaltyProvider>
   )
 }
 
-function CheckoutContentWrapper({ data, siteName, router }) {
+function CheckoutContentWrapper({ data, siteName, router, Header, Footer, normalizedTemplate }) {
   const { customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled } = useLoyalty()
   return <CheckoutContent 
     data={data} 
@@ -205,10 +224,13 @@ function CheckoutContentWrapper({ data, siteName, router }) {
     canRedeemReward={canRedeemReward} 
     getPointsToNextReward={getPointsToNextReward} 
     isLoyaltyEnabled={isLoyaltyEnabled}
+    Header={Header}
+    Footer={Footer}
+    normalizedTemplate={normalizedTemplate}
   />
 }
 
-function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled }) {
+function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled, Header, Footer, normalizedTemplate }) {
   const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
   const paymentGateway = data?.paymentGateway || {}
 
@@ -407,120 +429,156 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     <CMSProvider data={data}>
       <Head>
         <title>Checkout - {siteName}</title>
-        <style>{`
-          @media (max-width: 768px) {
-            .checkout-grid {
-              grid-template-columns: 1fr !important;
-            }
-            .checkout-sticky {
-              position: static !important;
-            }
-            .checkout-sticky > div {
-              position: static !important;
-            }
-            .checkout-step {
-              padding: 16px !important;
-            }
-            .checkout-input {
-              padding: 12px !important;
-              font-size: 16px !important;
-            }
-            .checkout-btn {
-              padding: 14px 20px !important;
-              font-size: 15px !important;
-            }
-          }
-        `}</style>
       </Head>
-      <Header />
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 40px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Checkout</h1>
-        <p style={{ color: '#666', marginBottom: 24 }}>Complete your order</p>
+      <div className="min-h-screen bg-[var(--color-accent)]">
+        <Header />
+        
+        {/* Theme-specific Hero */}
+        {normalizedTemplate === 'theme-d1' && (
+          <div className="relative bg-[var(--color-primary)] py-32 px-6 text-center text-white overflow-hidden">
+            <div className="relative z-10 space-y-6 max-w-4xl mx-auto">
+              <h1 className="font-serif text-5xl md:text-7xl leading-tight" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                Checkout
+              </h1>
+              <p className="max-w-2xl mx-auto text-white/90 font-light text-xl leading-relaxed" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+                Complete your order with our secure checkout process
+              </p>
+            </div>
+            {/* Decorative bottom wave */}
+            <div className="absolute bottom-0 left-0 right-0">
+              <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 120L60 110C120 100 240 80 360 75C480 70 600 80 720 85C840 90 960 90 1080 85C1200 80 1320 70 1380 65L1440 60V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="white" />
+              </svg>
+            </div>
+          </div>
+        )}
+        
+        {normalizedTemplate === 'theme-d2' && (
+          <div className="relative bg-gradient-to-br from-teal-50 to-cyan-100 py-32 px-6 text-center overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-teal-200/30 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-200/30 rounded-full blur-3xl"></div>
+            <div className="relative z-10 space-y-6 max-w-4xl mx-auto">
+              <div className="inline-flex items-center gap-3 text-teal-600 font-sans font-semibold text-sm uppercase tracking-wider">
+                <div className="w-8 h-0.5 bg-teal-600"></div>
+                <span>Modern Dining</span>
+                <div className="w-8 h-0.5 bg-teal-600"></div>
+              </div>
+              <h1 className="font-sans text-5xl md:text-7xl font-bold leading-tight text-gray-900">
+                Checkout
+              </h1>
+              <p className="max-w-2xl mx-auto text-gray-600 font-medium text-lg leading-relaxed">
+                Secure and convenient payment experience
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {(normalizedTemplate === 'theme-d3' || !['theme-d1', 'theme-d2'].includes(normalizedTemplate)) && (
+          <div className="relative bg-[var(--color-secondary)] py-48 px-6 text-center text-[var(--color-accent)] overflow-hidden">
+            <div className="absolute inset-0 z-0 opacity-20 mix-blend-overlay">
+              <img src="https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?q=80&w=2033&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
+            </div>
+            <div className="relative z-10 space-y-8 max-w-4xl mx-auto">
+              <div className="inline-flex items-center gap-4 text-[var(--color-primary)] font-sans font-semibold uppercase tracking-[0.4em] text-[10px]">
+                <Sparkles width={16} height={16} strokeWidth={2} />
+                <span>The Harvest</span>
+              </div>
+              <h1 className="font-serif text-6xl md:text-[120px] leading-[0.8] tracking-tight">
+                <span className="italic text-[var(--color-primary)]">Checkout</span>
+              </h1>
+              <p className="max-w-xl mx-auto text-[var(--color-accent)]/60 font-sans text-sm font-light leading-relaxed">
+                Complete your harvest collection
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-6xl mx-auto px-6 pb-24">
 
         {error && (
-          <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 16, marginBottom: 24, color: '#991b1b' }}>
+          <div className="p-6 bg-red-50 border border-red-200 rounded-[32px] mb-8 text-red-800">
             {error}
           </div>
         )}
 
-        <div className="checkout-grid" style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr 340px' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Left Column - Form Steps */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="lg:col-span-2 space-y-8">
             {/* Step 1: Customer Info */}
-            <div className="checkout-step" style={{ background: 'white', borderRadius: 12, border: step === 1 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
+            <div className={`${normalizedTemplate === 'theme-d1' ? 'bg-white border-[var(--color-secondary)]/20' : normalizedTemplate === 'theme-d2' ? 'bg-white border-teal-200' : 'bg-white'} rounded-[48px] border p-8 transition-all ${step === 1 ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] shadow-[var(--color-secondary)]/20' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 shadow-teal-500/20' : 'border-[var(--color-primary)]') + ' shadow-xl' : (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)]/10' : normalizedTemplate === 'theme-d2' ? 'border-teal-200' : 'border-[var(--color-secondary)]/10')}`}>
               <button 
                 onClick={() => setStep(1)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, marginBottom: step === 1 ? 20 : 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                className="w-full flex items-center gap-4 mb-8 bg-none border-none cursor-pointer p-0"
               >
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: step >= 1 ? '#2563eb' : '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: step >= 1 ? 'white' : '#666', fontWeight: 600 }}>
-                  {step > 1 ? <Check size={16} /> : '1'}
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step >= 1 ? (normalizedTemplate === 'theme-d1' ? 'bg-[var(--color-secondary)] text-white' : normalizedTemplate === 'theme-d2' ? 'bg-teal-500 text-white' : 'bg-[var(--color-primary)] text-[var(--color-accent)]') : (normalizedTemplate === 'theme-d1' ? 'bg-gray-200 text-gray-500' : normalizedTemplate === 'theme-d2' ? 'bg-gray-200 text-gray-500' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]/60')}`}>
+                  {step > 1 ? <Check width={20} height={20} strokeWidth={2} /> : '1'}
                 </div>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Customer Information</h2>
+                <h2 className={`font-serif text-2xl italic ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>Customer Information</h2>
               </button>
 
               {step === 1 && (
-                <div style={{ display: 'grid', gap: 16 }}>
+                <div className="space-y-6">
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Name *</label>
+                    <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-2 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Name *</label>
                     <input
                       type="text"
                       value={customerInfo.name}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-                      placeholder="Your name"
+                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
+                      placeholder="YOUR NAME"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Email *</label>
+                    <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-2 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Email *</label>
                     <input
                       type="email"
                       value={customerInfo.email}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-                      placeholder="your@email.com"
+                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
+                      placeholder="YOUR@EMAIL.COM"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Phone *</label>
+                    <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-2 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Phone *</label>
                     <input
                       type="tel"
                       value={customerInfo.phone}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-                      placeholder="Your phone number"
+                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
+                      placeholder="+1 (555) 000-0000"
                     />
                     {/* Loyalty info display */}
                     {isLoyaltyEnabled && customerInfo.phone && (
                       customer ? (
-                        <div style={{ marginTop: 12, padding: 12, background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                            <Star size={16} style={{ color: '#059669' }} />
-                            <span style={{ fontSize: 14, fontWeight: 600, color: '#059669' }}>
+                        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-full">
+                          <div className="flex items-center gap-3 mb-2">
+                            <Star width={16} height={16} strokeWidth={2} className="text-green-600" />
+                            <span className="text-sm font-bold text-green-700">
                               Welcome back! You have {customer.points} points
                             </span>
                           </div>
                           {getPointsToNextReward() && (
-                            <p style={{ fontSize: 12, color: '#047857', margin: 0 }}>
+                            <p className="text-xs text-green-600">
                               Only {getPointsToNextReward().pointsNeeded} more points for {getPointsToNextReward().reward.name}
                             </p>
                           )}
                         </div>
                       ) : (
-                        <div style={{ marginTop: 12, padding: 12, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Gift size={16} style={{ color: '#d97706' }} />
-                            <span style={{ fontSize: 14, fontWeight: 600, color: '#92400e' }}>
+                        <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-full">
+                          <div className="flex items-center gap-3">
+                            <Gift width={16} height={16} strokeWidth={2} className="text-amber-600" />
+                            <span className="text-sm font-bold text-amber-800">
                               Join our loyalty program!
                             </span>
                           </div>
-                          <p style={{ fontSize: 12, color: '#b45309', margin: '4px 0 0 0' }}>
+                          <p className="text-xs text-amber-700 mt-2">
                             Earn points with every order and redeem rewards
                           </p>
                           <button
                             onClick={() => setShowLoyaltyModal(true)}
-                            style={{ marginTop: 8, padding: '4px 8px', background: 'transparent', color: '#d97706', border: '1px solid #d97706', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                            className="mt-3 px-4 py-2 bg-transparent text-amber-600 border border-amber-600 rounded-full text-[10px] font-bold tracking-widest uppercase cursor-pointer hover:bg-amber-600 hover:text-white transition-colors"
                           >
                             Learn More
                           </button>
@@ -530,26 +588,27 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Special Instructions (optional)</label>
+                    <label className="block font-sans text-[10px] font-bold tracking-widest text-[var(--color-primary)] uppercase mb-2">Special Instructions (optional)</label>
                     <textarea
                       value={customerInfo.note}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, note: e.target.value })}
-                      style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, minHeight: 80, resize: 'vertical' }}
-                      placeholder="Any special requests or dietary requirements..."
+                      className="w-full px-6 py-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/20 rounded-full focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 resize-none font-sans"
+                      placeholder="ANY SPECIAL REQUESTS OR DIETARY REQUIREMENTS..."
+                      rows={3}
                     />
                   </div>
 
                   {/* Rewards Redemption Section */}
                   {isLoyaltyEnabled && customer && loyaltyConfig?.rewards?.length > 0 && (
-                    <div style={{ marginTop: 8, padding: 16, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                        <Gift size={18} style={{ color: '#d97706' }} />
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#92400e' }}>Rewards Available</span>
+                    <div className="mt-6 p-6 bg-amber-50 border border-amber-200 rounded-[32px]">
+                      <div className="flex items-center gap-3 mb-6">
+                        <Gift width={20} height={20} strokeWidth={2} className="text-amber-600" />
+                        <span className="font-serif text-xl italic text-amber-800">Rewards Available</span>
                       </div>
                       {redeemedReward ? (
-                        <div style={{ padding: 12, background: '#d1fae5', border: '1px solid #10b981', borderRadius: 6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: '#065f46' }}>
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-full">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-green-700">
                               {redeemedReward.name} applied
                             </span>
                             <button
@@ -557,17 +616,17 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                                 setRedeemedReward(null)
                                 setDiscountAmount(0)
                               }}
-                              style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}
+                              className="px-4 py-2 bg-red-500 text-white border-none rounded-full text-xs font-bold cursor-pointer hover:bg-red-600 transition-colors"
                             >
                               Remove
                             </button>
                           </div>
-                          <div style={{ fontSize: 13, color: '#047857', marginTop: 4 }}>
+                          <div className="text-sm text-green-600 mt-2">
                             -${redeemedReward.discountValue.toFixed(2)} discount
                           </div>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div className="flex flex-col gap-4">
                           {loyaltyConfig.rewards.map(reward => {
                             const canRedeem = canRedeemReward(reward)
                             return (
@@ -581,26 +640,22 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                                   )
                                 }}
                                 disabled={!canRedeem}
-                                style={{
-                                  padding: 12,
-                                  border: canRedeem ? '2px solid #f59e0b' : '1px solid #d1d5db',
-                                  borderRadius: 6,
-                                  background: canRedeem ? '#fffbeb' : '#f3f4f6',
-                                  cursor: canRedeem ? 'pointer' : 'not-allowed',
-                                  opacity: canRedeem ? 1 : 0.6,
-                                  textAlign: 'left'
-                                }}
+                                className={`p-4 border rounded-full text-left transition-all ${
+                                  canRedeem 
+                                    ? 'border-amber-400 bg-amber-50 cursor-pointer hover:bg-amber-100' 
+                                    : 'border-[var(--color-secondary)]/20 bg-[var(--color-accent)] cursor-not-allowed opacity-60'
+                                }`}
                               >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="flex justify-between items-center">
                                   <div>
-                                    <div style={{ fontSize: 14, fontWeight: 600, color: canRedeem ? '#92400e' : '#6b7280' }}>
+                                    <div className={`font-bold ${canRedeem ? 'text-amber-800' : 'text-[var(--color-secondary)]/60'}`}>
                                       {reward.name}
                                     </div>
-                                    <div style={{ fontSize: 12, color: canRedeem ? '#b45309' : '#9ca3af' }}>
+                                    <div className={`text-xs ${canRedeem ? 'text-amber-600' : 'text-[var(--color-secondary)]/40'}`}>
                                       {reward.pointsRequired} points
                                     </div>
                                   </div>
-                                  <div style={{ fontSize: 14, fontWeight: 700, color: canRedeem ? '#059669' : '#9ca3af' }}>
+                                  <div className={`font-bold ${canRedeem ? 'text-green-600' : 'text-[var(--color-secondary)]/40'}`}>
                                     {reward.discountType === 'percentage' 
                                       ? `${reward.discountValue}% OFF`
                                       : `$${reward.discountValue.toFixed(2)} OFF`
@@ -608,7 +663,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                                   </div>
                                 </div>
                                 {!canRedeem && (
-                                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                                  <div className="text-xs text-[var(--color-secondary)]/40 mt-2">
                                     Need {reward.pointsRequired - customer.points} more points
                                   </div>
                                 )}
@@ -623,47 +678,47 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                   <button
                     onClick={() => setStep(2)}
                     disabled={!isStepValid()}
-                    style={{ padding: '12px 24px', background: isStepValid() ? '#2563eb' : '#94a3b8', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: isStepValid() ? 'pointer' : 'not-allowed', width: '100%' }}
+                    className={`w-full py-5 rounded-full font-bold text-[10px] tracking-widest uppercase transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                      normalizedTemplate === 'theme-d1' 
+                        ? 'bg-amber-400 text-gray-900 hover:bg-amber-500' 
+                        : normalizedTemplate === 'theme-d2' 
+                        ? 'bg-teal-500 text-white hover:bg-teal-600' 
+                        : 'bg-[var(--color-primary)] text-[var(--color-accent)] hover:bg-[var(--color-secondary)]'
+                    }`}
                   >
-                    Continue to Pickup
+                    CONTINUE TO PICKUP
                   </button>
                 </div>
               )}
             </div>
 
             {/* Step 2: Pickup Info */}
-            <div className="checkout-step" style={{ background: 'white', borderRadius: 12, border: step === 2 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
+            <div className={`${normalizedTemplate === 'theme-d1' ? 'bg-white border-[var(--color-secondary)]/20' : normalizedTemplate === 'theme-d2' ? 'bg-white border-teal-200' : 'bg-white'} rounded-[48px] border p-8 transition-all ${step === 2 ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] shadow-[var(--color-secondary)]/20' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 shadow-teal-500/20' : 'border-[var(--color-primary)]') + ' shadow-xl' : (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)]/10' : normalizedTemplate === 'theme-d2' ? 'border-teal-200' : 'border-[var(--color-secondary)]/10')}`}>
               <button 
                 onClick={() => step >= 2 && setStep(2)}
                 disabled={step < 2}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, marginBottom: step === 2 ? 20 : 0, background: 'none', border: 'none', cursor: step >= 2 ? 'pointer' : 'not-allowed', padding: 0 }}
+                className="w-full flex items-center gap-4 mb-8 bg-none border-none cursor-pointer p-0 disabled:cursor-not-allowed"
               >
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: step >= 2 ? '#2563eb' : '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: step >= 2 ? 'white' : '#666', fontWeight: 600 }}>
-                  {step > 2 ? <Check size={16} /> : '2'}
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step >= 2 ? (normalizedTemplate === 'theme-d1' ? 'bg-[var(--color-secondary)] text-white' : normalizedTemplate === 'theme-d2' ? 'bg-teal-500 text-white' : 'bg-[var(--color-primary)] text-[var(--color-accent)]') : (normalizedTemplate === 'theme-d1' ? 'bg-gray-200 text-gray-500' : normalizedTemplate === 'theme-d2' ? 'bg-gray-200 text-gray-500' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]/60')}`}>
+                  {step > 2 ? <Check width={20} height={20} strokeWidth={2} /> : '2'}
                 </div>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Pickup Information</h2>
+                <h2 className={`font-serif text-2xl italic ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>Pickup Information</h2>
               </button>
 
               {step === 2 && (
-                <div style={{ display: 'grid', gap: 16 }}>
+                <div className="space-y-6">
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Order Type</label>
-                    <div style={{ display: 'flex', gap: 12 }}>
+                    <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Order Type</label>
+                    <div className="flex gap-4">
                       {(ordering?.orderTypes || ['pickup']).map(type => (
                         <button
                           key={type}
                           onClick={() => setOrderType(type)}
-                          style={{
-                            flex: 1,
-                            padding: '10px 16px',
-                            border: orderType === type ? '2px solid #2563eb' : '1px solid #d1d5db',
-                            borderRadius: 8,
-                            background: orderType === type ? '#eff6ff' : 'white',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            textTransform: 'capitalize'
-                          }}
+                          className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all ${
+                            orderType === type 
+                              ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
+                              : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
+                          }`}
                         >
                           {type}
                         </button>
@@ -672,44 +727,28 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Pickup Time</label>
-                    <div style={{ display: 'flex', gap: 12 }}>
+                    <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Pickup Time</label>
+                    <div className="flex gap-4">
                       <button
                         onClick={() => setPickupType('asap')}
-                        style={{
-                          flex: 1,
-                          padding: '10px 16px',
-                          border: pickupType === 'asap' ? '2px solid #2563eb' : '1px solid #d1d5db',
-                          borderRadius: 8,
-                          background: pickupType === 'asap' ? '#eff6ff' : 'white',
-                          fontSize: 14,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8
-                        }}
+                        className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all flex items-center justify-center gap-3 ${
+                          pickupType === 'asap' 
+                            ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
+                            : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
+                        }`}
                       >
-                        <Clock size={16} />
+                        <Clock width={18} height={18} strokeWidth={2} />
                         ASAP
                       </button>
                       <button
                         onClick={() => setPickupType('scheduled')}
-                        style={{
-                          flex: 1,
-                          padding: '10px 16px',
-                          border: pickupType === 'scheduled' ? '2px solid #2563eb' : '1px solid #d1d5db',
-                          borderRadius: 8,
-                          background: pickupType === 'scheduled' ? '#eff6ff' : 'white',
-                          fontSize: 14,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8
-                        }}
+                        className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all flex items-center justify-center gap-3 ${
+                          pickupType === 'scheduled' 
+                            ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
+                            : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
+                        }`}
                       >
-                        <Calendar size={16} />
+                        <Calendar width={18} height={18} strokeWidth={2} />
                         Scheduled
                       </button>
                     </div>
@@ -717,12 +756,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
                   {pickupType === 'scheduled' && (
                     <div>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Pickup Date & Time *</label>
+                      <label className="block font-sans text-[10px] font-bold tracking-widest text-[var(--color-primary)] uppercase mb-2">Pickup Date & Time *</label>
                       <input
                         type="datetime-local"
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
-                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                        className="w-full px-6 py-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/20 rounded-full focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-secondary)] font-sans"
                         min={new Date().toISOString().slice(0, 16)}
                       />
                     </div>
@@ -731,11 +770,11 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                   {/* Location dropdown - show only if multiple active locations */}
                   {data?.locations && data.locations.filter(loc => loc.isActive !== false).length > 1 && (
                     <div>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Select Location *</label>
+                      <label className="block font-sans text-[10px] font-bold tracking-widest text-[var(--color-primary)] uppercase mb-2">Select Location *</label>
                       <select
                         value={selectedLocation}
                         onChange={(e) => setSelectedLocation(e.target.value)}
-                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                        className="w-full px-6 py-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/20 rounded-full focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-secondary)] font-sans"
                         required
                       >
                         <option value="">Choose a location...</option>
@@ -749,25 +788,25 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                   )}
 
                   {ordering?.estimatedPrepTime && (
-                    <p style={{ fontSize: 13, color: '#666', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Clock size={14} />
+                    <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/40 uppercase flex items-center gap-3">
+                      <Clock width={14} height={14} strokeWidth={2} />
                       Estimated prep time: {ordering.estimatedPrepTime}
                     </p>
                   )}
 
-                  <div style={{ display: 'flex', gap: 12 }}>
+                  <div className="flex gap-4">
                     <button
                       onClick={() => setStep(1)}
-                      style={{ padding: '12px 24px', background: 'white', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', flex: 1 }}
+                      className="flex-1 py-4 bg-white border border-[var(--color-secondary)]/20 rounded-full font-sans font-bold text-sm text-[var(--color-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
                     >
                       Back
                     </button>
                     <button
                       onClick={() => setStep(3)}
                       disabled={!isStepValid()}
-                      style={{ padding: '12px 24px', background: isStepValid() ? '#2563eb' : '#94a3b8', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: isStepValid() ? 'pointer' : 'not-allowed', flex: 1 }}
+                      className="flex-1 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Continue to Payment
+                      CONTINUE TO PAYMENT
                     </button>
                   </div>
                 </div>
@@ -775,70 +814,54 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
             </div>
 
             {/* Step 3: Payment */}
-            <div className="checkout-step" style={{ background: 'white', borderRadius: 12, border: step === 3 ? '2px solid #2563eb' : '1px solid #e5e7eb', padding: 24 }}>
+            <div className={`bg-white rounded-[48px] border p-8 transition-all ${step === 3 ? 'border-[var(--color-primary)] shadow-xl' : 'border-[var(--color-secondary)]/10'}`}>
               <button 
                 onClick={() => step >= 3 && setStep(3)}
                 disabled={step < 3}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, marginBottom: step === 3 ? 20 : 0, background: 'none', border: 'none', cursor: step >= 3 ? 'pointer' : 'not-allowed', padding: 0 }}
+                className="w-full flex items-center gap-4 mb-8 bg-none border-none cursor-pointer p-0 disabled:cursor-not-allowed"
               >
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: step >= 3 ? '#2563eb' : '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: step >= 3 ? 'white' : '#666', fontWeight: 600 }}>
-                  {step > 3 ? <Check size={16} /> : '3'}
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step >= 3 ? 'bg-[var(--color-primary)] text-[var(--color-accent)]' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]/60'}`}>
+                  {step > 3 ? <Check width={20} height={20} strokeWidth={2} /> : '3'}
                 </div>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Payment</h2>
+                <h2 className="font-serif text-2xl italic text-[var(--color-secondary)]">Payment</h2>
               </button>
 
               {step === 3 && (
-                <div style={{ display: 'grid', gap: 12 }}>
+                <div className="space-y-4">
                   {paymentGateway.cashEnabled !== false && (
                     <button
                       onClick={() => setPaymentMethod('cash')}
-                      style={{
-                        width: '100%',
-                        padding: '16px',
-                        border: paymentMethod === 'cash' ? '2px solid #2563eb' : '1px solid #d1d5db',
-                        borderRadius: 8,
-                        background: paymentMethod === 'cash' ? '#eff6ff' : 'white',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12
-                      }}
+                      className={`w-full p-6 border rounded-full font-sans font-bold text-sm transition-all flex items-center gap-4 ${
+                        paymentMethod === 'cash' 
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]' 
+                          : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50'
+                      }`}
                     >
-                      <DollarSign size={20} />
-                      <div style={{ textAlign: 'left' }}>
+                      <DollarSign width={24} height={24} strokeWidth={2} />
+                      <div className="text-left flex-1">
                         <div>{paymentGateway.cashLabel || 'Pay at Pickup'}</div>
-                        <div style={{ fontSize: 12, fontWeight: 400, color: '#666' }}>Pay when you pick up your order</div>
+                        <div className="text-xs font-normal text-[var(--color-secondary)]/60">Pay when you pick up your order</div>
                       </div>
-                      {paymentMethod === 'cash' && <Check size={20} style={{ marginLeft: 'auto', color: '#2563eb' }} />}
+                      {paymentMethod === 'cash' && <Check width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)]" />}
                     </button>
                   )}
 
                   {paymentGateway.isActive && paymentGateway.provider === 'stripe' && (
                     <button
                       onClick={() => setPaymentMethod('stripe')}
-                      style={{
-                        width: '100%',
-                        padding: '16px',
-                        border: paymentMethod === 'stripe' ? '2px solid #2563eb' : '1px solid #d1d5db',
-                        borderRadius: 8,
-                        background: paymentMethod === 'stripe' ? '#eff6ff' : 'white',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12
-                      }}
+                      className={`w-full p-6 border rounded-full font-sans font-bold text-sm transition-all flex items-center gap-4 ${
+                        paymentMethod === 'stripe' 
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]' 
+                          : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50'
+                      }`}
                     >
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <CreditCard size={20} />
-                        <span style={{ fontSize: 18, fontWeight: 500 }}>💳</span>
+                      <div className="flex gap-2 items-center">
+                        <CreditCard width={24} height={24} strokeWidth={2} />
+                        <span className="text-2xl">💳</span>
                       </div>
-                      <div style={{ textAlign: 'left', flex: 1 }}>
+                      <div className="text-left flex-1">
                         <div>Card Payment</div>
-                        <div style={{ fontSize: 12, fontWeight: 400, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div className="text-xs font-normal text-[var(--color-secondary)]/60 flex items-center gap-2">
                           <span>Visa</span>
                           <span>•</span>
                           <span>Mastercard</span>
@@ -850,12 +873,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                           <span>Google Pay</span>
                         </div>
                       </div>
-                      {paymentMethod === 'stripe' && <Check size={20} style={{ color: '#2563eb' }} />}
+                      {paymentMethod === 'stripe' && <Check width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)]" />}
                     </button>
                   )}
 
                   {paymentMethod === 'stripe' && clientSecret && stripePromise && (
-                    <div style={{ marginTop: 12 }}>
+                    <div className="mt-6">
                       <Elements stripe={stripePromise} options={{ clientSecret }}>
                         <StripeCheckoutForm 
                           clientSecret={clientSecret}
@@ -870,16 +893,16 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     <button
                       onClick={handlePlaceOrder}
                       disabled={loading}
-                      style={{ padding: '12px 24px', background: loading ? '#94a3b8' : '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', width: '100%', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginTop: 12 }}
+                      className="w-full py-5 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mt-6"
                     >
-                      {loading ? <Loader2 size={16} className="animate-spin" /> : 'Continue to Payment'}
+                      {loading ? <Loader2 width={18} height={18} strokeWidth={2} className="animate-spin" /> : 'CONTINUE TO PAYMENT'}
                     </button>
                   )}
 
-                  <div style={{ display: 'flex', gap: 12 }}>
+                  <div className="flex gap-4">
                     <button
                       onClick={() => setStep(2)}
-                      style={{ padding: '12px 24px', background: 'white', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', flex: 1 }}
+                      className="flex-1 py-4 bg-white border border-[var(--color-secondary)]/20 rounded-full font-sans font-bold text-sm text-[var(--color-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
                     >
                       Back
                     </button>
@@ -887,9 +910,9 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                       <button
                         onClick={handlePlaceOrder}
                         disabled={!isStepValid() || loading}
-                        style={{ padding: '12px 24px', background: isStepValid() && !loading ? '#2563eb' : '#94a3b8', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: isStepValid() && !loading ? 'pointer' : 'not-allowed', flex: 1, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}
+                        className="flex-1 py-5 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {loading ? <Loader2 size={16} className="animate-spin" /> : 'Place Order'}
+                        {loading ? <Loader2 width={18} height={18} strokeWidth={2} className="animate-spin" /> : 'PLACE ORDER'}
                       </button>
                     )}
                   </div>
@@ -899,51 +922,51 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
           </div>
 
           {/* Right Column - Order Summary */}
-          <div className="checkout-sticky" style={{ position: 'sticky', top: 24 }}>
-            <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ShoppingCart size={20} />
-                Order Summary
+          <div className="lg:col-span-1">
+            <div className={`${normalizedTemplate === 'theme-d1' ? 'bg-white border-[var(--color-secondary)]/20' : normalizedTemplate === 'theme-d2' ? 'bg-white border-teal-200' : 'bg-white'} rounded-[48px] border p-8 sticky top-8`}>
+              <h2 className={`font-serif text-2xl italic mb-8 flex items-center gap-3 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>
+                <ShoppingCart width={24} height={24} strokeWidth={2} />
+                {normalizedTemplate === 'theme-d1' ? 'Order Summary' : normalizedTemplate === 'theme-d2' ? 'Your Order' : 'Your Harvest'}
               </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16, maxHeight: 300, overflowY: 'auto' }}>
+              <div className="flex flex-col gap-4 mb-8 max-h-[300px] overflow-y-auto">
                 {items.map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
-                      <div style={{ fontSize: 13, color: '#666' }}>Qty: {item.quantity}</div>
+                  <div key={item.id} className="flex justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <div className={`font-serif text-lg italic ${normalizedTemplate === 'theme-d1' ? 'text-gray-900' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>{item.name}</div>
+                      <div className={`text-xs font-sans font-bold tracking-widest uppercase ${normalizedTemplate === 'theme-d1' ? 'text-gray-500' : normalizedTemplate === 'theme-d2' ? 'text-gray-500' : 'text-[var(--color-secondary)]/60'}`}>Qty: {item.quantity}</div>
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>${(item.price * item.quantity).toFixed(2)}</div>
+                    <div className={`font-sans font-bold ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>${(item.price * item.quantity).toFixed(2)}</div>
                   </div>
                 ))}
               </div>
 
-              <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
-                  <span style={{ color: '#666' }}>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+              <div className={`border-t pt-8 space-y-4 ${normalizedTemplate === 'theme-d1' ? 'border-amber-200' : normalizedTemplate === 'theme-d2' ? 'border-teal-200' : 'border-[var(--color-secondary)]/10'}`}>
+                <div className="flex justify-between">
+                  <span className={`text-xs font-sans font-bold tracking-widest uppercase ${normalizedTemplate === 'theme-d1' ? 'text-gray-500' : normalizedTemplate === 'theme-d2' ? 'text-gray-500' : 'text-[var(--color-secondary)]/60'}`}>Subtotal</span>
+                  <span className={`font-sans font-bold ${normalizedTemplate === 'theme-d1' ? 'text-gray-900' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>${subtotal.toFixed(2)}</span>
                 </div>
                 {taxRate > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
-                    <span style={{ color: '#666' }}>{taxLabel} ({taxRate}%)</span>
-                    <span>${taxAmount.toFixed(2)}</span>
+                  <div className="flex justify-between">
+                    <span className={`text-xs font-sans font-bold tracking-widest uppercase ${normalizedTemplate === 'theme-d1' ? 'text-gray-500' : normalizedTemplate === 'theme-d2' ? 'text-gray-500' : 'text-[var(--color-secondary)]/60'}`}>{taxLabel} ({taxRate}%)</span>
+                    <span className={`font-sans font-bold ${normalizedTemplate === 'theme-d1' ? 'text-gray-900' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>${taxAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {orderType === 'delivery' && ordering?.deliveryFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
-                    <span style={{ color: '#666' }}>Delivery Fee</span>
-                    <span>${ordering.deliveryFee.toFixed(2)}</span>
+                  <div className="flex justify-between">
+                    <span className={`text-xs font-sans font-bold tracking-widest uppercase ${normalizedTemplate === 'theme-d1' ? 'text-gray-500' : normalizedTemplate === 'theme-d2' ? 'text-gray-500' : 'text-[var(--color-secondary)]/60'}`}>Delivery Fee</span>
+                    <span className={`font-sans font-bold ${normalizedTemplate === 'theme-d1' ? 'text-gray-900' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>${ordering.deliveryFee.toFixed(2)}</span>
                   </div>
                 )}
                 {redeemedReward && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
-                    <span style={{ color: '#059669' }}>Loyalty Discount ({redeemedReward.name})</span>
-                    <span style={{ color: '#059669' }}>{discountAmount > 0 ? `-$${discountAmount.toFixed(2)}` : '$0.00'}</span>
+                  <div className="flex justify-between">
+                    <span className="text-xs font-sans font-bold tracking-widest text-green-600 uppercase">Loyalty Discount ({redeemedReward.name})</span>
+                    <span className="text-xs font-sans font-bold tracking-widest text-green-600 uppercase">{discountAmount > 0 ? `-$${discountAmount.toFixed(2)}` : '$0.00'}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 700, marginTop: 12 }}>
-                  <span>Total</span>
-                  <span>${totalWithDiscount.toFixed(2)}</span>
+                <div className="flex justify-between pt-4">
+                  <span className={`font-serif text-2xl italic ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>Total</span>
+                  <span className={`font-serif text-2xl italic ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>${totalWithDiscount.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -952,30 +975,30 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
         {/* Loyalty Info Modal */}
         {showLoyaltyModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-            <div style={{ background: 'white', borderRadius: 12, maxWidth: 500, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Gift size={24} style={{ color: '#d97706' }} />
+          <div className="fixed top-0 left-0 right-0 bottom-0 bg-[var(--color-secondary)]/50 backdrop-blur-sm flex items-center justify-center z-[1000] p-6">
+            <div className="bg-white rounded-[48px] max-w-[500px] w-full max-h-[90vh] overflow-y-auto p-8">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="font-serif text-3xl italic text-[var(--color-secondary)] flex items-center gap-3">
+                  <Gift width={28} height={28} strokeWidth={2} className="text-[var(--color-primary)]" />
                   Loyalty Program
                 </h2>
                 <button
                   onClick={() => setShowLoyaltyModal(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  className="bg-none border-none cursor-pointer p-2 hover:bg-[var(--color-accent)] rounded-full transition-colors"
                 >
-                  <X size={24} style={{ color: '#666' }} />
+                  <X width={24} height={24} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                 </button>
               </div>
 
-              <div style={{ marginBottom: 20 }}>
-                <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.6, margin: '0 0 12px 0' }}>
+              <div className="mb-8">
+                <p className="font-sans text-sm text-[var(--color-secondary)] leading-relaxed mb-6">
                   Earn points with every order and redeem them for exclusive rewards!
                 </p>
-                <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>
+                <div className="p-6 bg-amber-50 border border-amber-200 rounded-[32px] mb-8">
+                  <div className="font-sans text-[10px] font-bold tracking-widest text-amber-800 uppercase mb-4">
                     How it works:
                   </div>
-                  <ul style={{ fontSize: 13, color: '#b45309', margin: 0, paddingLeft: 20, lineHeight: 1.8 }}>
+                  <ul className="font-sans text-xs text-amber-700 space-y-2 pl-6 leading-relaxed">
                     <li>Earn <strong>{loyaltyConfig?.pointsPerDollar || 1} point</strong> for every $1 spent</li>
                     <li>Points are automatically added to your account after each order</li>
                     <li>Redeem points for discounts and free items</li>
@@ -985,17 +1008,17 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
                 {loyaltyConfig?.rewards?.length > 0 && (
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
+                    <div className="font-sans text-[10px] font-bold tracking-widest text-[var(--color-secondary)] uppercase mb-4">
                       Available Rewards:
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="flex flex-col gap-4">
                       {loyaltyConfig.rewards.map(reward => (
-                        <div key={reward.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                        <div key={reward.id} className="flex justify-between items-center p-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/10 rounded-full">
                           <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>{reward.name}</div>
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>{reward.pointsRequired} points</div>
+                            <div className="font-serif text-lg italic text-[var(--color-secondary)]">{reward.name}</div>
+                            <div className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">{reward.pointsRequired} points</div>
                           </div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: '#059669' }}>
+                          <div className="font-sans font-bold text-green-600">
                             {reward.discountType === 'percentage' 
                               ? `${reward.discountValue}% OFF`
                               : `$${reward.discountValue.toFixed(2)} OFF`
@@ -1010,15 +1033,16 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
               <button
                 onClick={() => setShowLoyaltyModal(false)}
-                style={{ width: '100%', padding: '12px 24px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+                className="w-full py-5 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg"
               >
-                Got it!
+                GOT IT!
               </button>
             </div>
           </div>
         )}
+        </div>
+        <Footer />
       </div>
-      <Footer />
     </CMSProvider>
   )
 }

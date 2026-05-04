@@ -2,14 +2,18 @@ import { getSiteData } from '../lib/api'
 import { CMSProvider } from '../contexts/CMSContext'
 import { LoyaltyProvider } from '../contexts/LoyaltyContext'
 import ThemeD1Home from '../templates/theme-d1/HomePage'
+import ThemeD2Home from '../templates/theme-d2/HomePage'
+import ThemeD3Home from '../templates/theme-d3/HomePage'
 
 // Theme → Template mapping
 const TEMPLATES = {
   // Purpose-built themes
   'theme-v1':      ThemeD1Home,
   'theme-d1':      ThemeD1Home,
+  'theme-d2':      ThemeD2Home,
+  'theme-d3':      ThemeD3Home,
   'food-truck':    ThemeD1Home,
-  'cafe':          ThemeD1Home,
+  'cafe':          ThemeD3Home,
   'casual-family': ThemeD1Home,
   'modern-trendy': ThemeD1Home,
   'delivery':      ThemeD1Home,
@@ -42,6 +46,8 @@ export async function getServerSideProps({ query, req }) {
 }
 
 export default function HomePage({ data, template, siteType }) {
+  console.log('HomePage props:', { template, siteType, hasData: !!data })
+
   // Find Home page record to get its banner/settings
   const pages = data?.pages || []
   const homePage = pages.find((p) => p.pageType === 'home' || p.slug === '' || p.slug === '/')
@@ -63,8 +69,11 @@ export default function HomePage({ data, template, siteType }) {
   const normalizedTemplate = template?.replace(/\s+/g, '-') || 'theme-d1'
   const Template = TEMPLATES[normalizedTemplate] || TEMPLATES['theme-d1'] || ThemeD1Home
   
+  console.log('Template selected:', { normalizedTemplate, templateFound: !!Template })
+
   if (!Template) {
     console.error('Template not found for:', { template, normalizedTemplate, availableTemplates: Object.keys(TEMPLATES) })
+    return <div>Error: Template not found</div>
   }
   return (
     <CMSProvider data={enhancedData}>

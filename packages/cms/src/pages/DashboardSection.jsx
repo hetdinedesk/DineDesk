@@ -398,7 +398,7 @@ function OrdersTab({ clientId }) {
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
-      await updateOrderStatus(orderId, newStatus)
+      await updateOrderStatus(clientId, orderId, newStatus)
       queryClient.invalidateQueries(['orders', clientId])
     } catch (err) {
       alert('Failed to update order status: ' + err.message)

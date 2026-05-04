@@ -211,7 +211,7 @@ export const UtilityBelt = ({ isDark }) => {
               const variantStyles = {
                 primary: isDark ? 'bg-white text-gray-900 px-3 sm:px-4 py-1 sm:py-1.5 rounded shadow-sm' : 'bg-white text-[var(--color-primary)] px-3 sm:px-4 py-1 sm:py-1.5 rounded shadow-sm',
                 secondary: 'bg-[var(--color-secondary)] text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded shadow-sm',
-                outline: 'border border-white text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded hover:bg-white hover:text-[var(--color-primary)]',
+                outline: 'border border-white text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded hover:bg-white hover:text-gray-900',
                 text: 'text-white hover:underline px-2 py-1',
               };
 

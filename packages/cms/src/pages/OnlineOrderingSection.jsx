@@ -165,9 +165,9 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   const updateNotifications = (key, val) => setNotificationsForm(prev => ({ ...prev, [key]: val }))
   const updatePOS = (key, val) => setPOSForm(prev => ({ ...prev, [key]: val }))
 
-  const hasChanges = true
-  const hasPaymentChanges = true
-  const hasNotificationChanges = true
+  const hasChanges = JSON.stringify(form) !== JSON.stringify(savedRef.current)
+  const hasPaymentChanges = JSON.stringify(paymentForm) !== JSON.stringify(paymentSavedRef.current)
+  const hasNotificationChanges = JSON.stringify(notificationsForm) !== JSON.stringify(notificationsSavedRef.current)
 
   return (
     <div>

@@ -6,5 +6,5 @@ export const getOrders = (clientId, status) =>
 export const getOrder = (orderId) =>
   api.get(`/orders/${orderId}`).then(r => r.data)
 
-export const updateOrderStatus = (orderId, status) =>
-  api.patch(`/orders/${orderId}/status`, { status }).then(r => r.data)
+export const updateOrderStatus = (clientId, orderId, status) =>
+  api.patch(`/clients/${clientId}/orders/${orderId}/status`, { status }).then(r => r.data)
