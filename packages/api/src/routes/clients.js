@@ -2113,11 +2113,15 @@ router.put('/:id/config', async (req, res) => {
       }
     }
 
+    console.log('[API] Final update object:', JSON.stringify(updateObject, null, 2))
+    
     const config = await prisma.siteConfig.upsert({
       where:  { clientId },
       update: updateObject,
       create: { clientId, ...updateObject }
     })
+
+    console.log('[API] Saved config from database:', JSON.stringify(config, null, 2))
 
     // Clear export cache for this client
     exportCache.delete(clientId)
