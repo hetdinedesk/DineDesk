@@ -3,8 +3,15 @@ const nodemailer = require('nodemailer')
 let transporter = null
 
 function getTransporter(config) {
+  console.log('[EMAIL] getTransporter called')
+  console.log('[EMAIL] smtpHost:', config.smtpHost)
+  console.log('[EMAIL] smtpUser:', config.smtpUser)
+  console.log('[EMAIL] smtpPort:', config.smtpPort)
+  console.log('[EMAIL] smtpPassword set:', !!config.smtpPassword)
+  
   if (config.smtpHost && config.smtpUser && config.smtpPassword) {
-    return nodemailer.createTransport({
+    console.log('[EMAIL] Creating SMTP transporter...')
+    const transporter = nodemailer.createTransport({
       host: config.smtpHost,
       port: config.smtpPort || 587,
       secure: config.smtpPort === '465',
@@ -13,7 +20,10 @@ function getTransporter(config) {
         pass: config.smtpPassword
       }
     })
+    console.log('[EMAIL] Transporter created successfully')
+    return transporter
   }
+  console.log('[EMAIL] Missing SMTP credentials, returning null')
   return null
 }
 
