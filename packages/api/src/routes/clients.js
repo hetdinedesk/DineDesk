@@ -2057,6 +2057,7 @@ router.put('/:id/specials-config', async (req, res) => {
 router.get('/:id/config', async (req, res) => {
   try {
     const config = await prisma.siteConfig.findUnique({ where: { clientId: req.params.id } })
+    console.log(`[API] Retrieved config for client ${req.params.id}:`, JSON.stringify(config?.notifications || {}, null, 2))
     res.json(config || {})
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -2108,9 +2109,15 @@ router.put('/:id/config', async (req, res) => {
     for (const field of allFields) {
       if (updateDataWithVersion[field] !== undefined) {
         console.log(`[API] Setting ${field} from updateData`)
+        if (field === 'notifications') {
+          console.log(`[API] Notifications data being set:`, JSON.stringify(updateDataWithVersion[field], null, 2))
+        }
         updateObject[field] = updateDataWithVersion[field]
       } else if (existing && existing[field] !== undefined) {
         console.log(`[API] Keeping ${field} from existing config`)
+        if (field === 'notifications') {
+          console.log(`[API] Existing notifications data:`, JSON.stringify(existing[field], null, 2))
+        }
         updateObject[field] = existing[field]
       } else {
         console.log(`[API] ${field} not found in updateData or existing`)
