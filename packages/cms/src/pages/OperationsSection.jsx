@@ -852,6 +852,281 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
   )
 }
 
+// Analytics Dashboard Component
+function AnalyticsSection({ liveOrders, historyOrders }) {
+  // Calculate today's metrics
+  const today = new Date()
+  const todayOrders = [...liveOrders, ...historyOrders].filter(order => {
+    const orderDate = new Date(order.createdAt)
+    return orderDate.toDateString() === today.toDateString()
+  })
+  
+  const todayRevenue = todayOrders
+    .filter(order => order.paymentStatus === 'paid')
+    .reduce((sum, order) => sum + order.total, 0)
+  
+  const todayOrderCount = todayOrders.length
+  const averageOrderValue = todayOrderCount > 0 ? todayRevenue / todayOrderCount : 0
+  
+  // Calculate top selling items
+  const itemCounts = {}
+  todayOrders.forEach(order => {
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach(item => {
+        const itemName = item.name || 'Unknown Item'
+        itemCounts[itemName] = (itemCounts[itemName] || 0) + (item.quantity || 1)
+      })
+    }
+  })
+  
+  const topItems = Object.entries(itemCounts)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }))
+  
+  return (
+    <div>
+      <h3 style={{ 
+        fontSize: '18px', 
+        fontWeight: 'bold', 
+        color: C.t0, 
+        marginBottom: '20px',
+        textTransform: 'uppercase',
+        letterSpacing: '0.07em'
+      }}>
+        Today's Analytics
+      </h3>
+      
+      {/* Metrics Grid */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        gap: '16px', 
+        marginBottom: '24px' 
+      }}>
+        <div style={{ 
+          background: C.card, 
+          padding: '20px', 
+          borderRadius: '12px', 
+          textAlign: 'center' 
+        }}>
+          <div style={{ 
+            fontSize: '32px', 
+            fontWeight: 'bold', 
+            color: C.green, 
+            marginBottom: '8px' 
+          }}>
+            ${todayOrderCount}
+          </div>
+          <div style={{ fontSize: '14px', color: C.t2 }}>Orders Today</div>
+        </div>
+        
+        <div style={{ 
+          background: C.card, 
+          padding: '20px', 
+          borderRadius: '12px', 
+          textAlign: 'center' 
+        }}>
+          <div style={{ 
+            fontSize: '32px', 
+            fontWeight: 'bold', 
+            color: C.acc, 
+            marginBottom: '8px' 
+          }}>
+            ${todayRevenue.toFixed(2)}
+          </div>
+          <div style={{ fontSize: '14px', color: C.t2 }}>Revenue Today</div>
+        </div>
+        
+        <div style={{ 
+          background: C.card, 
+          padding: '20px', 
+          borderRadius: '12px', 
+          textAlign: 'center' 
+        }}>
+          <div style={{ 
+            fontSize: '32px', 
+            fontWeight: 'bold', 
+            color: C.t0, 
+            marginBottom: '8px' 
+          }}>
+            ${averageOrderValue.toFixed(2)}
+          </div>
+          <div style={{ fontSize: '14px', color: C.t2 }}>Average Order</div>
+        </div>
+      </div>
+      
+      {/* Top Selling Items */}
+      <div style={{ marginBottom: 16 }}>
+        <h4 style={{ 
+          fontSize: '16px', 
+          fontWeight: 'bold', 
+          color: C.t0, 
+          marginBottom: '12px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.07em'
+        }}>
+          Top Selling Items Today
+        </h4>
+        <div style={{ 
+          background: C.card, 
+          borderRadius: '12px', 
+          padding: '16px' 
+        }}>
+          {topItems.length === 0 ? (
+            <div style={{ textAlign: 'center', color: C.t3, padding: '20px' }}>
+              No items sold today
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {topItems.map((item, index) => (
+                <div key={index} style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '8px 0',
+                  borderBottom: index < topItems.length - 1 ? `1px solid ${C.border}20` : 'none'
+                }}>
+                  <span style={{ fontSize: '14px', color: C.t0 }}>{item.name}</span>
+                  <span style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '600', 
+                    color: C.acc 
+                  }}>
+                    {item.count} sold
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Customer Management Component
+function CustomersSection({ historyOrders }) {
+  const [searchTerm, setSearchTerm] = useState('')
+  
+  // Extract unique customers from orders
+  const customers = {}
+  historyOrders.forEach(order => {
+    const phone = order.customerPhone || 'No Phone'
+    const email = order.customerEmail || 'No Email'
+    const key = `${order.customerName}_${phone}`
+    
+    if (!customers[key]) {
+      customers[key] = {
+        name: order.customerName,
+        phone,
+        email,
+        orderCount: 0,
+        totalSpent: 0,
+        lastOrder: order.createdAt
+      }
+    }
+    
+    customers[key].orderCount += 1
+    customers[key].totalSpent += order.total || 0
+    
+    // Update last order date if more recent
+    const orderDate = new Date(order.createdAt)
+    const lastOrderDate = new Date(customers[key].lastOrder)
+    if (orderDate > lastOrderDate) {
+      customers[key].lastOrder = order.createdAt
+    }
+  })
+  
+  // Filter customers based on search
+  const filteredCustomers = Object.values(customers).filter(customer => {
+    if (searchTerm === '') return true
+    return customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           customer.phone.includes(searchTerm) ||
+           (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
+  })
+  
+  return (
+    <div>
+      <h3 style={{ 
+        fontSize: '18px', 
+        fontWeight: 'bold', 
+        color: C.t0, 
+        marginBottom: '20px',
+        textTransform: 'uppercase',
+        letterSpacing: '0.07em'
+      }}>
+        Customer Management
+      </h3>
+      
+      {/* Search */}
+      <div style={{ marginBottom: 16 }}>
+        <input
+          type="text"
+          placeholder="Search by name, phone, or email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: 'inherit'
+          }}
+        />
+      </div>
+      
+      {/* Customer List */}
+      <div style={{ 
+        background: C.card, 
+        borderRadius: '12px', 
+        overflow: 'hidden' 
+      }}>
+        {filteredCustomers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: C.t3 }}>
+            No customers found
+          </div>
+        ) : (
+          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {filteredCustomers.map((customer, index) => (
+              <div key={index} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                padding: '12px 16px',
+                borderBottom: index < filteredCustomers.length - 1 ? `1px solid ${C.border}20` : 'none'
+              }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: C.t0, marginBottom: '4px' }}>
+                    {customer.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: C.t2 }}>
+                    {customer.phone}
+                  </div>
+                  {customer.email && customer.email !== 'No Email' && (
+                    <div style={{ fontSize: '12px', color: C.t2 }}>
+                      {customer.email}
+                    </div>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '12px', color: C.t3, marginBottom: '4px' }}>
+                    {customer.orderCount} orders
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: C.acc }}>
+                    ${customer.totalSpent.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Order History Component
 function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange }) {
   const [searchTerm, setSearchTerm] = useState('')
