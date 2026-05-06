@@ -168,10 +168,10 @@ export default function OperationsSection({ clientId }) {
     const unacceptedOrdersCount = liveOrders.filter(o => o.status === 'new').length
     
     if (unacceptedOrdersCount > 0) {
-      // Play sound every 10 seconds for unaccepted orders
+      // Play sound every 5 seconds for unaccepted orders
       const soundInterval = setInterval(() => {
         playNotificationSound()
-      }, 10000)
+      }, 5000)
       
       // Store interval ID for cleanup
       window.currentSoundInterval = soundInterval
@@ -199,20 +199,28 @@ export default function OperationsSection({ clientId }) {
       try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)()
         
-        // Store the play function
+        // Store the play function with interesting sound
         audioRef.current = () => {
-          const osc = audioContext.createOscillator()
-          const gain = audioContext.createGain()
+          // Create a more interesting notification sound
+          const osc1 = audioContext.createOscillator()
+          const osc2 = audioContext.createOscillator()
+          const gainNode = audioContext.createGain()
           
-          osc.connect(gain)
-          gain.connect(audioContext.destination)
+          osc1.connect(gainNode)
+          osc2.connect(gainNode)
+          gainNode.connect(audioContext.destination)
           
-          osc.frequency.value = 800
-          osc.type = 'sine'
-          gain.gain.value = 0.1
+          // Create a pleasant two-tone notification
+          osc1.frequency.value = 523.25 // C5 note
+          osc2.frequency.value = 659.25 // E5 note
+          osc1.type = 'sine'
+          osc2.type = 'sine'
+          gainNode.gain.value = 0.15
           
-          osc.start()
-          osc.stop(audioContext.currentTime + 0.1)
+          osc1.start()
+          osc2.start(audioContext.currentTime + 0.1) // Start second note slightly delayed
+          osc1.stop(audioContext.currentTime + 0.3)
+          osc2.stop(audioContext.currentTime + 0.4)
         }
         
         console.log('Audio initialized with Web Audio API')
