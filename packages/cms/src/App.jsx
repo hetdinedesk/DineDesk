@@ -40,7 +40,6 @@ function MainApp() {
   const logout = useAuthStore(s => s.logout)
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const isManager = user?.role === 'MANAGER'
-  const isClient = user?.role === 'CLIENT'
   const canManageAll = isSuperAdmin || isManager
   const [buildMenu,    setBuildMenu]    = useState(false)
   const [deploying,    setDeploying]    = useState(false)
@@ -50,16 +49,10 @@ function MainApp() {
     const user = useAuthStore.getState().user
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
     const isManager = user?.role === 'MANAGER'
-    const isClient = user?.role === 'CLIENT'
-    if (isClient) return 'sites' // Clients go directly to sites
     return (isSuperAdmin || isManager) ? 'home' : 'sites'
   })
   const [activeSite, setActiveSite] = useState(null)
-  const [siteNav,    setSiteNav]    = useState(() => {
-    const user = useAuthStore.getState().user
-    const isClient = user?.role === 'CLIENT'
-    return isClient ? 'operations' : 'dashboard'
-  })
+  const [siteNav,    setSiteNav]    = useState('dashboard')
   const [dashboardSubsection, setDashboardSubsection] = useState('analytics')
 
   // ── Ref so event listener always sees latest activeSite ──
@@ -130,7 +123,7 @@ function MainApp() {
       }
     } else if (pathParts.length === 1) {
       const section = pathParts[0]
-      if (['home', 'sites', 'users'].includes(section)) {
+      if (['home', 'sites', 'users', 'operations'].includes(section)) {
         setGlobalNav(section)
         setActiveSite(null)
       }
@@ -244,8 +237,7 @@ function MainApp() {
   }, [siteNav, activeSite])
 
   const openSite = async (client) => {
-    // Client users start with Operations, others start with dashboard
-    setSiteNav(isClient ? 'operations' : 'dashboard')
+    setSiteNav('dashboard')
     try {
       const token = localStorage.getItem('dd_token')
       const cfg = await fetch(
@@ -307,8 +299,8 @@ function MainApp() {
   }
 
   const globalNavItems = canManageAll
-    ? [{ key:'home', label:'Home', Icon: Home }, { key:'sites', label:'Sites', Icon: Building2 }, ...(isSuperAdmin ? [{ key:'users', label:'Users', Icon: Users }] : [])]
-    : [{ key:'sites', label:'My Sites', Icon: Building2 }]
+    ? [{ key:'home', label:'Home', Icon: Home }, { key:'sites', label:'Sites', Icon: Building2 }, { key:'operations', label:'Operations', Icon: ShoppingCart }, ...(isSuperAdmin ? [{ key:'users', label:'Users', Icon: Users }] : [])]
+    : [{ key:'sites', label:'My Sites', Icon: Building2 }, { key:'operations', label:'Operations', Icon: ShoppingCart }]
 
   const getSiteNavItems = (site) => {
     const items = [
@@ -318,14 +310,6 @@ function MainApp() {
       { key: 'cms', label: 'CMS', Icon: Pencil },
       { key: 'config', label: 'Config', Icon: Settings2 },
     ]
-
-    // Client users only see Operations and Items
-    if (isClient) {
-      return [
-        { key: 'operations', label: 'Operations', Icon: ShoppingCart },
-        { key: 'items', label: 'Items', Icon: ClipboardList },
-      ]
-    }
 
     if (canManageAll || !site) return items
 
@@ -384,18 +368,35 @@ function MainApp() {
 
       <Container fill>
         <div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', width:'100%' }}>
-          {!activeSite && canManageAll && globalNav === 'home' && (
+          {!activeSite && globalNav === 'home' && (
             <GlobalHome onOpenSite={openSite} isSuperAdmin={isSuperAdmin} />
           )}
           {!activeSite && isSuperAdmin && globalNav === 'users' && (
             <div style={{ padding:40, color:C.t2 }}>Users management — coming soon.</div>
           )}
-          {!activeSite && (canManageAll ? globalNav === 'sites' : true) && (
-            <SitesList
-              onOpenSite={openSite}
-              isSuperAdmin={canManageAll}
-              clientAccess={user?.clientAccess || {}}
-              show={canManageAll
+          {!activeSite && globalNav === 'operations' && (
+            <div style={{ padding:40, textAlign:'center', color:C.t2 }}>
+              <div style={{ fontSize:18, fontWeight:'bold', marginBottom:16, color:C.t0 }}>Operations</div>
+              <div style={{ maxWidth:400, margin:'0 auto', textAlign:'left' }}>
+                <p style={{ marginBottom:12, color:C.t1 }}>Access your restaurant operations dashboard to manage orders, view analytics, and manage customer loyalty programs.</p>
+                <div style={{ 
+                  background:C.panel, 
+                  border:`1px solid ${C.border}`, 
+                  borderRadius:8, 
+                  padding:16,
+                  marginBottom:12 
+                }}>
+                  <h4 style={{ margin:'0 0 8px 0', fontSize:14, fontWeight:600, color:C.t0 }}>Quick Access</h4>
+                  <ul style={{ margin:0, paddingLeft:16, color:C.t1 }}>
+                    <li style={{ marginBottom:8 }}>• <strong>Order Management:</strong> Live orders, status tracking, and history</li>
+                    <li style={{ marginBottom:8 }}>• <strong>Analytics:</strong> Daily revenue, top items, and performance metrics</li>
+                    <li style={{ marginBottom:8 }}>• <strong>Customer Loyalty:</strong> Points tracking and order history</li>
+                    <li style={{ marginBottom:8 }}>• <strong>Payment Tracking:</strong> Paid/unpaid order status</li>
+                  </ul>
+                </div>
+                <p style={{ fontSize:12, color:C.t2 }}>Select a site from the <strong>Sites</strong> tab to access the Operations dashboard.</p>
+              </div>
+            </div>
                 ? globalNav === 'sites'
                 : globalNav === 'sites' || globalNav === 'home'}
             />
