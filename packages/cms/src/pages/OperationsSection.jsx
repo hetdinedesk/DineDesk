@@ -1042,19 +1042,32 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
           </button>
         </div>
 
-        {/* Status Badge */}
+        {/* Status and Payment Badges */}
         <div style={{ marginBottom: 20 }}>
-          <span style={{
-            background: `${statusColor}20`,
-            color: statusColor,
-            padding: '6px 14px',
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 700,
-            textTransform: 'capitalize'
-          }}>
-            {statusLabel}
-          </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{
+              background: `${statusColor}20`,
+              color: statusColor,
+              padding: '6px 14px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              textTransform: 'capitalize'
+            }}>
+              {statusLabel}
+            </span>
+            <span style={{
+              background: order.paymentStatus === 'paid' ? `${C.green}20` : `${C.red}20`,
+              color: order.paymentStatus === 'paid' ? C.green : C.red,
+              padding: '4px 10px',
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              textTransform: 'capitalize'
+            }}>
+              {order.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+            </span>
+          </div>
         </div>
 
         {/* Customer Info */}
