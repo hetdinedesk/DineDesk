@@ -157,6 +157,35 @@ export default function OperationsSection({ clientId }) {
     setPreviousOrderIds(currentOrderIds)
   }, [liveOrders])
 
+  // Keep playing sound for unaccepted new orders
+  useEffect(() => {
+    const unacceptedOrders = liveOrders.filter(o => o.status === 'new')
+    
+    if (unacceptedOrders.length > 0) {
+      // Play sound every 10 seconds for unaccepted orders
+      const soundInterval = setInterval(() => {
+        playNotificationSound()
+      }, 10000)
+      
+      // Store interval ID for cleanup
+      window.currentSoundInterval = soundInterval
+    } else {
+      // Clear interval if no unaccepted orders
+      if (window.currentSoundInterval) {
+        clearInterval(window.currentSoundInterval)
+        window.currentSoundInterval = null
+      }
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (window.currentSoundInterval) {
+        clearInterval(window.currentSoundInterval)
+        window.currentSoundInterval = null
+      }
+    }
+  }, [liveOrders])
+
   // Initialize audio for notification sound
   useEffect(() => {
     if (typeof window !== 'undefined') {
