@@ -270,10 +270,10 @@ export default function OperationsSection({ clientId }) {
       queryClient.invalidateQueries(['orders', clientId, selectedLocation, 'history'])
       queryClient.invalidateQueries(['orders', clientId])
       
-      // If order was completed or cancelled, switch to history tab
-      if (status === 'completed' || status === 'cancelled') {
-        setActiveTab('history')
-      }
+      // Keep user on live orders tab - don't auto-switch to history
+      // if (status === 'completed' || status === 'cancelled') {
+      //   setActiveTab('history')
+      // }
     }
   })
 
