@@ -338,14 +338,24 @@ router.get('/:orderId', async (req, res) => {
 router.patch('/:orderId/status', authenticateToken, async (req, res) => {
   try {
     const { status } = req.body
-    const validStatuses = ['new', 'preparing', 'almost_ready', 'packing', 'ready', 'completed', 'cancelled']
+    const validStatuses = ['new', 'accepted', 'preparing', 'almost_ready', 'packing', 'ready', 'completed', 'cancelled']
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' })
     }
 
+    // Build update data with timestamp
+    const updateData = { status }
+    const now = new Date()
+    
+    // Add timestamp for specific status changes
+    if (status === 'accepted') updateData.acceptedAt = now
+    if (status === 'preparing') updateData.preparingAt = now
+    if (status === 'ready') updateData.readyAt = now
+    if (status === 'completed') updateData.completedAt = now
+
     const order = await prisma.order.update({
       where: { id: req.params.orderId },
-      data: { status }
+      data: updateData
     })
     res.json(order)
   } catch (err) {
@@ -367,10 +377,11 @@ router.get('/update-statuses', async (req, res) => {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const clientId = getClientId(req)
-    const { status, limit = 50 } = req.query
+    const { status, limit = 50, locationId } = req.query
 
     const where = { clientId }
     if (status) where.status = status
+    if (locationId) where.locationId = locationId
 
     const orders = await prisma.order.findMany({
       where,

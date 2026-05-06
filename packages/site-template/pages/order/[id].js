@@ -41,7 +41,8 @@ export async function getServerSideProps({ query }) {
 }
 
 const statusConfig = {
-  new: { label: 'Order Received', icon: Clock, color: '#f59e0b', description: 'Your order has been received and is being prepared.' },
+  new: { label: 'Order Sent to Restaurant', icon: Clock, color: '#f59e0b', description: 'Your order has been sent to the restaurant and is awaiting confirmation.' },
+  accepted: { label: 'Order Accepted', icon: Check, color: '#10b981', description: 'Your order has been accepted by the restaurant.' },
   preparing: { label: 'Preparing', icon: Package, color: '#3b82f6', description: 'Your order is being prepared.' },
   almost_ready: { label: 'Almost Ready', icon: Clock, color: '#8b5cf6', description: 'Your order is almost ready!' },
   packing: { label: 'Packing', icon: Package, color: '#06b6d4', description: 'Your order is being packed.' },
@@ -316,6 +317,18 @@ export default function OrderStatusPage({ data, orderId, template }) {
   const StatusIcon = statusInfo.icon
   const items = Array.isArray(order.items) ? order.items : []
 
+  // Check if order is scheduled (has a future pickup time)
+  const isScheduledOrder = order.pickupTime && new Date(order.pickupTime) > new Date()
+  const scheduledTime = order.pickupTime ? new Date(order.pickupTime) : null
+
+  // Adjust status description for scheduled orders
+  let statusDescription = statusInfo.description
+  if (isScheduledOrder && order.status === 'new') {
+    statusDescription = 'Your order has been received and will be prepared closer to your scheduled pickup time.'
+  } else if (isScheduledOrder && order.status === 'preparing') {
+    statusDescription = 'Your order is being prepared for your scheduled pickup time.'
+  }
+
   const handleDownloadReceipt = () => {
     const printableReceipt = document.getElementById('printable-receipt')
     if (printableReceipt) {
@@ -381,8 +394,23 @@ export default function OrderStatusPage({ data, orderId, template }) {
               <div className="font-heading text-2xl italic" style={{ color: statusInfo.color }}>{statusInfo.label}</div>
             </div>
           </div>
-          <p className="font-body text-sm text-[var(--color-secondary)]/60 max-w-xl mx-auto leading-relaxed">{statusInfo.description}</p>
+          <p className="font-body text-sm text-[var(--color-secondary)]/60 max-w-xl mx-auto leading-relaxed">{statusDescription}</p>
         </div>
+
+        {/* Scheduled Order Banner */}
+        {isScheduledOrder && scheduledTime && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-[48px] p-6 mb-12">
+            <div className="flex items-center justify-center gap-4">
+              <Calendar width={32} height={32} strokeWidth={2} className="text-amber-600" />
+              <div className="text-left">
+                <div className="font-heading text-xl italic text-amber-800">Scheduled Order</div>
+                <div className="font-body text-sm text-amber-700">
+                  Your order is scheduled for <span className="font-bold">{scheduledTime.toLocaleDateString()}</span> at <span className="font-bold">{scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Status Progress */}
         <div className="bg-white rounded-[48px] border border-[var(--color-secondary)]/10 p-8 mb-12">

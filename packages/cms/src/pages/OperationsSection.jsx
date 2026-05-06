@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle } from 'lucide-react'
 import { getOrders, updateOrderStatus } from '../api/orders'
 import { getLocations } from '../api/locations'
-import { toggleOrdering, getConfig } from '../api/config'
+import { toggleOrdering } from '../api/config'
 import { C } from '../theme'
 
 const STATUS_COLORS = {
@@ -51,12 +51,53 @@ const formatCurrency = (amount) => {
   return `$${(amount || 0).toFixed(2)}`
 }
 
+const getOrderProgressTime = (order) => {
+  if (!order.acceptedAt && !order.preparingAt && !order.readyAt) return null
+  
+  const now = new Date()
+  let startTime = order.createdAt
+  let statusText = ''
+  let progressPercent = 0
+  
+  if (order.acceptedAt) {
+    startTime = new Date(order.acceptedAt)
+    statusText = 'Accepted'
+    progressPercent = 25
+  }
+  if (order.preparingAt) {
+    startTime = new Date(order.preparingAt)
+    statusText = 'Preparing'
+    progressPercent = 50
+  }
+  if (order.readyAt) {
+    startTime = new Date(order.readyAt)
+    statusText = 'Ready'
+    progressPercent = 75
+  }
+  if (order.completedAt) {
+    startTime = new Date(order.completedAt)
+    statusText = 'Completed'
+    progressPercent = 100
+  }
+  
+  const diffMs = now - startTime
+  const diffMins = Math.floor(diffMs / 60000)
+  
+  return {
+    statusText,
+    progressPercent,
+    timeElapsed: diffMins < 1 ? 'Just now' : `${diffMins}m`
+  }
+}
+
 export default function OperationsSection({ clientId }) {
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [orderingEnabled, setOrderingEnabled] = useState(true)
   const [activeTab, setActiveTab] = useState('live')
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [previousOrderIds, setPreviousOrderIds] = useState(new Set())
   const queryClient = useQueryClient()
+  const audioRef = useRef(null)
 
   // Fetch config to get initial ordering state
   const { data: config } = useQuery({
@@ -98,6 +139,52 @@ export default function OperationsSection({ clientId }) {
     refetchInterval: 5000, // Poll every 5 seconds for faster updates
     enabled: !!selectedLocation
   })
+
+  // Check for new orders and play notification sound
+  useEffect(() => {
+    const currentOrderIds = new Set(liveOrders.map(o => o.id))
+    const newOrders = liveOrders.filter(o => 
+      !previousOrderIds.has(o.id) && o.status === 'new'
+    )
+    
+    if (newOrders.length > 0) {
+      // Play notification sound
+      playNotificationSound()
+      // Show browser notification
+      showBrowserNotification(newOrders.length)
+    }
+    
+    setPreviousOrderIds(currentOrderIds)
+  }, [liveOrders])
+
+  // Initialize audio for notification sound
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHm8tiJOQgZqLvt52hEAw')
+    }
+  }, [])
+
+  const playNotificationSound = () => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(e => console.log('Audio play failed:', e))
+    }
+  }
+
+  const showBrowserNotification = (orderCount) => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('New Order Received', {
+        body: `${orderCount} new order${orderCount > 1 ? 's' : ''} received`,
+        icon: '/favicon.ico'
+      })
+    }
+  }
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   // Fetch history orders (completed, cancelled)
   const { data: historyOrders = [], isLoading: historyLoading } = useQuery({
@@ -466,6 +553,48 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
         </div>
       </div>
 
+      {/* Order Progress */}
+      {order.status !== 'new' && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', marginBottom: 4 }}>
+            Order Progress
+          </div>
+          {(() => {
+            const progress = getOrderProgressTime(order)
+            if (!progress) return null
+            
+            return (
+              <div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: 4
+                }}>
+                  <span style={{ fontSize: 12, color: C.t2 }}>
+                    {progress.statusText} - {progress.timeElapsed}
+                  </span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: 6,
+                  background: C.border,
+                  borderRadius: 3,
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${progress.progressPercent}%`,
+                    height: '100%',
+                    background: STATUS_COLORS[order.status],
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
       {/* Items Preview */}
       <div style={{ marginBottom: 12 }}>
         {order.items?.slice(0, 2).map((item, i) => (
@@ -498,6 +627,68 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           {order.orderType}
         </span>
       </div>
+
+      {/* Accept/Decline buttons for new orders */}
+      {order.status === 'new' && (
+        <div style={{ 
+          display: 'flex', 
+          gap: 8, 
+          marginTop: 12,
+          paddingTop: 12,
+          borderTop: `1px solid ${C.border}20`
+        }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onStatusChange(order.id, 'accepted')
+            }}
+            style={{
+              flex: 1,
+              padding: '10px',
+              background: C.green,
+              border: 'none',
+              borderRadius: 8,
+              color: 'white',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            <Check size={16} />
+            Accept Order
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onStatusChange(order.id, 'cancelled')
+            }}
+            style={{
+              flex: 1,
+              padding: '10px',
+              background: C.red,
+              border: 'none',
+              borderRadius: 8,
+              color: 'white',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            <X size={16} />
+            Decline Order
+          </button>
+        </div>
+      )}
     </div>
   )
 }
