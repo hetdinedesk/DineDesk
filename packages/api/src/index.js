@@ -66,6 +66,9 @@ app.use('/api/enquiries', require('./routes/enquiries'))
 // GROUPS ROUTE - for organizing sites
 app.use('/api/groups', require('./routes/groups'))
 
+// ACTIVITY LOG ROUTE - for site admin dashboard
+app.use('/api/activity', require('./routes/activityLog'))
+
 // PLATFORM SETTINGS ROUTE
 app.use('/api/platform', require('./routes/platform'))
 

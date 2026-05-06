@@ -148,7 +148,6 @@ function SAShell({ user, onLogout }) {
   const tabs = [
     { key:'dashboard', label:'Dashboard',         icon:'📊' },
     ...(isSuperAdmin ? [{ key:'users',     label:'Users',             icon:'👥' }] : []),
-    { key:'groups',    label:'Groups',            icon:'📁' },
     ...(isSuperAdmin ? [{ key:'activity',  label:'Activity Log',      icon:'📋' }] : []),
     ...(isSuperAdmin ? [{ key:'settings',  label:'Platform Settings', icon:'⚙️' }] : []),
   ]
@@ -222,7 +221,6 @@ function SAShell({ user, onLogout }) {
       <div style={{ flex:1, overflow:'hidden' }}>
         {tab==='dashboard' && <SADashboard />}
         {tab==='users'     && isSuperAdmin && <SAUsers     />}
-        {tab==='groups'    && <SAGroups    />}
         {tab==='activity'  && isSuperAdmin && <SAActivity  />}
         {tab==='settings'  && isSuperAdmin && <SASettings  />}
       </div>
@@ -417,26 +415,31 @@ function SAUsers() {
       setError('Name, email and password are required.'); return
     }
     setSaving(true); setError('')
-    const res = await fetch(API + '/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + localStorage.getItem(SA_TOKEN_KEY) },
-      body: JSON.stringify({
-        name: newName, email: newEmail, password: newPassword,
-        role: newRole, clientAccess: newAccess
+    try {
+      const res = await fetch(API + '/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + localStorage.getItem(SA_TOKEN_KEY) },
+        body: JSON.stringify({
+          name: newName, email: newEmail, password: newPassword,
+          role: newRole, clientAccess: newAccess
+        })
       })
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error || 'Failed'); setSaving(false); return }
-    setNewName(''); setNewEmail(''); setNewPassword(''); setNewRole('EDITOR'); setNewAccess({})
-    setShowAdd(false); setSaving(false);
-    sessionStorage.removeItem('sa_users_show_add')
-    sessionStorage.removeItem('sa_users_new_name')
-    sessionStorage.removeItem('sa_users_new_email')
-    // password not persisted
-    sessionStorage.removeItem('sa_users_new_role')
-    sessionStorage.removeItem('sa_users_new_access')
-    load()
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Failed'); setSaving(false); return }
+      setNewName(''); setNewEmail(''); setNewPassword(''); setNewRole('EDITOR'); setNewAccess({})
+      setShowAdd(false); setSaving(false);
+      sessionStorage.removeItem('sa_users_show_add')
+      sessionStorage.removeItem('sa_users_new_name')
+      sessionStorage.removeItem('sa_users_new_email')
+      // password not persisted
+      sessionStorage.removeItem('sa_users_new_role')
+      sessionStorage.removeItem('sa_users_new_access')
+      load()
+    } catch (err) {
+      setError('Connection error: ' + err.message)
+      setSaving(false)
+    }
   }
 
   const saveEdit = async () => {
@@ -987,15 +990,15 @@ function SAActivity() {
 // ── Platform Settings ───────────────────────────────────────────
 function SASettings() {
   const [form, setForm] = useState({
-    companyName:'DineDesk', supportEmail:'support@dinedesk.io',
-    contactPhone:'', website:'https://dinedesk.io',
-    defaultTimezone:'Australia/Melbourne',
+    companyName:'DineDesk', logoUrl:'', website:'https://dinedesk.io',
+    supportEmail:'support@dinedesk.io', contactPhone:'',
+    smtpHost:'', smtpPort:'587', smtpUser:'', smtpPassword:'',
+    defaultFromEmail:'', defaultTimezone:'Australia/Melbourne',
   })
   const [saved,  setSaved]  = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    // Load from API
     const token = localStorage.getItem(SA_TOKEN_KEY)
     fetch(API + '/platform', { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json())
@@ -1026,43 +1029,78 @@ function SASettings() {
     }
   }
 
-  const fields = [
-    { key:'companyName',     label:'Company Name',     type:'text',  ph:'DineDesk'               },
-    { key:'supportEmail',    label:'Support Email',    type:'email', ph:'support@dinedesk.io'     },
-    { key:'contactPhone',    label:'Contact Phone',    type:'text',  ph:'+61 400 000 000'         },
-    { key:'website',         label:'Website URL',      type:'url',   ph:'https://dinedesk.io'     },
-    { key:'defaultTimezone', label:'Default Timezone', type:'text',  ph:'Australia/Melbourne'     },
+  const sections = [
+    {
+      title:'Branding',
+      fields: [
+        { key:'companyName', label:'Company Name', type:'text', ph:'DineDesk' },
+        { key:'logoUrl',     label:'Logo URL',      type:'url',  ph:'https://example.com/logo.png' },
+        { key:'website',     label:'Website URL',   type:'url',  ph:'https://dinedesk.io' },
+      ]
+    },
+    {
+      title:'Contact Information',
+      fields: [
+        { key:'supportEmail', label:'Support Email', type:'email', ph:'support@dinedesk.io' },
+        { key:'contactPhone', label:'Contact Phone', type:'text',  ph:'+61 400 000 000' },
+      ]
+    },
+    {
+      title:'Email Configuration',
+      fields: [
+        { key:'smtpHost',         label:'SMTP Host',         type:'text', ph:'smtp.example.com' },
+        { key:'smtpPort',         label:'SMTP Port',         type:'text', ph:'587' },
+        { key:'smtpUser',         label:'SMTP User',         type:'text', ph:'user@example.com' },
+        { key:'smtpPassword',     label:'SMTP Password',     type:'password', ph:'••••••••' },
+        { key:'defaultFromEmail', label:'Default From Email',type:'email', ph:'noreply@dinedesk.io' },
+      ]
+    },
+    {
+      title:'General',
+      fields: [
+        { key:'defaultTimezone', label:'Default Timezone', type:'text', ph:'Australia/Melbourne' },
+      ]
+    },
   ]
 
   return (
     <div style={{ padding:'28px 36px', overflowY:'auto', height:'100%', boxSizing:'border-box' }}>
       <h2 style={{ margin:'0 0 4px', fontSize:18, fontWeight:800, color:C.t0 }}>Platform Settings</h2>
       <p style={{ margin:'0 0 24px', fontSize:13, color:C.t3 }}>Global settings for the DineDesk platform.</p>
-      <div style={{ maxWidth:560, background:C.panel, border:`1px solid ${C.border}`, borderRadius:12, padding:24 }}>
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          {fields.map(({ key, label, type, ph }) => (
-            <div key={key}>
-              <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase',
-                letterSpacing:'0.06em', display:'block', marginBottom:6 }}>{label}</label>
-              <input type={type} value={form[key]} placeholder={ph}
-                onChange={e => setForm(p=>({...p,[key]:e.target.value}))}
-                style={{ width:'100%', padding:'10px 12px', background:C.input,
-                  border:`1px solid ${C.border}`, borderRadius:8, color:C.t0,
-                  fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
-                onFocus={e => e.target.style.borderColor=C.acc}
-                onBlur={e => e.target.style.borderColor=C.border}
-              />
+
+      <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+        {sections.map((section, si) => (
+          <div key={si} style={{ maxWidth:640, background:C.panel, border:`1px solid ${C.border}`, borderRadius:12, padding:24 }}>
+            <h3 style={{ margin:'0 0 16px', fontSize:14, fontWeight:700, color:C.t0, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+              {section.title}
+            </h3>
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              {section.fields.map(({ key, label, type, ph }) => (
+                <div key={key}>
+                  <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase',
+                    letterSpacing:'0.06em', display:'block', marginBottom:6 }}>{label}</label>
+                  <input type={type} value={form[key]} placeholder={ph}
+                    onChange={e => setForm(p=>({...p,[key]:e.target.value}))}
+                    style={{ width:'100%', padding:'10px 12px', background:C.input,
+                      border:`1px solid ${C.border}`, borderRadius:8, color:C.t0,
+                      fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor=C.acc}
+                    onBlur={e => e.target.style.borderColor=C.border}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div style={{ marginTop:20, display:'flex', alignItems:'center', gap:12 }}>
-          <button onClick={save} disabled={saving}
-            style={{ padding:'10px 24px', background:C.acc, border:'none', borderRadius:8,
-              color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
-            {saving ? 'Saving…' : 'Save Settings'}
-          </button>
-          {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
-        </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop:24, display:'flex', alignItems:'center', gap:12 }}>
+        <button onClick={save} disabled={saving}
+          style={{ padding:'10px 24px', background:C.acc, border:'none', borderRadius:8,
+            color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+          {saving ? 'Saving…' : 'Save Settings'}
+        </button>
+        {saved && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
       </div>
     </div>
   )
