@@ -874,16 +874,22 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
 function AnalyticsSection({ liveOrders, historyOrders }) {
   // Calculate today's metrics
   const today = new Date()
+  today.setHours(0, 0, 0, 0) // Set to start of day
+  
   const todayOrders = [...liveOrders, ...historyOrders].filter(order => {
+    if (!order.createdAt) return false
     const orderDate = new Date(order.createdAt)
-    return orderDate.toDateString() === today.toDateString()
+    orderDate.setHours(0, 0, 0, 0) // Set to start of day
+    return orderDate.getTime() === today.getTime()
   })
   
+  // Calculate revenue from all orders (paid and unpaid for business insights)
   const todayRevenue = todayOrders
-    .filter(order => order.paymentStatus === 'paid')
-    .reduce((sum, order) => sum + order.total, 0)
+    .reduce((sum, order) => sum + (order.total || 0), 0)
   
   const todayOrderCount = todayOrders.length
+  
+  // Calculate average order value from all orders (not just paid ones)
   const averageOrderValue = todayOrderCount > 0 ? todayRevenue / todayOrderCount : 0
   
   // Calculate top selling items
@@ -891,8 +897,10 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
   todayOrders.forEach(order => {
     if (order.items && Array.isArray(order.items)) {
       order.items.forEach(item => {
+        if (!item) return
         const itemName = item.name || 'Unknown Item'
-        itemCounts[itemName] = (itemCounts[itemName] || 0) + (item.quantity || 1)
+        const quantity = parseInt(item.quantity) || 1
+        itemCounts[itemName] = (itemCounts[itemName] || 0) + quantity
       })
     }
   })
@@ -904,6 +912,27 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
   
   return (
     <div>
+      {/* Debug Info - Remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ 
+          background: '#fffbf0', 
+          border: '1px solid #fbbf24', 
+          borderRadius: '8px', 
+          padding: '12px', 
+          marginBottom: '16px',
+          fontSize: '12px',
+          color: '#92400e'
+        }}>
+          <strong>Debug Info:</strong><br/>
+          • Live Orders: {liveOrders.length}<br/>
+          • History Orders: {historyOrders.length}<br/>
+          • Today's Orders: {todayOrders.length}<br/>
+          • Today's Revenue: ${todayRevenue.toFixed(2)}<br/>
+          • Average Order: ${averageOrderValue.toFixed(2)}<br/>
+          • Top Items: {topItems.length}
+        </div>
+      )}
+      
       <h3 style={{ 
         fontSize: '18px', 
         fontWeight: 'bold', 
@@ -934,7 +963,7 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
             color: C.green, 
             marginBottom: '8px' 
           }}>
-            ${todayOrderCount}
+            {todayOrderCount}
           </div>
           <div style={{ fontSize: '14px', color: C.t2 }}>Orders Today</div>
         </div>
