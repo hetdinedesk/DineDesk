@@ -597,35 +597,11 @@ export default function OperationsSection({ clientId }) {
 
         {/* Order History */}
         {activeTab === 'history' && (
-          <div>
-            {historyLoading ? (
-              <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>Loading history...</div>
-            ) : historyOrders.length === 0 ? (
-              <div style={{
-                background: C.panel,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
-                padding: 60,
-                textAlign: 'center'
-              }}>
-                <Clock size={48} color={C.t3} style={{ marginBottom: 16 }} />
-                <div style={{ fontSize: 16, color: C.t2, marginBottom: 8 }}>No order history</div>
-                <div style={{ fontSize: 13, color: C.t3 }}>Completed orders will appear here</div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-                {historyOrders.map(order => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onClick={() => setSelectedOrder(order)}
-                    onStatusChange={handleStatusChange}
-                    isHistory
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <OrderHistorySection 
+            historyOrders={historyOrders}
+            onOrderClick={setSelectedOrder}
+            onStatusChange={handleStatusChange}
+          />
         )}
       </div>
 
@@ -698,17 +674,30 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
             {formatDate(order.createdAt)}
           </div>
         </div>
-        <span style={{
-          background: `${statusColor}20`,
-          color: statusColor,
-          padding: '4px 10px',
-          borderRadius: 6,
-          fontSize: 11,
-          fontWeight: 700,
-          textTransform: 'capitalize'
-        }}>
-          {statusLabel}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{
+            background: `${statusColor}20`,
+            color: statusColor,
+            padding: '4px 10px',
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: 'capitalize'
+          }}>
+            {statusLabel}
+          </span>
+          <span style={{
+            background: order.paymentStatus === 'paid' ? `${C.green}20` : `${C.red}20`,
+            color: order.paymentStatus === 'paid' ? C.green : C.red,
+            padding: '3px 8px',
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 600,
+            textTransform: 'capitalize'
+          }}>
+            {order.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+          </span>
+        </div>
       </div>
 
       {/* Customer Info */}
@@ -859,6 +848,123 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// Order History Component
+function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange }) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+  
+  // Filter orders based on search, status, and date
+  const filteredOrders = historyOrders.filter(order => {
+    // Search filter
+    const matchesSearch = searchTerm === '' || 
+      order.orderNumber.toString().includes(searchTerm) ||
+      order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.customerPhone.includes(searchTerm)
+    
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+    
+    // Date filter
+    const orderDate = new Date(order.createdAt)
+    const today = new Date()
+    let matchesDate = true
+    
+    if (dateFilter === 'today') {
+      matchesDate = orderDate.toDateString() === today.toDateString()
+    } else if (dateFilter === 'week') {
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+      matchesDate = orderDate >= weekAgo
+    } else if (dateFilter === 'month') {
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+      matchesDate = orderDate >= monthAgo
+    }
+    
+    return matchesSearch && matchesStatus && matchesDate
+  })
+  
+  return (
+    <div>
+      {/* Search and Filter Controls */}
+      <div style={{
+        display: 'flex',
+        gap: 16,
+        marginBottom: 24,
+        flexWrap: 'wrap'
+      }}>
+        <input
+          type="text"
+          placeholder="Search by order #, name, or phone..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: 200,
+            padding: '10px 12px',
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: 'inherit'
+          }}
+        />
+        
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{
+            padding: '10px 12px',
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: 'inherit',
+            minWidth: 120
+          }}
+        >
+          <option value="all">All Status</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        
+        <select
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          style={{
+            padding: '10px 12px',
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: 'inherit',
+            minWidth: 120
+          }}
+        >
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+      </div>
+      
+      {/* Results count */}
+      <div style={{ marginBottom: 16, fontSize: 13, color: C.t3 }}>
+        Showing {filteredOrders.length} of {historyOrders.length} orders
+      </div>
+      
+      {/* Order Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+        {filteredOrders.map(order => (
+          <OrderCard
+            key={order.id}
+            order={order}
+            onClick={() => onOrderClick(order)}
+            onStatusChange={onStatusChange}
+            isHistory
+          />
+        ))}
+      </div>
     </div>
   )
 }
