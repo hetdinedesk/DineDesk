@@ -52,30 +52,31 @@ const formatCurrency = (amount) => {
 }
 
 const getOrderProgressTime = (order) => {
-  if (!order.acceptedAt && !order.preparingAt && !order.readyAt) return null
+  if (order.status === 'new') return null
   
   const now = new Date()
   let startTime = order.createdAt
   let statusText = ''
   let progressPercent = 0
   
-  if (order.acceptedAt) {
-    startTime = new Date(order.acceptedAt)
+  // Use status instead of timestamps for now
+  if (order.status === 'accepted') {
+    startTime = order.createdAt // For now, use createdAt as start time
     statusText = 'Accepted'
     progressPercent = 25
   }
-  if (order.preparingAt) {
-    startTime = new Date(order.preparingAt)
+  if (order.status === 'preparing') {
+    startTime = order.createdAt // For now, use createdAt as start time
     statusText = 'Preparing'
     progressPercent = 50
   }
-  if (order.readyAt) {
-    startTime = new Date(order.readyAt)
+  if (order.status === 'ready') {
+    startTime = order.createdAt // For now, use createdAt as start time
     statusText = 'Ready'
     progressPercent = 75
   }
-  if (order.completedAt) {
-    startTime = new Date(order.completedAt)
+  if (order.status === 'completed') {
+    startTime = order.createdAt // For now, use createdAt as start time
     statusText = 'Completed'
     progressPercent = 100
   }
