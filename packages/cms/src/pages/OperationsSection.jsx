@@ -912,27 +912,6 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
   
   return (
     <div>
-      {/* Debug Info - Remove in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{ 
-          background: '#fffbf0', 
-          border: '1px solid #fbbf24', 
-          borderRadius: '8px', 
-          padding: '12px', 
-          marginBottom: '16px',
-          fontSize: '12px',
-          color: '#92400e'
-        }}>
-          <strong>Debug Info:</strong><br/>
-          • Live Orders: {liveOrders.length}<br/>
-          • History Orders: {historyOrders.length}<br/>
-          • Today's Orders: {todayOrders.length}<br/>
-          • Today's Revenue: ${todayRevenue.toFixed(2)}<br/>
-          • Average Order: ${averageOrderValue.toFixed(2)}<br/>
-          • Top Items: {topItems.length}
-        </div>
-      )}
-      
       <h3 style={{ 
         fontSize: '18px', 
         fontWeight: 'bold', 
