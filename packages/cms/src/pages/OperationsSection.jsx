@@ -870,7 +870,7 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
   )
 }
 
-// Analytics Dashboard Component
+// Analytics Dashboard Component - Fixed orders count display
 function AnalyticsSection({ liveOrders, historyOrders }) {
   // Calculate today's metrics
   const today = new Date()
