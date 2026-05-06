@@ -234,6 +234,9 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
   const paymentGateway = data?.paymentGateway || {}
 
+  // Check if ordering is enabled
+  const isOrderingEnabled = data?.ordering?.enabled !== false
+
   const [step, setStep] = useState(1) // 1: Info, 2: Pickup, 3: Payment
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -423,6 +426,107 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       return (paymentMethod === 'cash' && paymentGateway.cashEnabled !== false) || (paymentMethod === 'stripe' && paymentGateway.isActive)
     }
     return false
+  }
+
+  // Show ordering disabled message
+  if (!isOrderingEnabled) {
+    return (
+      <CMSProvider data={data}>
+        <Head>
+          <title>Orders Unavailable - {siteName}</title>
+        </Head>
+        <div className="min-h-screen bg-[var(--color-accent)]">
+          <Header />
+          
+          {/* Theme-specific Hero */}
+          {normalizedTemplate === 'theme-d1' && (
+            <div className="relative bg-[var(--color-primary)] py-32 px-6 text-center text-white overflow-hidden">
+              <div className="relative z-10 space-y-6 max-w-4xl mx-auto">
+                <h1 className="font-serif text-5xl md:text-7xl leading-tight" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                  Orders Temporarily Unavailable
+                </h1>
+                <p className="max-w-2xl mx-auto text-white/90 font-light text-xl leading-relaxed" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+                  We're not accepting orders at the moment
+                </p>
+              </div>
+              {/* Decorative bottom wave */}
+              <div className="absolute bottom-0 left-0 right-0">
+                <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M0 120L60 110C120 100 240 80 360 75C480 70 600 80 720 85C840 90 960 90 1080 85C1200 80 1320 70 1380 65L1440 60V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="white" />
+                </svg>
+              </div>
+            </div>
+          )}
+          
+          {normalizedTemplate === 'theme-d2' && (
+            <div className="relative bg-gradient-to-br from-teal-50 to-cyan-100 py-32 px-6 text-center overflow-hidden">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-teal-200/30 rounded-full blur-3xl"></div>
+              <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-200/30 rounded-full blur-3xl"></div>
+              <div className="relative z-10 space-y-6 max-w-4xl mx-auto">
+                <div className="inline-flex items-center gap-3 text-teal-600 font-sans font-semibold text-sm uppercase tracking-wider">
+                  <div className="w-8 h-0.5 bg-teal-600"></div>
+                  <span>Orders Unavailable</span>
+                  <div className="w-8 h-0.5 bg-teal-600"></div>
+                </div>
+                <h1 className="font-sans text-5xl md:text-7xl font-bold leading-tight text-gray-900">
+                  Sorry, Not Accepting Orders
+                </h1>
+                <p className="max-w-2xl mx-auto text-gray-600 font-medium text-lg leading-relaxed">
+                  We're temporarily unable to accept online orders
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {normalizedTemplate === 'theme-d3' && (
+            <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-32 px-6 text-center text-white overflow-hidden">
+              <div className="absolute inset-0 bg-black/20"></div>
+              <div className="relative z-10 space-y-6 max-w-4xl mx-auto">
+                <h1 className="font-serif text-5xl md:text-7xl leading-tight">
+                  Orders Unavailable
+                </h1>
+                <p className="max-w-2xl mx-auto text-gray-300 font-light text-xl leading-relaxed">
+                  We're not accepting orders at the moment
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {/* Content */}
+          <div className="max-w-4xl mx-auto px-6 py-16">
+            <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 text-center">
+              <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Clock className="w-10 h-10 text-amber-600" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                Sorry, Not Accepting Orders at the Moment
+              </h2>
+              <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+                We're temporarily unable to accept online orders. Please check back later or call us directly to place your order.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={() => router.push('/?site=' + router.query.site)}
+                  className="px-8 py-3 bg-[var(--color-primary)] text-white rounded-lg font-semibold hover:bg-[var(--color-primary)]/90 transition-colors"
+                >
+                  Return to Menu
+                </button>
+                {data?.settings?.phone && (
+                  <a
+                    href={`tel:${data.settings.phone}`}
+                    className="px-8 py-3 border-2 border-[var(--color-primary)] text-[var(--color-primary)] rounded-lg font-semibold hover:bg-[var(--color-primary)] hover:text-white transition-colors"
+                  >
+                    Call Us: {data.settings.phone}
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <Footer />
+        </div>
+      </CMSProvider>
+    )
   }
 
   return (
