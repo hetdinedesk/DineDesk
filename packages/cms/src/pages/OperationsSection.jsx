@@ -101,6 +101,10 @@ export default function OperationsSection({ clientId }) {
   const [previousOrderIds, setPreviousOrderIds] = useState(new Set())
   const queryClient = useQueryClient()
   const audioRef = useRef(null)
+  
+  // Check if current user is a client
+  const user = JSON.parse(localStorage.getItem('dd_user') || '{}')
+  const isClient = user.role === 'CLIENT'
 
   // Fetch config to get initial ordering state
   const { data: config } = useQuery({
@@ -313,6 +317,24 @@ export default function OperationsSection({ clientId }) {
     return liveOrders.filter(o => o.status === status).length
   }
 
+  // Calculate today's revenue for clients
+  const getTodayRevenue = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayOrders = liveOrders.filter(o => 
+      new Date(o.createdAt) >= today && o.status === 'completed'
+    )
+    return todayOrders.reduce((sum, order) => sum + order.total, 0)
+  }
+
+  // Calculate average order value
+  const getAverageOrderValue = () => {
+    const completedOrders = liveOrders.filter(o => o.status === 'completed')
+    if (completedOrders.length === 0) return 0
+    const total = completedOrders.reduce((sum, order) => sum + order.total, 0)
+    return total / completedOrders.length
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.page }}>
       
@@ -465,25 +487,101 @@ export default function OperationsSection({ clientId }) {
       {/* Main Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
         
+        {/* Client Dashboard */}
+        {isClient && (
+          <div style={{ 
+            background: C.panel, 
+            border: `1px solid ${C.border}`,
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '16px'
+          }}>
+            <h3 style={{ 
+              fontSize: '14px', 
+              fontWeight: 'bold', 
+              color: C.t0, 
+              marginBottom: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.07em'
+            }}>
+              Today's Performance
+            </h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+              gap: '16px',
+              marginBottom: '12px'
+            }}>
+              <div style={{ 
+                background: C.card, 
+                padding: '12px', 
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ 
+                  fontSize: '24px', 
+                  fontWeight: 'bold', 
+                  color: C.green,
+                  marginBottom: '4px' 
+                }}>
+                  ${getTodayRevenue().toFixed(2)}
+                </div>
+                <div style={{ fontSize: '12px', color: C.t2 }}>Today's Revenue</div>
+              </div>
+              <div style={{ 
+                background: C.card, 
+                padding: '12px', 
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ 
+                  fontSize: '24px', 
+                  fontWeight: 'bold', 
+                  color: C.acc,
+                  marginBottom: '4px' 
+                }}>
+                  {getOrderCountByStatus('completed')}
+                </div>
+                <div style={{ fontSize: '12px', color: C.t2 }}>Orders Completed</div>
+              </div>
+              <div style={{ 
+                background: C.card, 
+                padding: '12px', 
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <div style={{ 
+                  fontSize: '24px', 
+                  fontWeight: 'bold', 
+                  color: C.t0,
+                  marginBottom: '4px' 
+                }}>
+                  ${getAverageOrderValue().toFixed(2)}
+                </div>
+                <div style={{ fontSize: '12px', color: C.t2 }}>Average Order</div>
+              </div>
+            </div>
+            <div style={{ fontSize: '12px', color: C.t2, lineHeight: '1.5' }}>
+              Manage your orders efficiently with real-time notifications and status updates.
+            </div>
+          </div>
+        )}
+        
         {/* Live Orders */}
         {activeTab === 'live' && (
           <div>
             {liveLoading ? (
               <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>Loading orders...</div>
             ) : liveOrders.length === 0 ? (
-              <div style={{
-                background: C.panel,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
-                padding: 60,
-                textAlign: 'center'
-              }}>
-                <ShoppingCart size={48} color={C.t3} style={{ marginBottom: 16 }} />
-                <div style={{ fontSize: 16, color: C.t2, marginBottom: 8 }}>No live orders</div>
-                <div style={{ fontSize: 13, color: C.t3 }}>New orders will appear here automatically</div>
+              <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>
+                {isClient ? 'No orders yet. You\'ll see new orders here when customers place them!' : 'No live orders'}
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+                gap: '16px' 
+              }}>
                 {liveOrders.map(order => (
                   <OrderCard
                     key={order.id}

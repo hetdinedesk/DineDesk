@@ -40,6 +40,7 @@ function MainApp() {
   const logout = useAuthStore(s => s.logout)
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const isManager = user?.role === 'MANAGER'
+  const isClient = user?.role === 'CLIENT'
   const canManageAll = isSuperAdmin || isManager
   const [buildMenu,    setBuildMenu]    = useState(false)
   const [deploying,    setDeploying]    = useState(false)
@@ -49,10 +50,16 @@ function MainApp() {
     const user = useAuthStore.getState().user
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
     const isManager = user?.role === 'MANAGER'
+    const isClient = user?.role === 'CLIENT'
+    if (isClient) return 'sites' // Clients go directly to sites
     return (isSuperAdmin || isManager) ? 'home' : 'sites'
   })
   const [activeSite, setActiveSite] = useState(null)
-  const [siteNav,    setSiteNav]    = useState('dashboard')
+  const [siteNav,    setSiteNav]    = useState(() => {
+    const user = useAuthStore.getState().user
+    const isClient = user?.role === 'CLIENT'
+    return isClient ? 'operations' : 'dashboard'
+  })
   const [dashboardSubsection, setDashboardSubsection] = useState('analytics')
 
   // ── Ref so event listener always sees latest activeSite ──
@@ -237,7 +244,8 @@ function MainApp() {
   }, [siteNav, activeSite])
 
   const openSite = async (client) => {
-    setSiteNav('dashboard')
+    // Client users start with Operations, others start with dashboard
+    setSiteNav(isClient ? 'operations' : 'dashboard')
     try {
       const token = localStorage.getItem('dd_token')
       const cfg = await fetch(
@@ -310,6 +318,14 @@ function MainApp() {
       { key: 'cms', label: 'CMS', Icon: Pencil },
       { key: 'config', label: 'Config', Icon: Settings2 },
     ]
+
+    // Client users only see Operations and Items
+    if (isClient) {
+      return [
+        { key: 'operations', label: 'Operations', Icon: ShoppingCart },
+        { key: 'items', label: 'Items', Icon: ClipboardList },
+      ]
+    }
 
     if (canManageAll || !site) return items
 
