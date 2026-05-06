@@ -7,12 +7,13 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from './stores/authStore'
-import { LayoutDashboard, ClipboardList, Pencil, Settings2, Home, Building2, Users, Image } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Pencil, Settings2, Home, Building2, Users, Image, ShoppingCart } from 'lucide-react'
 import LoginPage     from './pages/LoginPage'
 import ItemsSection  from './pages/ItemsSection'
 import CmsSection    from './pages/CmsSection'
 import ConfigSection from './pages/ConfigSection'
 import DashboardSection from './pages/DashboardSection'
+import OperationsSection from './pages/OperationsSection'
 import HomepageBanners from './pages/HomepageBanners'
 import { C } from './theme'
 
@@ -305,6 +306,7 @@ function MainApp() {
     const items = [
       { key: 'dashboard', label: 'Home', Icon: LayoutDashboard },
       { key: 'items', label: 'Items', Icon: ClipboardList },
+      { key: 'operations', label: 'Operations', Icon: ShoppingCart },
       { key: 'cms', label: 'CMS', Icon: Pencil },
       { key: 'config', label: 'Config', Icon: Settings2 },
     ]
@@ -389,6 +391,7 @@ function MainApp() {
               siteType={activeSite.siteConfig?.settings?.siteType || 'restaurant'}
             />
           )}
+          {activeSite && siteNav === 'operations' && <OperationsSection clientId={activeSite.id} />}
           {activeSite && siteNav === 'cms'    && <CmsSection    clientId={activeSite.id} />}
           {activeSite && siteNav === 'config' && <ConfigSection clientId={activeSite.id} />}
           {activeSite && siteNav === 'dashboard' && <DashboardSection key={location.pathname} clientId={activeSite.id} onDeleteSite={deleteSite} subNav={dashboardSubsection} setSubNav={setDashboardSubsection} />}

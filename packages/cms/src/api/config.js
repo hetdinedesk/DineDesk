@@ -5,3 +5,6 @@ export const getConfig = (clientId) =>
 
 export const saveConfig = (clientId, data) =>
   api.put(`/clients/${clientId}/config`, data).then(r => r.data)
+
+export const toggleOrdering = (clientId, enabled, locationId) =>
+  api.patch(`/clients/${clientId}/config/ordering`, { enabled, locationId }).then(r => r.data)

@@ -2066,7 +2066,7 @@ router.get('/:id/config', async (req, res) => {
 router.put('/:id/config', async (req, res) => {
   try {
     const clientId = req.params.id
-    
+
     // Check if client exists first to avoid foreign key errors on upsert
     const client = await prisma.client.findUnique({ where: { id: clientId } })
     if (!client) {
@@ -2130,6 +2130,38 @@ router.put('/:id/config', async (req, res) => {
   } catch (err) {
     console.error('[CONFIG SAVE] Error:', err)
     console.error('[CONFIG SAVE] Error stack:', err.stack)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Ordering Toggle ─────────────────────────────────────────────
+router.patch('/:id/config/ordering', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.id
+    const { enabled, locationId } = req.body
+
+    // Get existing config
+    const existingConfig = await prisma.siteConfig.findUnique({
+      where: { clientId }
+    })
+
+    // Build ordering config
+    const ordering = existingConfig?.ordering || { enabled: false }
+    ordering.enabled = enabled
+
+    // Update config
+    const config = await prisma.siteConfig.upsert({
+      where: { clientId },
+      update: { ordering },
+      create: { clientId, ordering }
+    })
+
+    // Clear export cache
+    exportCache.delete(clientId)
+
+    res.json({ success: true, ordering })
+  } catch (err) {
+    console.error('[ORDERING TOGGLE] Error:', err)
     res.status(500).json({ error: err.message })
   }
 })
