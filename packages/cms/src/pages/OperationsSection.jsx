@@ -142,6 +142,8 @@ export default function OperationsSection({ clientId }) {
 
   // Check for new orders and play notification sound
   useEffect(() => {
+    if (!liveOrders || liveOrders.length === 0) return
+    
     const currentOrderIds = new Set(liveOrders.map(o => o.id))
     const newOrders = liveOrders.filter(o => 
       !previousOrderIds.has(o.id) && o.status === 'new'
@@ -155,10 +157,12 @@ export default function OperationsSection({ clientId }) {
     }
     
     setPreviousOrderIds(currentOrderIds)
-  }, [liveOrders])
+  }, [liveOrders?.map(o => o.id).join(',')]) // Stable dependency
 
   // Keep playing sound for unaccepted new orders
   useEffect(() => {
+    if (!liveOrders) return
+    
     const unacceptedOrdersCount = liveOrders.filter(o => o.status === 'new').length
     
     if (unacceptedOrdersCount > 0) {
@@ -184,7 +188,7 @@ export default function OperationsSection({ clientId }) {
         window.currentSoundInterval = null
       }
     }
-  }, [liveOrders?.length]) // Only depend on array length, not array reference
+  }, [liveOrders?.filter(o => o.status === 'new').length]) // Stable dependency
 
   // Initialize audio for notification sound
   useEffect(() => {
@@ -219,8 +223,8 @@ export default function OperationsSection({ clientId }) {
   }, [])
 
   const playNotificationSound = () => {
-    if (audioRef.current) {
-      audioRef.current.play().catch(e => console.log('Audio play failed:', e))
+    if (audioRef.current && typeof audioRef.current === 'function') {
+      audioRef.current()
     }
   }
 
