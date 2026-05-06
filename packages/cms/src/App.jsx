@@ -397,6 +397,13 @@ function MainApp() {
                 <p style={{ fontSize:12, color:C.t2 }}>Select a site from the <strong>Sites</strong> tab to access the Operations dashboard.</p>
               </div>
             </div>
+          )}
+          {!activeSite && (canManageAll ? globalNav === 'sites' : true) && (
+            <SitesList
+              onOpenSite={openSite}
+              isSuperAdmin={canManageAll}
+              clientAccess={user?.clientAccess || {}}
+              show={canManageAll
                 ? globalNav === 'sites'
                 : globalNav === 'sites' || globalNav === 'home'}
             />
