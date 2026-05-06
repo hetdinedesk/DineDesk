@@ -159,9 +159,9 @@ export default function OperationsSection({ clientId }) {
 
   // Keep playing sound for unaccepted new orders
   useEffect(() => {
-    const unacceptedOrders = liveOrders.filter(o => o.status === 'new')
+    const unacceptedOrdersCount = liveOrders.filter(o => o.status === 'new').length
     
-    if (unacceptedOrders.length > 0) {
+    if (unacceptedOrdersCount > 0) {
       // Play sound every 10 seconds for unaccepted orders
       const soundInterval = setInterval(() => {
         playNotificationSound()
@@ -184,12 +184,37 @@ export default function OperationsSection({ clientId }) {
         window.currentSoundInterval = null
       }
     }
-  }, [liveOrders])
+  }, [liveOrders?.length]) // Only depend on array length, not array reference
 
   // Initialize audio for notification sound
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHm8tiJOQgZqLvt52hEAw')
+      // Create a simple beep sound using Web Audio API
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.value = 800 // 800Hz beep
+      oscillator.type = 'sine'
+      
+      // Store the play function
+      audioRef.current = () => {
+        const osc = audioContext.createOscillator()
+        const gain = audioContext.createGain()
+        
+        osc.connect(gain)
+        gain.connect(audioContext.destination)
+        
+        osc.frequency.value = 800
+        osc.type = 'sine'
+        gain.gain.value = 0.1
+        
+        osc.start()
+        osc.stop(audioContext.currentTime + 0.1)
+      }
     }
   }, [])
 

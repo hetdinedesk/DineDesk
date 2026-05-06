@@ -343,20 +343,14 @@ router.patch('/:orderId/status', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid status' })
     }
 
-    // Build update data with timestamp
+    // Build update data with timestamp (temporarily disabled until DB migration)
     const updateData = { status }
-    const now = new Date()
-    
-    // Add timestamp for specific status changes (only if fields exist in database)
-    try {
-      if (status === 'accepted') updateData.acceptedAt = now
-      if (status === 'preparing') updateData.preparingAt = now
-      if (status === 'ready') updateData.readyAt = now
-      if (status === 'completed') updateData.completedAt = now
-    } catch (err) {
-      // If timestamp fields don't exist yet, just update status
-      console.log('Timestamp fields not yet available, updating status only')
-    }
+    // TODO: Add timestamp fields after database migration
+    // const now = new Date()
+    // if (status === 'accepted') updateData.acceptedAt = now
+    // if (status === 'preparing') updateData.preparingAt = now
+    // if (status === 'ready') updateData.readyAt = now
+    // if (status === 'completed') updateData.completedAt = now
 
     const order = await prisma.order.update({
       where: { id: req.params.orderId },
