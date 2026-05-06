@@ -83,6 +83,8 @@ const getOrderProgressTime = (order) => {
   const diffMs = now - startTime
   const diffMins = Math.floor(diffMs / 60000)
   
+  console.log('Order progress for', order.id, 'status:', order.status, 'progress:', statusText)
+  
   return {
     statusText,
     progressPercent,
@@ -193,31 +195,34 @@ export default function OperationsSection({ clientId }) {
   // Initialize audio for notification sound
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Create a simple beep sound using Web Audio API
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-      
-      oscillator.frequency.value = 800 // 800Hz beep
-      oscillator.type = 'sine'
-      
-      // Store the play function
-      audioRef.current = () => {
-        const osc = audioContext.createOscillator()
-        const gain = audioContext.createGain()
+      // Try Web Audio API first
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
         
-        osc.connect(gain)
-        gain.connect(audioContext.destination)
+        // Store the play function
+        audioRef.current = () => {
+          const osc = audioContext.createOscillator()
+          const gain = audioContext.createGain()
+          
+          osc.connect(gain)
+          gain.connect(audioContext.destination)
+          
+          osc.frequency.value = 800
+          osc.type = 'sine'
+          gain.gain.value = 0.1
+          
+          osc.start()
+          osc.stop(audioContext.currentTime + 0.1)
+        }
         
-        osc.frequency.value = 800
-        osc.type = 'sine'
-        gain.gain.value = 0.1
-        
-        osc.start()
-        osc.stop(audioContext.currentTime + 0.1)
+        console.log('Audio initialized with Web Audio API')
+      } catch (err) {
+        console.log('Web Audio API failed, falling back to Audio element:', err)
+        // Fallback to simple Audio element
+        audioRef.current = () => {
+          const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHm8tiJOQgZqLvt52hEAw')
+          audio.play().catch(e => console.log('Audio play failed:', e))
+        }
       }
     }
   }, [])
