@@ -203,6 +203,64 @@ function PrintableReceipt({ order, data }) {
         </div>
       )}
 
+      {/* Order Progress Bar */}
+      {order.status !== 'new' && order.status !== 'cancelled' && (
+        <div style={{ marginBottom: '16px', padding: '16px', background: '#f5f5f5', borderRadius: '8px' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>ORDER PROGRESS</div>
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '4px',
+              fontSize: '14px'
+            }}>
+              <span style={{ color: '#666' }}>
+                {(() => {
+                  if (order.status === 'accepted') return 'Order Accepted'
+                  if (order.status === 'preparing') return 'Preparing'
+                  if (order.status === 'almost_ready') return 'Almost Ready'
+                  if (order.status === 'packing') return 'Packing'
+                  if (order.status === 'ready') return 'Ready for Pickup'
+                  return order.status
+                })()}
+              </span>
+              <span style={{ color: '#666' }}>
+                {(() => {
+                  if (order.acceptedAt) {
+                    const diffMs = new Date() - new Date(order.acceptedAt)
+                    const diffMins = Math.floor(diffMs / 60000)
+                    return diffMins < 1 ? 'Just now' : `${diffMins}m ago`
+                  }
+                  return ''
+                })()}
+              </span>
+            </div>
+            <div style={{
+              width: '100%',
+              height: '8px',
+              background: '#e0e0e0',
+              borderRadius: '4px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: (() => {
+                  if (order.status === 'accepted') return '25%'
+                  if (order.status === 'preparing') return '50%'
+                  if (order.status === 'almost_ready') return '75%'
+                  if (order.status === 'packing') return '85%'
+                  if (order.status === 'ready') return '100%'
+                  return '0%'
+                })(),
+                height: '100%',
+                background: statusInfo.color,
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div style={{ textAlign: 'center', marginTop: '20px', paddingTop: '20px', borderTop: '2px dashed black', fontSize: '14px' }}>
         <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '18px' }}>THANK YOU FOR YOUR ORDER!</div>
