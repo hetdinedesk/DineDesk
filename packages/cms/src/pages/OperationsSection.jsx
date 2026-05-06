@@ -462,7 +462,7 @@ export default function OperationsSection({ clientId }) {
         display: 'flex',
         flexShrink: 0
       }}>
-        {['live', 'history'].map(tab => (
+        {['live', 'history', 'analytics', 'customers'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -479,7 +479,10 @@ export default function OperationsSection({ clientId }) {
               textTransform: 'capitalize'
             }}
           >
-            {tab === 'live' ? `Live Orders (${liveOrders.length})` : `Order History (${historyOrders.length})`}
+            {tab === 'live' && `Live Orders (${liveOrders.length})`}
+            {tab === 'history' && `Order History (${historyOrders.length})`}
+            {tab === 'analytics' && 'Analytics'}
+            {tab === 'customers' && 'Customers'}
           </button>
         ))}
       </div>
@@ -601,6 +604,21 @@ export default function OperationsSection({ clientId }) {
             historyOrders={historyOrders}
             onOrderClick={setSelectedOrder}
             onStatusChange={handleStatusChange}
+          />
+        )}
+
+        {/* Analytics Dashboard */}
+        {activeTab === 'analytics' && (
+          <AnalyticsSection 
+            liveOrders={liveOrders}
+            historyOrders={historyOrders}
+          />
+        )}
+
+        {/* Customer Management */}
+        {activeTab === 'customers' && (
+          <CustomersSection 
+            historyOrders={historyOrders}
           />
         )}
       </div>
@@ -1005,16 +1023,17 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
   )
 }
 
-// Customer Management Component
+// Enhanced Customer Management Component (Loyalty Program)
 function CustomersSection({ historyOrders }) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
   
-  // Extract unique customers from orders
+  // Extract unique customers from orders (phone numbers as loyalty accounts)
   const customers = {}
   historyOrders.forEach(order => {
     const phone = order.customerPhone || 'No Phone'
     const email = order.customerEmail || 'No Email'
-    const key = `${order.customerName}_${phone}`
+    const key = phone // Use phone number as unique identifier for loyalty
     
     if (!customers[key]) {
       customers[key] = {
@@ -1023,19 +1042,36 @@ function CustomersSection({ historyOrders }) {
         email,
         orderCount: 0,
         totalSpent: 0,
-        lastOrder: order.createdAt
+        loyaltyPoints: 0,
+        lastOrder: order.createdAt,
+        firstOrder: order.createdAt,
+        orders: [],
+        averageOrderValue: 0
       }
     }
     
     customers[key].orderCount += 1
     customers[key].totalSpent += order.total || 0
+    customers[key].loyaltyPoints += Math.floor((order.total || 0) * 0.1) // 10% of order value as points
+    customers[key].orders.push(order)
+    
+    // Update first order date if earlier
+    const orderDate = new Date(order.createdAt)
+    const firstOrderDate = new Date(customers[key].firstOrder)
+    if (orderDate < firstOrderDate) {
+      customers[key].firstOrder = order.createdAt
+    }
     
     // Update last order date if more recent
-    const orderDate = new Date(order.createdAt)
     const lastOrderDate = new Date(customers[key].lastOrder)
     if (orderDate > lastOrderDate) {
       customers[key].lastOrder = order.createdAt
     }
+  })
+  
+  // Calculate average order value for each customer
+  Object.values(customers).forEach(customer => {
+    customer.averageOrderValue = customer.orderCount > 0 ? customer.totalSpent / customer.orderCount : 0
   })
   
   // Filter customers based on search
@@ -1045,6 +1081,15 @@ function CustomersSection({ historyOrders }) {
            customer.phone.includes(searchTerm) ||
            (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
   })
+  
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—'
+    return new Date(dateStr).toLocaleDateString('en-AU', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    })
+  }
   
   return (
     <div>
@@ -1056,7 +1101,7 @@ function CustomersSection({ historyOrders }) {
         textTransform: 'uppercase',
         letterSpacing: '0.07em'
       }}>
-        Customer Management
+        Customer Loyalty Program
       </h3>
       
       {/* Search */}
@@ -1088,34 +1133,89 @@ function CustomersSection({ historyOrders }) {
             No customers found
           </div>
         ) : (
-          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
             {filteredCustomers.map((customer, index) => (
-              <div key={index} style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderBottom: index < filteredCustomers.length - 1 ? `1px solid ${C.border}20` : 'none'
-              }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: C.t0, marginBottom: '4px' }}>
-                    {customer.name}
+              <div 
+                key={index} 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '16px',
+                  borderBottom: index < filteredCustomers.length - 1 ? `1px solid ${C.border}20` : 'none',
+                  cursor: 'pointer',
+                  ':hover': {
+                    background: C.page
+                  }
+                }}
+                onClick={() => setSelectedCustomer(customer)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = C.page
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <div style={{ 
+                      fontSize: '16px', 
+                      fontWeight: '600', 
+                      color: C.t0 
+                    }}>
+                      {customer.name}
+                    </div>
+                    <span style={{
+                      background: C.acc,
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      fontSize: '10px',
+                      fontWeight: '600'
+                    }}>
+                      {customer.loyaltyPoints} pts
+                    </span>
                   </div>
-                  <div style={{ fontSize: '12px', color: C.t2 }}>
-                    {customer.phone}
+                  <div style={{ fontSize: '12px', color: C.t2, marginBottom: 4 }}>
+                    📱 {customer.phone}
                   </div>
                   {customer.email && customer.email !== 'No Email' && (
-                    <div style={{ fontSize: '12px', color: C.t2 }}>
-                      {customer.email}
+                    <div style={{ fontSize: '12px', color: C.t2, marginBottom: 4 }}>
+                      ✉️ {customer.email}
                     </div>
                   )}
+                  <div style={{ fontSize: '11px', color: C.t3 }}>
+                    Member since: {formatDate(customer.firstOrder)}
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '12px', color: C.t3, marginBottom: '4px' }}>
+                <div style={{ textAlign: 'right', minWidth: '150px' }}>
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: C.t3, 
+                    marginBottom: '4px' 
+                  }}>
                     {customer.orderCount} orders
                   </div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: C.acc }}>
+                  <div style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '600', 
+                    color: C.acc, 
+                    marginBottom: '4px' 
+                  }}>
                     ${customer.totalSpent.toFixed(2)}
+                  </div>
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: C.t3, 
+                    marginBottom: '4px' 
+                  }}>
+                    Avg: ${customer.averageOrderValue.toFixed(2)}
+                  </div>
+                  <div style={{ 
+                    fontSize: '11px', 
+                    color: C.t3 
+                  }}>
+                    Last: {formatDate(customer.lastOrder)}
                   </div>
                 </div>
               </div>
@@ -1123,6 +1223,165 @@ function CustomersSection({ historyOrders }) {
           </div>
         )}
       </div>
+      
+      {/* Customer Detail Modal */}
+      {selectedCustomer && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: C.panel,
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ 
+                fontSize: '18px', 
+                fontWeight: 'bold', 
+                color: C.t0, 
+                margin: 0 
+              }}>
+                Customer Profile: {selectedCustomer.name}
+              </h3>
+              <button
+                onClick={() => setSelectedCustomer(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: C.t3,
+                  fontSize: 20,
+                  cursor: 'pointer',
+                  padding: 4
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Customer Info Grid */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)', 
+              gap: '16px', 
+              marginBottom: '20px' 
+            }}>
+              <div style={{ padding: '12px', background: C.page, borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: C.t3, textTransform: 'uppercase', marginBottom: 4 }}>
+                  Contact Info
+                </div>
+                <div style={{ fontSize: '13px', color: C.t0, marginBottom: 4 }}>
+                  📱 {selectedCustomer.phone}
+                </div>
+                {selectedCustomer.email && selectedCustomer.email !== 'No Email' && (
+                  <div style={{ fontSize: '13px', color: C.t0 }}>
+                    ✉️ {selectedCustomer.email}
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ padding: '12px', background: C.page, borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: C.t3, textTransform: 'uppercase', marginBottom: 4 }}>
+                  Loyalty Stats
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: C.acc, marginBottom: 4 }}>
+                  {selectedCustomer.loyaltyPoints} Points
+                </div>
+                <div style={{ fontSize: '12px', color: C.t3 }}>
+                  Member since: {formatDate(selectedCustomer.firstOrder)}
+                </div>
+              </div>
+            </div>
+            
+            {/* Order Stats */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gap: '12px', 
+              marginBottom: '20px' 
+            }}>
+              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.green, marginBottom: 4 }}>
+                  {selectedCustomer.orderCount}
+                </div>
+                <div style={{ fontSize: '11px', color: C.t3 }}>Total Orders</div>
+              </div>
+              
+              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.acc, marginBottom: 4 }}>
+                  ${selectedCustomer.totalSpent.toFixed(2)}
+                </div>
+                <div style={{ fontSize: '11px', color: C.t3 }}>Total Spent</div>
+              </div>
+              
+              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.t0, marginBottom: 4 }}>
+                  ${selectedCustomer.averageOrderValue.toFixed(2)}
+                </div>
+                <div style={{ fontSize: '11px', color: C.t3 }}>Average Order</div>
+              </div>
+            </div>
+            
+            {/* Recent Orders */}
+            <div>
+              <h4 style={{ 
+                fontSize: '14px', 
+                fontWeight: 'bold', 
+                color: C.t0, 
+                marginBottom: '12px' 
+              }}>
+                Recent Orders (Last 10)
+              </h4>
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {selectedCustomer.orders.slice(-10).reverse().map((order, index) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '8px 12px',
+                    borderBottom: index < 9 ? `1px solid ${C.border}20` : 'none',
+                    fontSize: '12px'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: '600', color: C.t0 }}>
+                        #{order.orderNumber}
+                      </div>
+                      <div style={{ color: C.t2 }}>
+                        {formatDate(order.createdAt)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: '600', color: C.acc }}>
+                        ${order.total.toFixed(2)}
+                      </div>
+                      <div style={{ 
+                        fontSize: '10px', 
+                        color: C.t3,
+                        textTransform: 'capitalize'
+                      }}>
+                        {order.status}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
