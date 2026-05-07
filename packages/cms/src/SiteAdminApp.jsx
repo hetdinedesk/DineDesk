@@ -379,7 +379,7 @@ function SAUsers() {
     sessionStorage.setItem('sa_users_new_access', JSON.stringify(newAccess))
   }, [showAdd, editUser, newName, newEmail, newPassword, newRole, newAccess])
 
-  const TABS = ['items', 'cms', 'config', 'dashboard']
+  const TABS = ['items', 'cms', 'config', 'dashboard', 'operations']
 
   const load = () => {
     setLoading(true)
