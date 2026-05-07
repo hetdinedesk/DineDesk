@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { DDLogo } from './Components/Layout'
 import { apiFetch as baseApiFetch } from './api/utils'
+import { OrderProvider } from './contexts/OrderContext'
 
 const SA_TOKEN_KEY = 'dd_sa_token'
 
@@ -192,7 +193,7 @@ function SAShell({ user, onLogout }) {
         </div>
 
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <a href="/" style={{ padding:'6px 14px', background:'transparent',
+          <a href="/" target="_blank" style={{ padding:'6px 14px', background:'transparent',
             border:`1px solid ${C.border}`, borderRadius:6,
             color:C.t2, fontSize:12, cursor:'pointer', fontFamily:'inherit',
             textDecoration:'none', display:'flex', alignItems:'center', gap:5 }}>
@@ -219,10 +220,12 @@ function SAShell({ user, onLogout }) {
 
       {/* Content */}
       <div style={{ flex:1, overflow:'hidden' }}>
-        {tab==='dashboard' && <SADashboard />}
-        {tab==='users'     && isSuperAdmin && <SAUsers     />}
-        {tab==='activity'  && isSuperAdmin && <SAActivity  />}
-        {tab==='settings'  && isSuperAdmin && <SASettings  />}
+        <OrderProvider clientId="site-admin">
+          {tab==='dashboard' && <SADashboard />}
+          {tab==='users'     && isSuperAdmin && <SAUsers     />}
+          {tab==='activity'  && isSuperAdmin && <SAActivity  />}
+          {tab==='settings'  && isSuperAdmin && <SASettings  />}
+        </OrderProvider>
       </div>
     </div>
   )
