@@ -417,7 +417,7 @@ function MainApp() {
           )}
           {activeSite && siteNav === 'operations' && <OperationsSection clientId={activeSite.id} />}
           {activeSite && siteNav === 'cms'    && <CmsSection    clientId={activeSite.id} user={user} />}
-          {activeSite && siteNav === 'config' && <ConfigSection clientId={activeSite.id} />}
+          {activeSite && siteNav === 'config' && <ConfigSection clientId={activeSite.id} user={user} />}
           {activeSite && siteNav === 'dashboard' && <DashboardSection key={location.pathname} clientId={activeSite.id} onDeleteSite={deleteSite} subNav={dashboardSubsection} setSubNav={setDashboardSubsection} />}
         </div>
       </Container>

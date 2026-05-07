@@ -68,9 +68,42 @@ function SaveBtn({ onClick, saving }) {
   )
 }
 
-export default function ConfigSection({ clientId }) {
+export default function ConfigSection({ clientId, user }) {
   const navigate = useNavigate()
   const location = useLocation()
+  
+  // Determine user access level for Config section
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isManager = user?.role === 'MANAGER'
+  const hasFullConfigAccess = isSuperAdmin || isManager
+  const userConfigAccess = user?.clientAccess?.[clientId] || []
+  const hasConfigAccess = userConfigAccess.includes('config')
+  
+  // Filter sidebar based on access level
+  const getFilteredSidebar = () => {
+    if (hasFullConfigAccess) {
+      return SIDEBAR // Full access for super admins and managers
+    }
+    
+    if (hasConfigAccess) {
+      // Limited access - only site settings, social links, and loyalty program
+      return [
+        { group:'General', Icon: Settings, items:[
+          { key:'site-settings',  label:'Site Settings', Icon: Settings },
+        ]},
+        { group:'Design', Icon: Layout, items:[
+          { key:'social-links',   label:'Social Links', Icon: Share2 },
+        ]},
+        { group:'Loyalty', Icon: Gift, items:[
+          { key:'loyalty',        label:'Loyalty Program', Icon: Gift },
+        ]},
+      ]
+    }
+    
+    return [] // No access
+  }
+  
+  const FILTERED_SIDEBAR = getFilteredSidebar()
   // Restore activeKey from sessionStorage on page refresh
   const getSavedActiveKey = () => {
     try {
@@ -177,10 +210,41 @@ export default function ConfigSection({ clientId }) {
 
   return (
     <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden' }}>
+      // If user has no access to Config section
+  if (FILTERED_SIDEBAR.length === 0) {
+    return (
+      <div style={{ 
+        display:'flex', 
+        alignItems:'center', 
+        justifyContent:'center', 
+        flex:1, 
+        minHeight:0, 
+        padding:40,
+        textAlign:'center',
+        color:C.t3,
+        fontSize:14
+      }}>
+        <div>
+          <div style={{ fontSize:16, fontWeight:600, marginBottom:8, color:C.t2 }}>
+            Access Restricted
+          </div>
+          <div>
+            You don't have permission to access Config section.
+          </div>
+          <div style={{ fontSize:12, marginTop:8, color:C.t4 }}>
+            Please contact your administrator for access to Site Settings, Social Links, or Loyalty Program configuration.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden' }}>
       {/* Config sidebar */}
       <div style={{ width:210, minWidth:210, background:C.panel,
         borderRight:`1px solid ${C.border}`, overflowY:'auto' }}>
-        {SIDEBAR.map(grp => {
+        {FILTERED_SIDEBAR.map(grp => {
           const GroupIcon = grp.Icon
           return (
             <div key={grp.group}>
