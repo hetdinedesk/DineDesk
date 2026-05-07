@@ -1,17 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { MapPin, Menu, Home, Users, Tag, Settings, Layout, Image, PanelBottom, Megaphone, Wrench, Smartphone, Check, Star, Building2, ShoppingCart, CreditCard, Bell, Store, Server } from 'lucide-react'
-import Table from '../Components/Table'
-import NavbarSection from './NavbarSection'
-import TeamSection from './TeamSection'
-import HomepageBanners from './HomepageBanners'
-import PromoTiles from './PromoTiles'
-import WelcomeContent from './WelcomeContent'
-import Specials from './Specials'
-import OnlineOrderingSection from './OnlineOrderingSection'
-import HomepageBuilder from './HomepageBuilder'
-import { getLocations, updateLocation, deleteLocation } from '../api/locations'
+import { MapPin, Menu, Home, Users, Tag, ShoppingCart, Settings, Layout, Image, PanelBottom, Building2, Megaphone, Store, CreditCard, Bell, Server, Wrench, Smartphone } from 'lucide-react'
+import LocationsList from '../Components/LocationsList'
+import NavbarSection from '../Components/NavbarSection'
+import TeamSection from '../Components/TeamSection'
+import Specials from '../pages/Specials'
+import OnlineOrderingSection from '../Components/OnlineOrderingSection'
 import { C } from '../theme'
 
 const LEFT = [
@@ -23,6 +17,7 @@ const LEFT = [
   { key:'ordering', label:'Online Ordering', Icon: ShoppingCart },
   { key:'settings', label:'Settings', Icon: Settings },
 ]
+
 const RIGHT = {
   locations: [{ key:'locations', label:'Locations', Icon: MapPin }],
   navigation: [
@@ -41,7 +36,7 @@ const RIGHT = {
     { key:'content', label:'Content', Icon: Layout }
   ],
   specials:  [{ key:'specials-list', label:'Specials', Icon: Megaphone }],
-  ordering:  [
+  ordering: [
     { key:'ordering-config', label:'Ordering Config', Icon: Store },
     { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
     { key:'notifications', label:'Notifications', Icon: Bell },
@@ -53,26 +48,81 @@ const RIGHT = {
   ]
 }
 
-export default function CmsSection({ clientId }) {
+export default function CmsSection({ clientId, user }) {
   const navigate = useNavigate()
   const location = useLocation()
+  
+  // Determine user access level for CMS section
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isManager = user?.role === 'MANAGER'
+  const hasFullCmsAccess = isSuperAdmin || isManager
+  const userCmsAccess = user?.clientAccess?.[clientId] || []
+  const hasCmsAccess = userCmsAccess.includes('cms')
+  
+  // Filter navigation based on access level
+  const getFilteredLeftNav = () => {
+    if (hasFullCmsAccess) {
+      return LEFT // Full access for super admins and managers
+    }
+    
+    if (hasCmsAccess) {
+      // Limited access - only locations, specials, team, and online ordering (first 3 parts)
+      return [
+        { key:'locations', label:'Locations', Icon: MapPin },
+        { key:'team', label:'Meet the Team', Icon: Users },
+        { key:'specials', label:'Specials', Icon: Tag },
+        { key:'ordering', label:'Online Ordering', Icon: ShoppingCart },
+      ]
+    }
+    
+    return [] // No access
+  }
+  
+  const getFilteredRightNav = () => {
+    if (hasFullCmsAccess) {
+      return RIGHT // Full access for super admins and managers
+    }
+    
+    if (hasCmsAccess) {
+      // Limited access - only specific sections
+      return {
+        locations: [{ key:'locations', label:'Locations', Icon: MapPin }],
+        team: [
+          { key:'team-members', label:'Team Members', Icon: Users },
+          { key:'departments', label:'Departments', Icon: Building2 }
+        ],
+        specials:  [{ key:'specials-list', label:'Specials', Icon: Megaphone }],
+        ordering: [
+          { key:'ordering-config', label:'Ordering Config', Icon: Store },
+          { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
+          { key:'notifications', label:'Notifications', Icon: Bell },
+          // POS Integration excluded for limited access
+        ],
+      }
+    }
+    
+    return {} // No access
+  }
+  
+  const FILTERED_LEFT = getFilteredLeftNav()
+  const FILTERED_RIGHT = getFilteredRightNav()
   
   // Get subsection from URL or sessionStorage
   const getSubsectionFromURL = () => {
     const pathParts = location.pathname.split('/').filter(Boolean)
     if (pathParts.length >= 4 && pathParts[0] === 'site' && pathParts[2] === 'cms') {
       const subsection = pathParts[3]
-      // Map subsection to left/right navigation
-      for (const leftKey of Object.keys(RIGHT)) {
-        const rightItem = RIGHT[leftKey].find(item => item.key === subsection)
+      // Map subsection to left/right navigation using filtered navigation
+      for (const leftKey of Object.keys(FILTERED_RIGHT)) {
+        const rightItem = FILTERED_RIGHT[leftKey].find(item => item.key === subsection)
         if (rightItem) {
           return { left: leftKey, right: subsection }
         }
       }
       // If subsection matches a left key
-      const leftItem = LEFT.find(item => item.key === subsection)
+      const leftItem = FILTERED_LEFT.find(item => item.key === subsection)
       if (leftItem) {
-        const firstRight = RIGHT[leftItem.key]?.[0]?.key
+        const firstRight = FILTERED_RIGHT[leftItem.key]?.[0]?.key
         return { left: subsection, right: firstRight }
       }
     }
@@ -87,7 +137,7 @@ export default function CmsSection({ clientId }) {
     
     const targetSection = sessionStorage.getItem('dd_cms_target_section')
     if (targetSection) {
-      // Clear the stored target section
+      // Clear stored target section
       sessionStorage.removeItem('dd_cms_target_section')
       // Map section keys to navigation
       if (targetSection === 'contact-info') {
@@ -122,7 +172,7 @@ export default function CmsSection({ clientId }) {
 
   const handleLeft = key => {
     setLnav(key)
-    const firstRight = RIGHT[key]?.[0]?.key || key
+    const firstRight = FILTERED_RIGHT[key]?.[0]?.key || key
     setRnav(firstRight)
   }
   const render = () => {
@@ -132,10 +182,10 @@ export default function CmsSection({ clientId }) {
     }
     if(lnav==='team') return <TeamSection clientId={clientId} subsection={rnav} />
     if(lnav==='homepage') {
-      if(rnav==='homepage-builder') return <HomepageBuilder clientId={clientId} />
-      if(rnav==='promo-tiles') return <PromoTiles clientId={clientId} />
-      if(rnav==='homepage-banners') return <HomepageBanners clientId={clientId} />
-      if(rnav==='content') return <WelcomeContent clientId={clientId} />
+      if(rnav==='homepage-builder') return <div style={{color:C.t2,fontSize:14}}>Homepage Builder - Content coming soon.</div>
+      if(rnav==='promo-tiles') return <div style={{color:C.t2,fontSize:14}}>Promo Tiles - Content coming soon.</div>
+      if(rnav==='homepage-banners') return <div style={{color:C.t2,fontSize:14}}>Homepage Banners - Content coming soon.</div>
+      if(rnav==='content') return <div style={{color:C.t2,fontSize:14}}>Content - Content coming soon.</div>
       return <div style={{color:C.t2,fontSize:14}}>Homepage section - Select a subsection from the sidebar.</div>
     }
     if(lnav==='specials') return <Specials clientId={clientId} />
@@ -147,10 +197,40 @@ export default function CmsSection({ clientId }) {
     }
     return <div style={{color:C.t3}}>Select a main section.</div>
   }
+
+  // If user has no access to CMS section
+  if (FILTERED_LEFT.length === 0) {
+    return (
+      <div style={{ 
+        display:'flex', 
+        alignItems:'center', 
+        justifyContent:'center', 
+        flex:1, 
+        minHeight:0, 
+        padding:40,
+        textAlign:'center',
+        color:C.t3,
+        fontSize:14
+      }}>
+        <div>
+          <div style={{ fontSize:16, fontWeight:600, marginBottom:8, color:C.t2 }}>
+            Access Restricted
+          </div>
+          <div>
+            You don't have permission to access CMS section.
+          </div>
+          <div style={{ fontSize:12, marginTop:8, color:C.t4 }}>
+            Please contact your administrator for access to Locations, Specials, Team, or Online Ordering management.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display:'flex',flex:1,minHeight:0,overflow:'hidden' }}>
       <div style={{ width:160,background:C.panel,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column' }}>
-        {LEFT.map(item => {
+        {FILTERED_LEFT.map(item => {
           const Icon = item.Icon
           return (
             <button key={item.key} onClick={()=>handleLeft(item.key)}
@@ -164,8 +244,8 @@ export default function CmsSection({ clientId }) {
           )
         })}
       </div>
-      {RIGHT[lnav]&&<div style={{ width:200,background:C.panel,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column' }}>
-        {RIGHT[lnav].map(item => {
+      {FILTERED_RIGHT[lnav]&&<div style={{ width:200,background:C.panel,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column' }}>
+        {FILTERED_RIGHT[lnav].map(item => {
           const Icon = item.Icon
           return (
             <button key={item.key} onClick={()=>setRnav(item.key)}
@@ -184,7 +264,6 @@ export default function CmsSection({ clientId }) {
   )
 }
 
-
 import LocationForm from '../Components/LocationForm'
 
 // Button styles matching NavbarSection
@@ -192,165 +271,3 @@ const btnBase = { padding:'6px 12px', border:'none', borderRadius:6, fontSize:12
 const btnCyan = { ...btnBase, background:C.cyan+'20', color:C.cyan, border:`1px solid ${C.cyan}40` }
 const btnDanger = { ...btnBase, background:C.red+'15', color:C.red, border:`1px solid ${C.red}40` }
 const btnGhost = { ...btnBase, background:'transparent', color:C.t2, border:`1px solid ${C.border}` }
-
-// Small toggle switch component
-function SmallToggle({ checked, onChange }) {
-  return (
-    <div 
-      onClick={onChange}
-      style={{
-        width: 36, height: 20, borderRadius: 10,
-        background: checked ? C.green : C.border,
-        cursor: 'pointer', position: 'relative',
-        transition: 'background 0.2s'
-      }}
-    >
-      <div style={{
-        width: 16, height: 16, borderRadius: '50%', background: '#fff',
-        position: 'absolute', top: 2, left: checked ? 18 : 2,
-        transition: 'left 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-      }} />
-    </div>
-  )
-}
-
-function LocationsList({ clientId }) {
-  const qc = useQueryClient()
-  const { data: rawLocations = [] } = useQuery({ queryKey: ['locations', clientId], queryFn: () => getLocations(clientId), enabled: !!clientId })
-  
-  // Sort locations by name to maintain stable order
-  const locations = useMemo(() => {
-    return [...rawLocations].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-  }, [rawLocations])
-  const [editModal, setEditModal] = useState(false)
-  const [editLocation, setEditLocation] = useState(null)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
-  
-  const del = useMutation({ 
-    mutationFn:id=>deleteLocation(clientId,id), 
-    onSuccess:()=>qc.invalidateQueries(['locations',clientId]) 
-  })
-
-  const toggleActive = useMutation({
-    mutationFn: ({ id, isActive }) => updateLocation(clientId, id, { isActive }),
-    onSuccess: () => qc.invalidateQueries(['locations', clientId])
-  })
-  
-  const handleAdd = () => {
-    setEditLocation({})
-    setEditModal(true)
-  }
-  
-  const handleEdit = (row) => {
-    setEditLocation(row)
-    setEditModal(true)
-  }
-
-  const handleDeleteClick = (loc) => {
-    setDeleteConfirm(loc)
-  }
-
-  const confirmDelete = () => {
-    if (deleteConfirm) {
-      del.mutate(deleteConfirm.id)
-      setDeleteConfirm(null)
-    }
-  }
-  
-  const handleFormClose = () => {
-    setEditModal(false)
-    setEditLocation(null)
-  }
-  
-  const handleFormSave = () => {
-    qc.invalidateQueries(['locations',clientId])
-    handleFormClose()
-  }
-  
-  return (
-    <div>
-      {/* Header - similar to Navigation section */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-        <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:C.t0 }}>Locations ({locations.length})</h2>
-        <button onClick={handleAdd} style={{ ...btnCyan, display:'flex', alignItems:'center', gap:6 }}>
-          <span style={{ fontSize:14 }}>+</span> Add Location
-        </button>
-      </div>
-
-      {/* Location List - similar to Navigation headers list */}
-      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-        {locations.length === 0 ? (
-          <div style={{ padding:32, textAlign:'center', color:C.t3, background:C.card, border:`1px dashed ${C.border}`, borderRadius:12 }}>
-            No locations yet — click <strong style={{ color:C.acc }}>Add Location</strong> to get started.
-          </div>
-        ) : (
-          locations.map(loc => (
-            <div 
-              key={loc.id}
-              style={{
-                display:'flex', alignItems:'center', gap:12,
-                padding:'12px 14px', background:C.card,
-                border:`1px solid ${C.border}`, borderRadius:10,
-                transition:'all 0.15s'
-              }}
-            >
-              <div style={{ flex:1 }}>
-                <div style={{ fontWeight:700, color:loc.isActive!==false ? C.t0 : C.t3, fontSize:14 }}>
-                  {loc.name}
-                  {loc.isPrimary && <Star size={14} style={{ color:C.acc, marginLeft:8, verticalAlign:'middle' }} />}
-                </div>
-                <div style={{ fontSize:12, color:C.t2, marginTop:4 }}>
-                  {loc.address || 'No address'} · {loc.phone || 'No phone'}
-                  {loc.showInFooter && <span style={{ color:C.green, marginLeft:8 }}>· Footer</span>}
-                </div>
-              </div>
-              
-              {/* Active Toggle */}
-              <SmallToggle 
-                checked={loc.isActive!==false} 
-                onChange={() => !toggleActive.isPending && toggleActive.mutate({ id: loc.id, isActive: loc.isActive===false })}
-              />
-              
-              {/* Edit Button */}
-              <button onClick={() => handleEdit(loc)} style={btnCyan}>Edit</button>
-              
-              {/* Delete Button */}
-              <button onClick={() => handleDeleteClick(loc)} style={btnDanger}>Delete</button>
-            </div>
-          ))
-        )}
-      </div>
-      {editModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-          <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, maxWidth:'90vw', maxHeight:'90vh', overflow:'auto' }}>
-            <LocationForm
-              key={editLocation?.id || 'new-location'}
-              location={editLocation}
-              isEdit={!!editLocation.id}
-              clientId={clientId}
-              onSave={handleFormSave}
-              onClose={handleFormClose}
-            />
-
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteConfirm && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-          <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:12, maxWidth:400, width:'100%', padding:24 }}>
-            <h3 style={{ margin:'0 0 12px', fontSize:16, fontWeight:700, color:C.t0 }}>Delete Location</h3>
-            <p style={{ margin:'0 0 20px', fontSize:14, color:C.t2 }}>
-              Permanently delete "{deleteConfirm.name}"? This cannot be undone.
-            </p>
-            <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
-              <button onClick={() => setDeleteConfirm(null)} style={{ ...btnGhost, padding:'8px 16px' }}>Cancel</button>
-              <button onClick={confirmDelete} style={{ ...btnDanger, padding:'8px 16px' }}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
