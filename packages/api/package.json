@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "build": "npx prisma generate",
-    "start": "npx prisma db push --accept-data-loss && node src/index.js",
+    "start": "node src/index.js",
     "prisma:generate": "npx prisma generate",
     "prisma:push": "npx prisma db push --accept-data-loss",
     "prisma:seed": "node prisma/seed.js",
