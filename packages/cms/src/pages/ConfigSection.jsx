@@ -3,6 +3,9 @@ import { getConfig, saveConfig } from '../api/config'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { deployClient, getDeploys, createNetlifySite, getNetlifyDeploys, deleteNetlifySite } from '../api/deployment'
+import { getLocations } from '../api/locations'
+import { getTables, createTable, deleteTable, generateQRCode } from '../api/tables'
+import { QRCodeSVG } from 'qrcode.react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
@@ -29,7 +32,7 @@ const SIDEBAR = [
     { key:'header-config',  label:'Header', Icon: Layout },
     { key:'social-links',   label:'Social Links', Icon: Share2 },
     { key:'reviews',        label:'Reviews', Icon: Star },
-    { key:'booking',        label:'Booking', Icon: Calendar },
+    { key:'table-management', label:'Table Management', Icon: Calendar },
   ]},
   { group:'Loyalty', Icon: Gift, items:[
     { key:'loyalty',        label:'Loyalty Program', Icon: Gift },
@@ -186,7 +189,7 @@ export default function ConfigSection({ clientId, user }) {
         case 'social-links':   return <SocialLinksConfig {...common} />
         case 'reviews':        return <ReviewsConfig   {...common} />
         case 'footer':         return <FooterConfig    {...common} />
-        case 'booking':        return <BookingConfig   {...common} />
+        case 'table-management': return <TableManagementConfig {...common} />
         case 'loyalty':        return <LoyaltyConfigUI {...common} activeKey={activeKey} />
         case 'netlify':        return <NetlifyConfig   {...common} client={client} />
         default: return <div style={{color:C.t3}}>Coming soon.</div>
@@ -208,9 +211,7 @@ export default function ConfigSection({ clientId, user }) {
     }
   }
 
-  return (
-    <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden' }}>
-      // If user has no access to Config section
+  // If user has no access to Config section
   if (FILTERED_SIDEBAR.length === 0) {
     return (
       <div style={{ 
@@ -4274,21 +4275,22 @@ function FooterConfig({ clientId, config, setHasUnsavedChanges }) {
   )
 }
 
-// ── Booking Config ───────────────────────────────────────────
-function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
+// ── Table Management Config ───────────────────────────────────────────
+function TableManagementConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
+  const [activeTab, setActiveTab] = useState('reservations')
   const qc = useQueryClient()
+
+  // Reservations tab state
   const numericFields = ['minParty', 'maxParty', 'advanceNotice', 'maxDaysAhead', 'slotInterval']
   const convertBooking = (booking) => {
     const converted = {}
     for (const [k, v] of Object.entries(booking || {})) {
       converted[k] = numericFields.includes(k) && typeof v === 'string' && v !== '' ? Number(v) : v
     }
-    if (converted.enabled === undefined) {
-      converted.enabled = false
-    }
+    if (converted.enabled === undefined) converted.enabled = false
     return converted
   }
-  const [f,     setF]     = useState(convertBooking(config.booking))
+  const [f, setF] = useState(convertBooking(config.booking))
   const savedFRef = useRef(convertBooking(config.booking))
 
   useEffect(() => {
@@ -4305,7 +4307,6 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
   }, [f, setHasUnsavedChanges])
 
   const s = (k, v) => {
-    const numericFields = ['minParty', 'maxParty', 'advanceNotice', 'maxDaysAhead', 'slotInterval']
     const value = numericFields.includes(k) ? (v === '' ? '' : Number(v)) : v
     setF(p => ({...p, [k]: value}))
   }
@@ -4313,21 +4314,66 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
   const mutation = useMutation({
     mutationFn: () => {
       const bookingData = convertBooking(f)
-      console.log('[Booking Save] Sending booking data:', JSON.stringify(bookingData, null, 2))
       return saveConfig(clientId, { booking: bookingData })
     },
     onSuccess: (data) => {
-      console.log('[Booking Save] Server response:', JSON.stringify(data.booking, null, 2))
       qc.invalidateQueries(['config', clientId])
       savedFRef.current = convertBooking(data.booking || f)
       setHasUnsavedChanges(false)
     },
     onError: (err) => {
-      console.error('[Booking Save Error]', err.response?.data || err.message)
       alert('Save failed: ' + (err.response?.data?.error || err.message))
     }
   })
 
+  // QR Ordering tab state
+  const [selectedLocation, setSelectedLocation] = useState(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [selectedTable, setSelectedTable] = useState(null)
+  const [newTable, setNewTable] = useState({ tableNumber: '', capacity: 4 })
+
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations', clientId],
+    queryFn: () => getLocations(clientId),
+    staleTime: 1000 * 60 * 5
+  })
+
+  const { data: tables = [], isLoading: tablesLoading } = useQuery({
+    queryKey: ['tables', clientId, selectedLocation],
+    queryFn: () => getTables(clientId, selectedLocation),
+    enabled: !!selectedLocation,
+    staleTime: 1000 * 30
+  })
+
+  useEffect(() => {
+    if (locations.length > 0 && !selectedLocation) {
+      setSelectedLocation(locations[0].id)
+    }
+  }, [locations, selectedLocation])
+
+  const createTableMutation = useMutation({
+    mutationFn: (data) => createTable(clientId, selectedLocation, data),
+    onSuccess: () => {
+      qc.invalidateQueries(['tables', clientId, selectedLocation])
+      setShowAddModal(false)
+      setNewTable({ tableNumber: '', capacity: 4 })
+    }
+  })
+
+  const deleteTableMutation = useMutation({
+    mutationFn: (tableId) => deleteTable(clientId, selectedLocation, tableId),
+    onSuccess: () => qc.invalidateQueries(['tables', clientId, selectedLocation])
+  })
+
+  const qrMutation = useMutation({
+    mutationFn: (tableId) => generateQRCode(clientId, selectedLocation, tableId),
+    onSuccess: () => qc.invalidateQueries(['tables', clientId, selectedLocation])
+  })
+
+  const currentLocation = locations.find(l => l.id === selectedLocation)
+
+  // Reservations helpers
   const inp = (label, key, placeholder, opts={}) => (
     <div key={key}>
       <label style={{ fontSize:11, fontWeight:700, color:C.t3,
@@ -4339,15 +4385,12 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
         placeholder={placeholder}
         style={{ width:'100%', padding:'9px 11px', background:C.input,
           border:`1px solid ${C.border}`, borderRadius:7, color:C.t0,
-          fontSize:13,
-          fontFamily: opts.mono ? "'Fira Code',monospace" : 'inherit',
+          fontSize:13, fontFamily: opts.mono ? "'Fira Code',monospace" : 'inherit',
           outline:'none', boxSizing:'border-box' }}
         onFocus={e => e.target.style.borderColor = C.acc}
         onBlur={e  => e.target.style.borderColor = C.border}
       />
-      {opts.hint && (
-        <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>{opts.hint}</div>
-      )}
+      {opts.hint && <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>{opts.hint}</div>}
     </div>
   )
 
@@ -4361,186 +4404,441 @@ function BookingConfig({ clientId, config, setHasUnsavedChanges, activeKey }) {
       </div>
       <div onClick={() => s(key, !f[key])}
         style={{ width:44, height:24, borderRadius:12, cursor:'pointer',
-          background: f[key] ? C.acc : C.hover, flexShrink:0,
-          position:'relative',
-          border:`1px solid ${f[key] ? C.acc : C.border2}`,
-          transition:'background 0.15s' }}>
+          background: f[key] ? C.acc : C.hover, flexShrink:0, position:'relative',
+          border:`1px solid ${f[key] ? C.acc : C.border2}`, transition:'background 0.15s' }}>
         <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff',
-          position:'absolute', top:2,
-          left: f[key] ? 22 : 2, transition:'left 0.15s' }}/>
+          position:'absolute', top:2, left: f[key] ? 22 : 2, transition:'left 0.15s' }}/>
       </div>
-    </div>
-  )
-
-  const SaveRow = () => (
-    <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:24 }}>
-      <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
-        style={{ padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
-          border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
-          cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
-          boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
-      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
     </div>
   )
 
   return (
     <div>
       <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
-        Booking
+        Table Management
       </h2>
       <p style={{ margin:'0 0 20px', fontSize:13, color:C.t3 }}>
-        Configure how customers book tables at your restaurant.
+        Configure table reservations and QR ordering for your restaurant.
       </p>
 
-      {/* Enable Booking System */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:20, marginBottom:16 }}>
-        <div style={{ display:'flex', alignItems:'center',
-          justifyContent:'space-between' }}>
-          <div>
-            <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>Enable Booking System</div>
-            <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
-              Turn on to allow customers to book tables
+      {/* Tab Navigation */}
+      <div style={{ display:'flex', gap:8, marginBottom:24, borderBottom:`1px solid ${C.border}` }}>
+        {[
+          { key:'reservations', label:'Reservations', desc:'Booking methods & capacity' },
+          { key:'qr-ordering', label:'QR Ordering', desc:'Table QR codes for ordering' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              padding:'12px 20px', background:'transparent', border:'none',
+              borderBottom: activeTab === tab.key ? `2px solid ${C.acc}` : '2px solid transparent',
+              color: activeTab === tab.key ? C.t0 : C.t2, fontSize:13, fontWeight:600,
+              cursor:'pointer', fontFamily:'inherit', textAlign:'left'
+            }}
+          >
+            <div>{tab.label}</div>
+            <div style={{ fontSize:11, fontWeight:400, color: activeTab === tab.key ? C.t1 : C.t3 }}>
+              {tab.desc}
             </div>
-          </div>
-          <div onClick={() => s('enabled', !f.enabled)}
-            style={{ width:44, height:24, borderRadius:12, cursor:'pointer',
-              background: f.enabled ? C.acc : C.hover, flexShrink:0,
-              position:'relative',
-              border:`1px solid ${f.enabled ? C.acc : C.border2}`,
-              transition:'background 0.15s' }}>
-            <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff',
-              position:'absolute', top:2,
-              left: f.enabled ? 22 : 2, transition:'left 0.15s' }}/>
-          </div>
-        </div>
+          </button>
+        ))}
       </div>
 
-      {f.enabled && (
-        <>
-          {/* Booking Method */}
+      {/* Reservations Tab */}
+      {activeTab === 'reservations' && (
+        <div>
+          {/* Enable Booking System */}
           <div style={{ background:C.card, border:`1px solid ${C.border}`,
             borderRadius:12, padding:20, marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-              textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>
-              Booking Method
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:C.t0 }}>Enable Booking System</div>
+                <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>
+                  Allow customers to book tables ahead of time
+                </div>
+              </div>
+              <div onClick={() => s('enabled', !f.enabled)}
+                style={{ width:44, height:24, borderRadius:12, cursor:'pointer',
+                  background: f.enabled ? C.acc : C.hover, flexShrink:0, position:'relative',
+                  border:`1px solid ${f.enabled ? C.acc : C.border2}`, transition:'background 0.15s' }}>
+                <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff',
+                  position:'absolute', top:2, left: f.enabled ? 22 : 2, transition:'left 0.15s' }}/>
+              </div>
             </div>
-            <div style={{ fontSize:12, color:C.t3, marginBottom:14 }}>
-              Choose how customers make bookings
-            </div>
+          </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)',
-          gap:8, marginBottom:16 }}>
-          {[
-            { key:'external',  label:'External System' },
-            { key:'email',     label:'Email Form' },
-            { key:'phone',     label:'Phone Call' },
-          ].map(p => {
-            const isSelected = (f.confirmationMethod || 'external') === p.key
-            return (
-              <button key={p.key}
-                onClick={() => s('confirmationMethod', p.key)}
-                style={{ padding:'8px', borderRadius:7, cursor:'pointer',
-                  fontFamily:'inherit', fontSize:12, fontWeight:600,
-                  border:`1px solid ${isSelected ? C.acc : C.border}`,
-                  background: isSelected ? C.accBg : 'transparent',
-                  color: isSelected ? C.acc : C.t2 }}>
-                {p.label}
-                {isSelected && ' ✓'}
+          {f.enabled && (
+            <>
+              {/* Booking Method */}
+              <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                borderRadius:12, padding:20, marginBottom:16 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+                  Booking Method
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:16 }}>
+                  {[
+                    { key:'external',  label:'External System' },
+                    { key:'email',     label:'Email Form' },
+                    { key:'phone',     label:'Phone Call' },
+                  ].map(p => {
+                    const isSelected = (f.confirmationMethod || 'external') === p.key
+                    return (
+                      <button key={p.key} onClick={() => s('confirmationMethod', p.key)}
+                        style={{ padding:'8px', borderRadius:7, cursor:'pointer',
+                          fontFamily:'inherit', fontSize:12, fontWeight:600,
+                          border:`1px solid ${isSelected ? C.acc : C.border}`,
+                          background: isSelected ? C.accBg : 'transparent',
+                          color: isSelected ? C.acc : C.t2 }}>
+                        {p.label} {isSelected && '✓'}
+                      </button>
+                    )
+                  })}
+                </div>
+                {f.confirmationMethod === 'external' && (
+                  <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
+                    {inp('External Booking URL', 'bookingUrl', 'https://www.opentable.com.au/...',
+                      { mono: true, hint: 'OpenTable, ResDiary, Quandoo or custom URL' })}
+                  </div>
+                )}
+                {f.confirmationMethod === 'phone' && (
+                  <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
+                    {inp('Phone Booking Number', 'bookingPhone', '+61 3 9123 4567',
+                      { hint: 'Clicking Book a Table will call this number' })}
+                  </div>
+                )}
+              </div>
+
+              {/* Available Tables by Location */}
+              <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                borderRadius:12, padding:20, marginBottom:16 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                    Available Tables
+                  </div>
+                  <select
+                    value={selectedLocation || ''}
+                    onChange={(e) => setSelectedLocation(e.target.value)}
+                    style={{
+                      padding:'6px 12px', background:C.input, border:`1px solid ${C.border}`,
+                      borderRadius:6, color:C.t0, fontSize:13, fontFamily:'inherit', cursor:'pointer'
+                    }}
+                  >
+                    <option value="">Select location...</option>
+                    {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                  </select>
+                </div>
+
+                {!selectedLocation ? (
+                  <div style={{ textAlign:'center', padding:20, color:C.t3, fontSize:13 }}>
+                    Select a location to view tables
+                  </div>
+                ) : tablesLoading ? (
+                  <div style={{ textAlign:'center', padding:20, color:C.t3 }}>Loading tables...</div>
+                ) : tables.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:20, color:C.t3 }}>
+                    <div style={{ fontSize:24, marginBottom:8 }}>🪑</div>
+                    <div style={{ fontSize:13 }}>No tables configured</div>
+                    <div style={{ fontSize:11, marginTop:4, color:C.t2 }}>
+                      Add tables in the "QR Ordering" tab
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                      {tables.map(table => (
+                        <div key={table.id} style={{
+                          display:'flex', alignItems:'center', gap:8,
+                          padding:'10px 14px', background:C.panel,
+                          border:`1px solid ${table.isActive ? C.border2 : C.red}40`,
+                          borderRadius:8
+                        }}>
+                          <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>
+                            Table {table.tableNumber}
+                          </span>
+                          <span style={{ fontSize:11, color:C.t2 }}>
+                            ({table.capacity} seats)
+                          </span>
+                          <span style={{
+                            fontSize:10, fontWeight:600, padding:'2px 6px', borderRadius:4,
+                            background: table.isActive ? `${C.green}20` : `${C.red}20`,
+                            color: table.isActive ? C.green : C.red
+                          }}>
+                            {table.isActive ? 'Available' : 'Inactive'}
+                          </span>
+                          {table.booking && (
+                            <span style={{
+                              fontSize:10, fontWeight:600, padding:'2px 6px', borderRadius:4,
+                              background: `${C.amber}20`, color: C.amber
+                            }}>
+                              Booked
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${C.border}` }}>
+                      <div style={{ display:'flex', gap:16, fontSize:12, color:C.t2 }}>
+                        <span><strong style={{ color:C.t0 }}>{tables.length}</strong> total tables</span>
+                        <span><strong style={{ color:C.t0 }}>{tables.filter(t => t.isActive).length}</strong> active</span>
+                        <span><strong style={{ color:C.t0 }}>{tables.filter(t => t.booking).length}</strong> currently booked</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Email Form Settings */}
+              {f.confirmationMethod === 'email' && (
+                <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                  borderRadius:12, padding:20, marginBottom:16 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+                    Booking Form Settings
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                    {inp('Min Party Size', 'minParty', 'e.g. 1')}
+                    {inp('Max Party Size', 'maxParty', 'e.g. 20')}
+                    {inp('Advance Notice (hours)', 'advanceNotice', 'e.g. 2',
+                      { hint: 'How many hours ahead a booking can be made' })}
+                    {inp('Max Days Ahead', 'maxDaysAhead', 'e.g. 60',
+                      { hint: 'How far in advance customers can book' })}
+                  </div>
+                </div>
+              )}
+
+              {/* Button Labels & Display */}
+              <div style={{ background:C.card, border:`1px solid ${C.border}`,
+                borderRadius:12, padding:20, marginBottom:16 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:C.t3,
+                  textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+                  Button Labels
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:16 }}>
+                  {inp('Book Button Text', 'bookLabel', 'e.g. Book a Table',
+                    { hint: 'Shown on booking buttons across the site' })}
+                  {inp('Confirmation Message', 'bookConfirmMsg', 'e.g. Thanks! We\'ll see you soon.',
+                    { hint: 'Shown after booking is submitted' })}
+                </div>
+                {toggle('Show Book Button in Navigation', 'showInNav')}
+                {toggle('Show Book Button on Location Cards', 'showOnLocations')}
+              </div>
+
+              {/* Save Button */}
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:24 }}>
+                <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
+                  style={{ padding:'10px 28px', background: mutation.isPending ? C.card : C.acc,
+                    border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
+                    cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                  {mutation.isPending ? 'Saving…' : 'Save Changes'}
+                </button>
+                {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* QR Ordering Tab */}
+      {activeTab === 'qr-ordering' && (
+        <div>
+          {/* Location Selector */}
+          <div style={{ marginBottom:20, padding:14, background:C.card,
+            border:`1px solid ${C.border}`, borderRadius:10, display:'flex',
+            justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <label style={{ display:'block', fontSize:12, fontWeight:600, color:C.t2, marginBottom:8 }}>
+                Select Location
+              </label>
+              <select
+                value={selectedLocation || ''}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                style={{
+                  padding:'10px 14px', background:C.input, border:`1px solid ${C.border}`,
+                  borderRadius:7, color:C.t0, fontSize:14, fontFamily:'inherit', cursor:'pointer'
+                }}
+              >
+                <option value="">Choose a location...</option>
+                {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+              </select>
+            </div>
+            <button
+              onClick={() => setShowAddModal(true)}
+              disabled={!selectedLocation}
+              style={{
+                padding:'10px 18px', background:C.acc, border:'none', borderRadius:7,
+                color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit',
+                opacity: !selectedLocation ? 0.5 : 1
+              }}
+            >
+              + Add Table
+            </button>
+          </div>
+
+          {/* Tables Grid */}
+          {!selectedLocation ? (
+            <div style={{ textAlign:'center', padding:40, color:C.t3 }}>
+              Please select a location to view tables
+            </div>
+          ) : tablesLoading ? (
+            <div style={{ textAlign:'center', padding:40, color:C.t3 }}>Loading tables...</div>
+          ) : tables.length === 0 ? (
+            <div style={{ textAlign:'center', padding:40, color:C.t3 }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>🪑</div>
+              <div>No tables found for this location</div>
+              <div style={{ fontSize:12, marginTop:8, color:C.t2 }}>Click "Add Table" to create your first table</div>
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:16 }}>
+              {tables.map(table => (
+                <div key={table.id} style={{
+                  background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20,
+                  display:'flex', flexDirection:'column', gap:12
+                }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize:20, fontWeight:800, color:C.t0 }}>Table {table.tableNumber}</div>
+                      <div style={{ fontSize:12, color:C.t2, marginTop:2 }}>Capacity: {table.capacity} people</div>
+                    </div>
+                    <span style={{
+                      padding:'4px 10px', borderRadius:6, fontSize:11, fontWeight:700,
+                      background: table.isActive ? `${C.green}20` : `${C.red}20`,
+                      color: table.isActive ? C.green : C.red
+                    }}>{table.isActive ? 'Active' : 'Inactive'}</span>
+                  </div>
+
+                  {/* QR Preview */}
+                  <div style={{
+                    background:'#fff', borderRadius:8, padding:16, display:'flex',
+                    justifyContent:'center', alignItems:'center', minHeight:140, cursor:'pointer'
+                  }} onClick={() => { setSelectedTable(table); setShowQRModal(true); }}>
+                    {table.qrCodeUrl ? (
+                      <QRCodeSVG value={table.qrCodeUrl} size={120} level="M" />
+                    ) : (
+                      <div style={{ textAlign:'center', color:C.t3 }}>
+                        <div style={{ fontSize:32, marginBottom:8 }}>📷</div>
+                        <div style={{ fontSize:11 }}>No QR code</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display:'flex', gap:8, marginTop:'auto' }}>
+                    <button onClick={() => { setSelectedTable(table); setShowQRModal(true); }}
+                      style={{ flex:1, padding:'8px 12px', background:C.panel, border:`1px solid ${C.border2}`,
+                        borderRadius:6, color:C.t1, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                      View QR
+                    </button>
+                    <button onClick={() => qrMutation.mutate(table.id)} disabled={qrMutation.isPending}
+                      style={{ flex:1, padding:'8px 12px', background:C.panel, border:`1px solid ${C.border2}`,
+                        borderRadius:6, color:C.t1, fontSize:12, cursor:'pointer', fontFamily:'inherit',
+                        opacity: qrMutation.isPending ? 0.5 : 1 }}>
+                      {qrMutation.isPending ? '...' : 'Regenerate'}
+                    </button>
+                    <button onClick={() => { if(confirm('Delete this table?')) deleteTableMutation.mutate(table.id); }}
+                      style={{ padding:'8px 12px', background:'transparent', border:`1px solid ${C.red}40`,
+                        borderRadius:6, color:C.red, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Table Modal */}
+      {showAddModal && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)',
+          display:'flex', justifyContent:'center', alignItems:'center', zIndex:1000
+        }} onClick={() => setShowAddModal(false)}>
+          <div style={{
+            background:C.panel, border:`1px solid ${C.border}`, borderRadius:12, padding:24,
+            width:'100%', maxWidth:400
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin:'0 0 16px', fontSize:16, fontWeight:700, color:C.t0 }}>Add New Table</h3>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ display:'block', fontSize:12, fontWeight:600, color:C.t2, marginBottom:6 }}>Location</label>
+              <div style={{ padding:'10px 14px', background:C.card, border:`1px solid ${C.border}`,
+                borderRadius:7, color:C.t1, fontSize:14 }}>{currentLocation?.name || 'Unknown'}</div>
+            </div>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ display:'block', fontSize:12, fontWeight:600, color:C.t2, marginBottom:6 }}>Table Number</label>
+              <input type="text" value={newTable.tableNumber}
+                onChange={e => setNewTable({...newTable, tableNumber: e.target.value})}
+                placeholder="e.g. 1, A1, Patio-1"
+                style={{ width:'100%', padding:'10px 14px', background:C.input,
+                  border:`1px solid ${C.border}`, borderRadius:7, color:C.t0, fontSize:14 }}
+              />
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <label style={{ display:'block', fontSize:12, fontWeight:600, color:C.t2, marginBottom:6 }}>Capacity</label>
+              <input type="number" value={newTable.capacity}
+                onChange={e => setNewTable({...newTable, capacity: parseInt(e.target.value) || 1})}
+                min={1} max={50}
+                style={{ width:'100%', padding:'10px 14px', background:C.input,
+                  border:`1px solid ${C.border}`, borderRadius:7, color:C.t0, fontSize:14 }}
+              />
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setShowAddModal(false)}
+                style={{ flex:1, padding:'10px', background:'transparent', border:`1px solid ${C.border}`,
+                  borderRadius:7, color:C.t2, fontSize:13, cursor:'pointer' }}>Cancel</button>
+              <button onClick={() => createTableMutation.mutate(newTable)} disabled={!newTable.tableNumber || createTableMutation.isPending}
+                style={{ flex:1, padding:'10px', background:C.acc, border:'none', borderRadius:7,
+                  color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer',
+                  opacity: (!newTable.tableNumber || createTableMutation.isPending) ? 0.5 : 1 }}>
+                {createTableMutation.isPending ? 'Creating...' : 'Create Table'}
               </button>
-            )
-          })}
-        </div>
-
-        {f.confirmationMethod === 'external' && (
-          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
-            {inp('External Booking URL', 'bookingUrl',
-              'https://www.opentable.com.au/...',
-              { mono: true,
-                hint: 'Paste your OpenTable, ResDiary, Quandoo or custom booking page URL' })}
-          </div>
-        )}
-        {f.confirmationMethod === 'phone' && (
-          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:16 }}>
-            {inp('Phone Booking Number', 'bookingPhone',
-              '+61 3 9123 4567',
-              { hint: 'Clicking Book a Table will call this number' })}
-          </div>
-        )}
-      </div>
-
-      {/* Restaurant Capacity */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:20, marginBottom:16 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-          Restaurant Capacity
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-          {inp('Maximum Tables', 'maxTables', 'e.g. 20',
-            { hint: 'Total number of tables available per location' })}
-        </div>
-      </div>
-
-      {/* Booking Form Settings (for email method) */}
-      {f.confirmationMethod === 'email' && (
-        <div style={{ background:C.card, border:`1px solid ${C.border}`,
-          borderRadius:12, padding:20, marginBottom:16 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-            textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-            Booking Form Settings
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-            {inp('Min Party Size', 'minParty', 'e.g. 1')}
-            {inp('Max Party Size', 'maxParty', 'e.g. 20')}
-            {inp('Advance Notice (hours)', 'advanceNotice', 'e.g. 2',
-              { hint: 'How many hours ahead a booking can be made' })}
-            {inp('Max Days Ahead', 'maxDaysAhead', 'e.g. 60',
-              { hint: 'How far in advance customers can book' })}
-            {inp('Time Slot Interval (mins)', 'slotInterval', 'e.g. 30',
-              { hint: '30 = slots at 6:00, 6:30, 7:00 etc' })}
-          </div>
-          <div style={{ marginTop:14 }}>
-            {inp('Notification Email', 'notifyEmail',
-              'e.g. bookings@restaurant.com',
-              { hint: 'Where booking notifications are sent' })}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Button Labels */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:20, marginBottom:16 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-          Button Labels
+      {/* QR View Modal */}
+      {showQRModal && selectedTable && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.8)',
+          display:'flex', justifyContent:'center', alignItems:'center', zIndex:1000
+        }} onClick={() => setShowQRModal(false)}>
+          <div style={{
+            background:'#fff', borderRadius:16, padding:32, textAlign:'center', width:'100%', maxWidth:360
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin:'0 0 8px', fontSize:18, fontWeight:700, color:'#1a1a1a' }}>
+              Table {selectedTable.tableNumber}
+            </h3>
+            <p style={{ margin:'0 0 24px', fontSize:13, color:'#666' }}>
+              Scan to order at {currentLocation?.name}
+            </p>
+            {selectedTable.qrCodeUrl ? (
+              <div style={{ marginBottom:24, display:'flex', justifyContent:'center' }}>
+                <QRCodeSVG value={selectedTable.qrCodeUrl} size={220} level="H" />
+              </div>
+            ) : (
+              <div style={{ marginBottom:24, padding:40, color:'#999' }}>No QR code generated yet</div>
+            )}
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => { navigator.clipboard.writeText(selectedTable.qrCodeUrl); alert('Copied!'); }}
+                disabled={!selectedTable.qrCodeUrl}
+                style={{ flex:1, padding:'12px', background:'#f0f0f0', border:'none', borderRadius:8,
+                  color:'#333', fontWeight:600, fontSize:13, cursor:'pointer', opacity: !selectedTable.qrCodeUrl ? 0.5 : 1 }}>
+                Copy URL
+              </button>
+              <button onClick={() => setShowQRModal(false)}
+                style={{ flex:1, padding:'12px', background:'#FF6B2B', border:'none', borderRadius:8,
+                  color:'#fff', fontWeight:600, fontSize:13, cursor:'pointer' }}>Close</button>
+            </div>
+            {selectedTable.qrCodeUrl && (
+              <p style={{ margin:'16px 0 0', fontSize:11, color:'#999', wordBreak:'break-all' }}>
+                {selectedTable.qrCodeUrl}
+              </p>
+            )}
+          </div>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-          {inp('Book Button Text', 'bookLabel', 'e.g. Book a Table',
-            { hint: 'Shown on booking buttons across the site' })}
-          {inp('Confirmation Message', 'bookConfirmMsg',
-            'e.g. Thanks! We\'ll see you soon.',
-            { hint: 'Shown after a booking is submitted' })}
-        </div>
-      </div>
-
-      {/* Display Options */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:20, marginBottom:16 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:C.t3,
-          textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-          Display Options
-        </div>
-        {toggle('Show Book Button in Navigation Bar',
-          'showInNav', 'Display booking button in the site navigation')}
-        {toggle('Show Book Button on Location Cards',
-          'showOnLocations', 'Display booking button on each location card')}
-      </div>
-
-      <SaveRow/>
-        </>
       )}
     </div>
   )

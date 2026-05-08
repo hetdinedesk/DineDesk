@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BarChart3, Copy } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Copy, Trash2 } from 'lucide-react'
 import { getAnalytics } from '../api/analytics'
 import { getMenuItems } from '../api/menuItems'
 import { getPages } from '../api/pages'
@@ -372,6 +372,7 @@ function OverviewTab({ clientId, period, onDeleteSite }) {
         </div>
       )}
     </div>
+  )
 }
 
 // ── Placeholder for other tabs ────────────────────────────────

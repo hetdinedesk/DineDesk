@@ -60,6 +60,7 @@ app.use('/api/clients', require('./routes/clients'))
 app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories
 app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
 app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
+app.use('/api/clients', require('./routes/tables')) // Handles /api/clients/:clientId/locations/:locationId/tables
 app.use('/api/loyalty', require('./routes/loyalty'))
 app.use('/api/enquiries', require('./routes/enquiries'))
 
