@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle } from 'lucide-react'
+import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle, Table } from 'lucide-react'
 import { getOrders, updateOrderStatus } from '../api/orders'
 import { getLocations } from '../api/locations'
 import { toggleOrdering } from '../api/config'
+import { getTables, updateTableBookingStatus } from '../api/tables'
 import { C } from '../theme'
 
 const STATUS_COLORS = {
@@ -462,7 +463,7 @@ export default function OperationsSection({ clientId }) {
         display: 'flex',
         flexShrink: 0
       }}>
-        {['live', 'history', 'analytics', 'customers'].map(tab => (
+        {['live', 'history', 'tables', 'analytics', 'customers'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -481,6 +482,7 @@ export default function OperationsSection({ clientId }) {
           >
             {tab === 'live' && `Live Orders (${liveOrders.length})`}
             {tab === 'history' && `Order History (${historyOrders.length})`}
+            {tab === 'tables' && 'Tables'}
             {tab === 'analytics' && 'Analytics'}
             {tab === 'customers' && 'Customers'}
           </button>
@@ -600,10 +602,20 @@ export default function OperationsSection({ clientId }) {
 
         {/* Order History */}
         {activeTab === 'history' && (
-          <OrderHistorySection 
+          <OrderHistorySection
             historyOrders={historyOrders}
             onOrderClick={setSelectedOrder}
             onStatusChange={handleStatusChange}
+          />
+        )}
+
+        {/* Tables */}
+        {activeTab === 'tables' && (
+          <TablesTab
+            clientId={clientId}
+            selectedLocation={selectedLocation}
+            liveOrders={liveOrders}
+            queryClient={queryClient}
           />
         )}
 
@@ -1730,6 +1742,164 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Tables Tab ────────────────────────────────────────────────
+function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
+  const { data: tables = [], isLoading } = useQuery({
+    queryKey: ['tables', clientId, selectedLocation],
+    queryFn: () => getTables(clientId, selectedLocation),
+    enabled: !!selectedLocation,
+    refetchInterval: 10000
+  })
+
+  const updateBookingMutation = useMutation({
+    mutationFn: ({ tableId, isBooked }) =>
+      updateTableBookingStatus(clientId, selectedLocation, tableId, { isBooked }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tables', clientId, selectedLocation])
+    }
+  })
+
+  const toggleBooking = (tableId, currentBookingId) => {
+    updateBookingMutation.mutate({
+      tableId,
+      isBooked: !currentBookingId
+    })
+  }
+
+  if (!selectedLocation) {
+    return (
+      <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>
+        Please select a location to view tables
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return <div style={{ textAlign: 'center', padding: 40 }}>Loading tables...</div>
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.t0 }}>Tables</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: C.t3 }}>
+            View orders by table and manage walk-in bookings
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+        {tables.map(table => {
+          const tableOrders = liveOrders.filter(o => o.tableId === table.id)
+          const isBooked = !!table.bookingId
+
+          return (
+            <div key={table.id} style={{
+              background: C.panel,
+              border: `1px solid ${isBooked ? `${C.amber}40` : C.border}`,
+              borderRadius: 12,
+              padding: 20
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.t0 }}>Table {table.tableNumber}</div>
+                  <div style={{ fontSize: 12, color: C.t2 }}>{table.capacity} seats</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <span style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: isBooked ? `${C.amber}20` : `${C.green}20`,
+                    color: isBooked ? C.amber : C.green
+                  }}>
+                    {isBooked ? 'Booked' : 'Available'}
+                  </span>
+                  <span style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    background: table.isActive ? `${C.green}20` : `${C.red}20`,
+                    color: table.isActive ? C.green : C.red
+                  }}>
+                    {table.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Orders for this table */}
+              {tableOrders.length > 0 ? (
+                <div style={{ background: C.card, borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, marginBottom: 8 }}>
+                    Active Orders ({tableOrders.length})
+                  </div>
+                  {tableOrders.map(order => (
+                    <div key={order.id} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '8px 0', borderBottom: `1px solid ${C.border2}`
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.t0 }}>
+                          #{order.orderNumber}
+                        </div>
+                        <div style={{ fontSize: 11, color: C.t2 }}>
+                          {order.orderType} • ${order.total}
+                        </div>
+                      </div>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                        background: `${STATUS_COLORS[order.status]}20`,
+                        color: STATUS_COLORS[order.status]
+                      }}>
+                        {STATUS_LABELS[order.status]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  background: C.card, borderRadius: 8, padding: 12, marginBottom: 12,
+                  textAlign: 'center', fontSize: 12, color: C.t3
+                }}>
+                  No active orders
+                </div>
+              )}
+
+              {/* Walk-in booking toggle */}
+              <button
+                onClick={() => toggleBooking(table.id, table.bookingId)}
+                disabled={updateBookingMutation.isPending}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: isBooked ? C.red : C.green,
+                  border: 'none',
+                  borderRadius: 8,
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  opacity: updateBookingMutation.isPending ? 0.5 : 1
+                }}
+              >
+                {isBooked ? 'Mark as Available' : 'Mark as Booked (Walk-in)'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {tables.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🪑</div>
+          <div>No tables configured</div>
+          <div style={{ fontSize: 12, marginTop: 4, color: C.t2 }}>
+            Add tables in Config {'>'} Table Management
+          </div>
+        </div>
+      )}
     </div>
   )
 }

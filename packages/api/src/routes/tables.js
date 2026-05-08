@@ -218,6 +218,37 @@ router.delete('/:clientId/locations/:locationId/tables/:tableId', authenticateTo
   }
 })
 
+// POST - Update table booking status (for walk-ins)
+router.post('/:clientId/locations/:locationId/tables/:tableId/booking-status', authenticateToken, async (req, res) => {
+  try {
+    const clientId = getClientId(req)
+    const { locationId, tableId } = req.params
+    const { isBooked, bookingId } = req.body
+
+    // Verify table belongs to client and location
+    const table = await prisma.restaurantTable.findFirst({
+      where: { id: tableId, clientId, locationId }
+    })
+
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' })
+    }
+
+    // Update table booking status
+    const updatedTable = await prisma.restaurantTable.update({
+      where: { id: tableId },
+      data: {
+        bookingId: isBooked ? (bookingId || null) : null
+      }
+    })
+
+    res.json({ success: true, table: updatedTable })
+  } catch (err) {
+    console.error('[TABLES] Update booking status error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // POST - Generate/Regenerate QR code for table
 router.post('/:clientId/locations/:locationId/tables/:tableId/qrcode', authenticateToken, async (req, res) => {
   try {

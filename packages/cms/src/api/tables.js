@@ -17,3 +17,6 @@ export const generateQRCode = (clientId, locationId, tableId) =>
 
 export const getMaxPartySize = (clientId, locationId) =>
   api.get(`/clients/${clientId}/locations/${locationId}/max-party-size`).then(r => r.data)
+
+export const updateTableBookingStatus = (clientId, locationId, tableId, data) =>
+  api.post(`/clients/${clientId}/locations/${locationId}/tables/${tableId}/booking-status`, data).then(r => r.data)

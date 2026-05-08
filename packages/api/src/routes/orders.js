@@ -52,6 +52,11 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Customer name, email, and phone are required' })
     }
 
+    // Validate dine-in order requirements
+    if (orderType === 'dine_in' && !tableId) {
+      return res.status(400).json({ error: 'Table ID is required for dine-in orders' })
+    }
+
     // Get client config to check if ordering is enabled
     const client = await prisma.client.findUnique({
       where: { id: clientId },
@@ -213,6 +218,8 @@ router.post('/', async (req, res) => {
         deliveryFee,
         paymentGatewayId: paymentGateway?.id,
         locationId: locationId || null,
+        tableId: tableId || null,
+        paymentPreference: paymentPreference || 'pay_at_table',
         pointsEarned,
         pointsUsed: pointsUsed || 0,
         rewardUsed: rewardUsed || null,
@@ -311,10 +318,33 @@ router.post('/', async (req, res) => {
     }
 
     // For cash orders, return immediately
-    res.json({
+    const responseData = {
       order,
       requiresPayment: false
-    })
+    }
+
+    // Include table details if tableId exists
+    if (order.tableId) {
+      const table = await prisma.restaurantTable.findUnique({
+        where: { id: order.tableId },
+        select: {
+          id: true,
+          tableNumber: true,
+          capacity: true,
+          location: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      })
+      if (table) {
+        responseData.table = table
+      }
+    }
+
+    res.json(responseData)
   } catch (err) {
     console.error('Create order error:', err)
     res.status(500).json({ error: err.message })
