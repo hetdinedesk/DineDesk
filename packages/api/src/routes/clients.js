@@ -91,6 +91,75 @@ function clearExportCache(clientId) {
 // MUST stay above router.use(authenticateToken)
 // ═══════════════════════════════════════════════════════════════
 
+// Check booking availability for preview site
+router.get('/:id/bookings/availability', async (req, res) => {
+  try {
+    const clientId = req.params.id
+    const { date, time, locationId } = req.query
+
+    if (!clientId || !date) {
+      return res.status(400).json({ error: 'Missing clientId or date' })
+    }
+
+    // Get client config to check maxTables
+    const siteConfig = await prisma.siteConfig.findUnique({
+      where: { id: clientId },
+      select: { booking: true }
+    })
+
+    const maxTables = siteConfig?.booking?.maxTables || 20
+
+    // Count existing bookings
+    const where = {
+      clientId,
+      bookingDate: new Date(date),
+      status: { in: ['pending', 'confirmed'] }
+    }
+
+    // If locationId is provided, filter by location
+    if (locationId) {
+      where.locationId = locationId
+    }
+
+    // Get total tables for the location
+    const totalTables = await prisma.restaurantTable.count({
+      where: {
+        clientId,
+        locationId,
+        isActive: true
+      }
+    })
+
+    // If we have table information, use it for more accurate availability
+    const actualMaxTables = Math.min(maxTables, totalTables)
+
+    if (time) {
+      where.bookingTime = time
+    }
+
+    const existingBookings = await prisma.booking.count({ where })
+
+    // Calculate available tables
+    let availableTables = actualMaxTables - existingBookings
+    
+    // If no tables are configured, show 0 available
+    if (totalTables === 0) {
+      availableTables = 0
+    }
+
+    res.json({
+      maxTables: actualMaxTables,
+      existingBookings,
+      availableTables,
+      isAvailable: availableTables > 0,
+      totalConfiguredTables: totalTables
+    })
+  } catch (error) {
+    console.error('Availability check error:', error)
+    res.status(500).json({ error: 'Failed to check availability' })
+  }
+})
+
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
