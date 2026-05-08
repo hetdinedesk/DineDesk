@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "name": "install",
+      "command": "npm install"
+    },
+    {
+      "name": "build",
+      "command": "npx prisma generate && npx prisma db push --accept-data-loss"
+    }
+  ],
+  "deploy": {
+    "startCommand": "npx prisma db push --accept-data-loss && node src/index.js"
+  }
+}
