@@ -125,11 +125,33 @@ model Location {
   menuCategories    String[]  @default([])
   servicesAvailable String[]  @default([])
   bookings          Booking[]
+  tables            RestaurantTable[]
   client            Client    @relation(fields: [clientId], references: [id])
   orders            Order[]
 
   @@index([clientId])
   @@index([isPrimary])
+}
+
+model RestaurantTable {
+  id          String   @id @default(cuid())
+  clientId    String
+  locationId  String
+  tableNumber String
+  capacity    Int      @default(4)
+  qrCodeUrl   String?
+  isActive    Boolean  @default(true)
+  bookingId   String?
+  position    Json?    @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  orders      Order[]
+
+  @@index([clientId])
+  @@index([locationId])
+  @@unique([locationId, tableNumber])
 }
 
 model MenuCategory {
@@ -153,7 +175,10 @@ model MenuItem {
   imageUrl    String?
   isAvailable Boolean       @default(true)
   isFeatured  Boolean       @default(false)
-  sortOrder   Int           @default(0)
+  sortOrder    Int           @default(0)
+  sizes        Json?         @default("[]")
+  addons       Json?         @default("[]")
+  hasVariants  Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now()) @updatedAt
   category    MenuCategory? @relation(fields: [categoryId], references: [id])
@@ -536,10 +561,13 @@ model Order {
   pointsUsed            Int             @default(0)
   rewardUsed            Json?
   locationId            String?
+  tableId               String?
+  paymentPreference     String   @default("upfront")
   discountAmount        Float           @default(0)
   client                Client          @relation(fields: [clientId], references: [id])
   customer              Customer?       @relation(fields: [customerId], references: [id])
   location              Location?       @relation(fields: [locationId], references: [id])
+  table                 RestaurantTable? @relation(fields: [tableId], references: [id])
   paymentGateway        PaymentGateway? @relation(fields: [paymentGatewayId], references: [id])
 
   @@index([clientId])
@@ -617,6 +645,7 @@ model Booking {
   locationId         String?
   client             Client    @relation(fields: [clientId], references: [id])
   location           Location? @relation(fields: [locationId], references: [id])
+  tables             RestaurantTable[]
 
   @@index([clientId])
   @@index([locationId])
