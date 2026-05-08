@@ -29,14 +29,25 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
     try {
       const API_URL = process.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
       const locationParam = formData.locationId ? `&locationId=${formData.locationId}` : ''
-      const response = await fetch(
-        `${API_URL}/clients/${clientId}/bookings/availability?date=${formData.bookingDate}${formData.bookingTime ? `&time=${formData.bookingTime}` : ''}${locationParam}`
-      )
+      const url = `${API_URL}/clients/${clientId}/bookings/availability?date=${formData.bookingDate}${formData.bookingTime ? `&time=${formData.bookingTime}` : ''}${locationParam}`
+      
+      console.log('[BookingForm] Checking availability:', { API_URL, clientId, url })
+      
+      const response = await fetch(url)
+      
+      console.log('[BookingForm] Response status:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[BookingForm] Response error:', errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+      
       const data = await response.json()
       setAvailability(data)
       return data
     } catch (err) {
-      console.error('Availability check error:', err)
+      console.error('[BookingForm] Availability check error:', err)
       return null
     }
   }

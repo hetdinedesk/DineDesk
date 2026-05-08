@@ -272,8 +272,7 @@ export default function OperationsSection({ clientId }) {
         ['completed', 'cancelled'].includes(o.status)
       )
     ),
-    enabled: !!selectedLocation,
-    refetchInterval: 30000 // Refresh every 30 seconds
+    enabled: !!selectedLocation && activeTab === 'history'
   })
 
   // Update order status mutation
