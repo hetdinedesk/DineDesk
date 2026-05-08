@@ -1764,10 +1764,21 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
   })
 
   const toggleBooking = (tableId, currentBookingId) => {
-    updateBookingMutation.mutate({
-      tableId,
-      isBooked: !currentBookingId
-    })
+    if (currentBookingId) {
+      // Unbook the table
+      updateBookingMutation.mutate({
+        tableId,
+        isBooked: false
+      })
+    } else {
+      // Book the table for walk-in (create a dummy booking)
+      const walkInBookingId = `walkin-${Date.now()}`
+      updateBookingMutation.mutate({
+        tableId,
+        isBooked: true,
+        bookingId: walkInBookingId
+      })
+    }
   }
 
   if (!selectedLocation) {
