@@ -3078,8 +3078,3 @@ router.delete('/:clientId/rewards/:rewardId', authenticateToken, async (req, res
 
 module.exports = router
 module.exports.clearExportCache = clearExportCache
-    res.status(500).json({ error: err.message })
-  }
-})
-
-module.exports = router
