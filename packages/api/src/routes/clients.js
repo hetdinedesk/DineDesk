@@ -82,6 +82,10 @@ function setCachedExport(clientId, data) {
   exportCache.set(clientId, { data, timestamp: Date.now() })
 }
 
+function clearExportCache(clientId) {
+  exportCache.delete(clientId)
+}
+
 // ═══════════════════════════════════════════════════════════════
 // PUBLIC ROUTES — no auth token needed
 // MUST stay above router.use(authenticateToken)
