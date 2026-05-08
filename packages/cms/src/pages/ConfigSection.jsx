@@ -4349,7 +4349,7 @@ function TableManagementConfig({ clientId, config, setHasUnsavedChanges, activeK
   const { data: maxPartyData } = useQuery({
     queryKey: ['maxPartySize', clientId, selectedLocation],
     queryFn: () => getMaxPartySize(clientId, selectedLocation),
-    enabled: !!selectedLocation && activeTab === 'reservations',
+    enabled: !!selectedLocation,
     staleTime: 1000 * 30
   })
 
