@@ -272,7 +272,8 @@ export default function OperationsSection({ clientId }) {
         ['completed', 'cancelled'].includes(o.status)
       )
     ),
-    enabled: !!selectedLocation && activeTab === 'history'
+    enabled: !!selectedLocation,
+    refetchInterval: 30000 // Refresh every 30 seconds
   })
 
   // Update order status mutation
@@ -1756,10 +1757,14 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
   })
 
   const updateBookingMutation = useMutation({
-    mutationFn: ({ tableId, isBooked }) =>
-      updateTableBookingStatus(clientId, selectedLocation, tableId, { isBooked }),
+    mutationFn: ({ tableId, isBooked, bookingId }) =>
+      updateTableBookingStatus(clientId, selectedLocation, tableId, { isBooked, bookingId }),
     onSuccess: () => {
       queryClient.invalidateQueries(['tables', clientId, selectedLocation])
+    },
+    onError: (error) => {
+      console.error('[CMS] Booking status update failed:', error)
+      alert('Failed to update booking status: ' + error.message)
     }
   })
 
@@ -1771,12 +1776,22 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
         isBooked: false
       })
     } else {
-      // Book the table for walk-in (create a dummy booking)
-      const walkInBookingId = `walkin-${Date.now()}`
+      // Check if table has active dine-in orders before allowing walk-in
+      const hasDineInOrders = liveOrders.some(o => 
+        o.tableId === tableId && 
+        ['new', 'accepted', 'preparing', 'ready'].includes(o.status)
+      )
+      
+      if (hasDineInOrders) {
+        // Table has active dine-in orders, don't allow walk-in booking
+        alert('This table has active dine-in orders. Walk-in booking is not allowed to prevent cross-booking.')
+        return
+      }
+      
+      // Book the table for walk-in (API will create a real booking record)
       updateBookingMutation.mutate({
         tableId,
-        isBooked: true,
-        bookingId: walkInBookingId
+        isBooked: true
       })
     }
   }

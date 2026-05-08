@@ -225,27 +225,60 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/booking-status', a
     const { locationId, tableId } = req.params
     const { isBooked, bookingId } = req.body
 
+    console.log('[TABLES] Booking status update:', { clientId, locationId, tableId, isBooked, bookingId })
+
     // Verify table belongs to client and location
     const table = await prisma.restaurantTable.findFirst({
       where: { id: tableId, clientId, locationId }
     })
 
     if (!table) {
+      console.log('[TABLES] Table not found:', { tableId, clientId, locationId })
       return res.status(404).json({ error: 'Table not found' })
     }
 
-    // Update table booking status
-    const updatedTable = await prisma.restaurantTable.update({
-      where: { id: tableId },
-      data: {
-        bookingId: isBooked ? (bookingId || null) : null
+    if (isBooked) {
+      // Create a walk-in booking record if no bookingId is provided
+      let actualBookingId = bookingId
+      if (!actualBookingId) {
+        const now = new Date()
+        const walkInBooking = await prisma.booking.create({
+          data: {
+            clientId,
+            customerName: 'Walk-in Customer',
+            partySize: table.capacity || 2,
+            bookingDate: now,
+            bookingTime: `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`,
+            status: 'confirmed',
+            confirmationMethod: 'walk-in',
+            locationId
+          }
+        })
+        actualBookingId = walkInBooking.id
+        console.log('[TABLES] Created walk-in booking:', walkInBooking.id)
       }
-    })
 
-    res.json({ success: true, table: updatedTable })
+      // Update table with the booking ID
+      const updatedTable = await prisma.restaurantTable.update({
+        where: { id: tableId },
+        data: { bookingId: actualBookingId }
+      })
+
+      console.log('[TABLES] Table booked successfully:', updatedTable)
+      res.json({ success: true, table: updatedTable })
+    } else {
+      // Unbook the table
+      const updatedTable = await prisma.restaurantTable.update({
+        where: { id: tableId },
+        data: { bookingId: null }
+      })
+
+      console.log('[TABLES] Table unbooked successfully:', updatedTable)
+      res.json({ success: true, table: updatedTable })
+    }
   } catch (err) {
     console.error('[TABLES] Update booking status error:', err)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: err.message, details: err.stack })
   }
 })
 
