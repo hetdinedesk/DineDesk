@@ -14,6 +14,7 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [availability, setAvailability] = useState(null)
+  const [success, setSuccess] = useState(null)
 
   const bookingConfig = config?.booking || {}
   const confirmationMethod = bookingConfig.confirmationMethod || 'external'
@@ -66,7 +67,8 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
           ...formData,
           confirmationMethod,
           partySize: parseInt(formData.partySize),
-          locationId: formData.locationId || null
+          locationId: formData.locationId || null,
+          autoAssignTable: true // Enable auto-assignment
         })
       })
 
@@ -77,11 +79,13 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
       }
 
       // Success
+      setSuccess(data)
       if (onSuccess) {
         onSuccess(data)
       }
 
-      // Reset form
+      // Reset form after 3 seconds
+      setTimeout(() => {
       setFormData({
         locationId: '',
         customerName: '',
@@ -93,6 +97,8 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
         notes: ''
       })
       setAvailability(null)
+        setSuccess(null)
+      }, 3000)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -120,6 +126,29 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
     <div className="p-6">
       {bookingConfig.bookLabel && (
         <p className="text-gray-600 mb-6 text-sm">{bookingConfig.bookLabel}</p>
+      )}
+
+      {/* Success Message with Allocated Table */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+          <div className="flex items-center text-green-700 mb-2">
+            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="font-semibold">Booking Confirmed!</span>
+          </div>
+          {success.table && (
+            <div className="text-sm text-green-600">
+              <p className="font-medium">Table Allocated: {success.table.tableNumber}</p>
+              <p>Capacity: {success.table.capacity} seats</p>
+            </div>
+          )}
+          {!success.table && (
+            <p className="text-sm text-green-600">
+              A table will be assigned upon arrival.
+            </p>
+          )}
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
