@@ -99,14 +99,14 @@ function MenuItemsTab({ clientId }) {
   const [search,    setSearch]    = useState('')
   const [adding,    setAdding]    = useState(false)
   const [editingId, setEditingId]  = useState(null)
-  const [newItem,   setNewItem]   = useState({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
+  const [newItem,   setNewItem]   = useState({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'', sizes:[], addons:[] })
   const [formErr, setFormErr] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingStatus, setProcessingStatus] = useState('')
 
   // Track unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const initialNewItem = useMemo(() => ({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' }), [])
+  const initialNewItem = useMemo(() => ({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'', sizes:[], addons:[] }), [])
   useEffect(() => {
     const hasChanges = JSON.stringify(newItem) !== JSON.stringify(initialNewItem)
     setHasUnsavedChanges(hasChanges)
@@ -151,12 +151,15 @@ function MenuItemsTab({ clientId }) {
         isFeatured:  newItem.isFeatured,
         isAvailable: true,
         sortOrder:   0,
+        sizes:       newItem.sizes || [],
+        addons:      newItem.addons || [],
+        hasVariants: (newItem.sizes?.length > 0) || (newItem.addons?.length > 0),
         ...(categoryId ? { categoryId } : {})
       })
     },
     onSuccess: () => {
       qc.invalidateQueries(['menu-items', clientId])
-      setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
+      setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'', sizes:[], addons:[] })
       setAdding(false)
       setHasUnsavedChanges(false)
       setFormErr('')
@@ -183,19 +186,25 @@ function MenuItemsTab({ clientId }) {
           categoryId = created.id
         }
       }
-      return apiFetch(`/clients/${clientId}/menu-items/${editingId}`, 'PUT', {
+      const updateData = {
         name:        newItem.name.trim(),
         description: newItem.description.trim() || null,
         price:       newItem.price ? parseFloat(newItem.price) : null,
         imageUrl:    newItem.imageUrl || null,
         isFeatured:  newItem.isFeatured,
+        sizes:       newItem.sizes || [],
+        addons:      newItem.addons || [],
+        hasVariants: (newItem.sizes?.length > 0) || (newItem.addons?.length > 0),
         ...(categoryId ? { categoryId } : {})
-      })
+      }
+      console.log('[CMS] Sending update with data:', updateData)
+      return apiFetch(`/clients/${clientId}/menu-items/${editingId}`, 'PUT', updateData)
     },
     onSuccess: () => {
       qc.invalidateQueries(['menu-items', clientId])
-      setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
+      setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'', sizes:[], addons:[] })
       setEditingId(null)
+      setAdding(false)
       setHasUnsavedChanges(false)
       setFormErr('')
     },
@@ -232,15 +241,19 @@ function MenuItemsTab({ clientId }) {
       description: item.description || '',
       categoryName: item.category?.name || '',
       isFeatured: item.isFeatured || false,
-      imageUrl: item.imageUrl || ''
+      imageUrl: item.imageUrl || '',
+      sizes: item.sizes || [],
+      addons: item.addons || []
     })
     setEditingId(item.id)
     setAdding(true)
     setFormErr('')
+    // Scroll to top to show the edit form
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const cancelEdit = () => {
-    setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'' })
+    setNewItem({ name:'', price:'', description:'', categoryName:'', isFeatured:false, imageUrl:'', sizes:[], addons:[] })
     setEditingId(null)
     setAdding(false)
     setFormErr('')
@@ -440,6 +453,113 @@ function MenuItemsTab({ clientId }) {
               ⭐ Featured on homepage — shows in Best Selling Dishes section on the website
             </label>
           </div>
+
+          {/* Sizes Section */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:12, marginBottom:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                Sizes / Variants
+              </label>
+              <button
+                onClick={() => {
+                  const newSize = { name: '', priceAdjustment: 0 }
+                  setNewItem(p => ({...p, sizes: [...(p.sizes || []), newSize]}))
+                }}
+                style={{ padding:'4px 10px', background:C.acc, border:'none', borderRadius:4, color:'#fff', fontSize:11, cursor:'pointer' }}>
+                + Add Size
+              </button>
+            </div>
+            {(newItem.sizes || []).length === 0 && (
+              <div style={{ fontSize:12, color:C.t3, fontStyle:'italic' }}>No sizes added yet.</div>
+            )}
+            {(newItem.sizes || []).map((size, idx) => (
+              <div key={idx} style={{ display:'flex', gap:8, marginBottom:8, alignItems:'center' }}>
+                <input
+                  value={size.name}
+                  onChange={e => {
+                    const newSizes = [...(newItem.sizes || [])]
+                    newSizes[idx] = { ...newSizes[idx], name: e.target.value }
+                    setNewItem(p => ({...p, sizes: newSizes}))
+                  }}
+                  placeholder="e.g. Small, Medium, Large"
+                  style={{ ...inp, flex:2 }}
+                />
+                <input
+                  type="number"
+                  value={size.priceAdjustment || ''}
+                  onChange={e => {
+                    const newSizes = [...(newItem.sizes || [])]
+                    newSizes[idx] = { ...newSizes[idx], priceAdjustment: parseFloat(e.target.value) || 0 }
+                    setNewItem(p => ({...p, sizes: newSizes}))
+                  }}
+                  placeholder="Price adjustment"
+                  style={{ ...inp, flex:1 }}
+                />
+                <button
+                  onClick={() => {
+                    const newSizes = (newItem.sizes || []).filter((_, i) => i !== idx)
+                    setNewItem(p => ({...p, sizes: newSizes}))
+                  }}
+                  style={{ padding:'6px 10px', background:'transparent', border:`1px solid ${C.red}40`, borderRadius:4, color:C.red, fontSize:11, cursor:'pointer' }}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Addons Section */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:12, marginBottom:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                Add-ons / Extras
+              </label>
+              <button
+                onClick={() => {
+                  const newAddon = { name: '', price: 0 }
+                  setNewItem(p => ({...p, addons: [...(p.addons || []), newAddon]}))
+                }}
+                style={{ padding:'4px 10px', background:C.acc, border:'none', borderRadius:4, color:'#fff', fontSize:11, cursor:'pointer' }}>
+                + Add Add-on
+              </button>
+            </div>
+            {(newItem.addons || []).length === 0 && (
+              <div style={{ fontSize:12, color:C.t3, fontStyle:'italic' }}>No add-ons added yet.</div>
+            )}
+            {(newItem.addons || []).map((addon, idx) => (
+              <div key={idx} style={{ display:'flex', gap:8, marginBottom:8, alignItems:'center' }}>
+                <input
+                  value={addon.name}
+                  onChange={e => {
+                    const newAddons = [...(newItem.addons || [])]
+                    newAddons[idx] = { ...newAddons[idx], name: e.target.value }
+                    setNewItem(p => ({...p, addons: newAddons}))
+                  }}
+                  placeholder="e.g. Extra Cheese, Bacon"
+                  style={{ ...inp, flex:2 }}
+                />
+                <input
+                  type="number"
+                  value={addon.price || ''}
+                  onChange={e => {
+                    const newAddons = [...(newItem.addons || [])]
+                    newAddons[idx] = { ...newAddons[idx], price: parseFloat(e.target.value) || 0 }
+                    setNewItem(p => ({...p, addons: newAddons}))
+                  }}
+                  placeholder="Price"
+                  style={{ ...inp, flex:1 }}
+                />
+                <button
+                  onClick={() => {
+                    const newAddons = (newItem.addons || []).filter((_, i) => i !== idx)
+                    setNewItem(p => ({...p, addons: newAddons}))
+                  }}
+                  style={{ padding:'6px 10px', background:'transparent', border:`1px solid ${C.red}40`, borderRadius:4, color:C.red, fontSize:11, cursor:'pointer' }}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+
           {formErr && (
             <div style={{ background:'#2A0A0A', border:'1px solid #EF444440', borderRadius:7,
               padding:'8px 12px', fontSize:12, color:C.red, marginBottom:10 }}>

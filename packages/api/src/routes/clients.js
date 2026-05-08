@@ -91,11 +91,12 @@ router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
 
+    // TEMPORARILY DISABLED CACHE TO DEBUG SIZES/ADDONS ISSUE
     // Check cache first
-    const cached = getCachedExport(id)
-    if (cached) {
-      return res.json(cached)
-    }
+    // const cached = getCachedExport(id)
+    // if (cached) {
+    //   return res.json(cached)
+    // }
 
     const [client, menuCategories, menuItems, specials, pages, banners, footerSections, unassignedFooterLinks, cfg, navigationItems, homeSections, promoTiles, promoConfig, featuredConfig, welcomeContent, teamDepartments, specialsConfig, homepageLayout, customTextBlocks, paymentGateway, legalDocs, loyaltyConfig] = await Promise.all([
       prisma.client.findUnique({
@@ -153,7 +154,10 @@ router.get('/:id/export', async (req, res) => {
           imageUrl: true,
           isAvailable: true,
           isFeatured: true,
-          sortOrder: true
+          sortOrder: true,
+          sizes: true,
+          addons: true,
+          hasVariants: true
         }
       }),
       prisma.special.findMany({
@@ -3068,6 +3072,12 @@ router.delete('/:clientId/rewards/:rewardId', authenticateToken, async (req, res
     res.json({ success: true })
   } catch (err) {
     console.error('Delete reward error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+module.exports = router
+module.exports.clearExportCache = clearExportCache
     res.status(500).json({ error: err.message })
   }
 })

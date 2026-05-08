@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Search, Plus, Check, Gift, Phone } from 'lucide-react';
+import { Search, Plus, Check, Gift, Phone, MapPin } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
+import ItemCustomizationModal from '../../components/ItemCustomizationModal';
+import { getCurrentTableInfo, formatTableDisplay } from '../../lib/tableDetection';
+import { useRouter } from 'next/router';
 
 // Image URLs
 const IMAGES = {
@@ -18,11 +21,14 @@ const IMAGES = {
 };
 
 export default function MenuPage({ data, page, banner }) {
+  const router = useRouter();
   const { menuCategories, menuItems, shortcodes, contentPages, ordering } = useCMS();
   const { addItem, isEnabled: orderingEnabled } = useCart();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [addedItems, setAddedItems] = useState({});
+  const [customizingItem, setCustomizingItem] = useState(null);
+  const [currentTableInfo, setCurrentTableInfo] = useState(null);
 
   // Get loyalty config from data instead of hook
   const loyaltyConfig = data?.loyaltyConfig;
@@ -65,6 +71,29 @@ export default function MenuPage({ data, page, banner }) {
   };
 
   const handleAddItem = (item) => {
+    // Debug: Log item data to help diagnose variant detection
+    console.log('handleAddItem called for item:', item.name, {
+      hasVariants: item.hasVariants,
+      sizes: item.sizes,
+      addons: item.addons,
+      sizesLength: item.sizes?.length || 0,
+      addonsLength: item.addons?.length || 0
+    });
+
+    // Check if item has sizes or addons (more robust detection)
+    const hasSizes = item.sizes && Array.isArray(item.sizes) && item.sizes.length > 0;
+    const hasAddons = item.addons && Array.isArray(item.addons) && item.addons.length > 0;
+    const hasVariantsFlag = item.hasVariants === true;
+
+    // If item has sizes or addons, open customization modal
+    if (hasVariantsFlag || hasSizes || hasAddons) {
+      console.log('Opening customization modal for:', item.name);
+      setCustomizingItem(item);
+      return;
+    }
+
+    // Otherwise add directly to cart
+    console.log('Adding directly to cart (no variants):', item.name);
     addItem({
       id: item.id,
       name: replaceShortcodes(item.name || '', shortcodes),
@@ -75,6 +104,23 @@ export default function MenuPage({ data, page, banner }) {
     setTimeout(() => {
       setAddedItems(prev => ({ ...prev, [item.id]: false }));
     }, 2000);
+  };
+
+  const handleCustomAdd = (cartItem) => {
+    addItem({
+      id: cartItem.id,
+      name: cartItem.name,
+      price: cartItem.totalPrice,
+      image: cartItem.image,
+      selectedSize: cartItem.selectedSize,
+      selectedAddons: cartItem.selectedAddons,
+      specialInstructions: cartItem.specialInstructions,
+    });
+    setAddedItems({ ...addedItems, [cartItem.id]: true });
+    setTimeout(() => {
+      setAddedItems(prev => ({ ...prev, [cartItem.id]: false }));
+    }, 2000);
+    setCustomizingItem(null);
   };
 
   return (
@@ -341,6 +387,15 @@ export default function MenuPage({ data, page, banner }) {
           </div>
         )}
       </div>
+
+      {/* Item Customization Modal */}
+      <ItemCustomizationModal
+        item={customizingItem}
+        isOpen={!!customizingItem}
+        onClose={() => setCustomizingItem(null)}
+        onAddToCart={handleCustomAdd}
+        shortcodes={shortcodes}
+      />
     </div>
   );
 }

@@ -3,6 +3,17 @@ const { authenticateToken } = require('../middleware/auth')
 const { prisma } = require('../lib/prisma')
 const { log } = require('../lib/activityLog')
 const router = express.Router()
+
+// Import clearExportCache from clients route
+let clearExportCache
+router.use((req, res, next) => {
+  // Lazy load to avoid circular dependency
+  if (!clearExportCache) {
+    clearExportCache = require('./clients').clearExportCache
+  }
+  next()
+})
+
 router.use(authenticateToken)
 
 router.get('/:clientId/menu-categories', async (req, res) => {
@@ -66,18 +77,31 @@ router.get('/:clientId/menu-items', async (req, res) => {
 
 router.post('/:clientId/menu-items', async (req, res) => {
   try {
-    const { categoryId, price, ...rest } = req.body
+    const { categoryId, price, sizes, addons, hasVariants, ...rest } = req.body
+    const clientId = req.params.clientId
+    
+    console.log('[API] Creating menu item with:', { name: rest.name, sizes, addons, hasVariants })
+    
     const item = await prisma.menuItem.create({
       data: {
         ...rest,
-        clientId: req.params.clientId,
+        clientId,
         price: price ? parseFloat(price) : null,
+        sizes: sizes || [],
+        addons: addons || [],
+        hasVariants: hasVariants || false,
         ...(categoryId ? { categoryId } : {})
       }
     })
+    
+    console.log('[API] Created menu item:', { id: item.id, sizes: item.sizes, addons: item.addons })
+    
+    // Clear export cache so preview sites get fresh data
+    if (clearExportCache) clearExportCache(clientId)
+    
     log({
       action: 'MENU_ITEM_ADDED', entity: 'MenuItem', entityName: item.name,
-      userId: req.user.id, userName: req.user.name, clientId: req.params.clientId
+      userId: req.user.id, userName: req.user.name, clientId
     })
     res.json(item)
   } catch (err) {
@@ -102,14 +126,27 @@ router.put('/:clientId/menu-items/reorder', async (req, res) => {
 
 router.put('/:clientId/menu-items/:id', async (req, res) => {
   try {
-    const { price, ...rest } = req.body
+    const { price, sizes, addons, hasVariants, ...rest } = req.body
+    const clientId = req.params.clientId
+    
+    console.log('[API] Updating menu item:', { id: req.params.id, sizes, addons, hasVariants })
+    
     const item = await prisma.menuItem.update({
       where: { id: req.params.id },
       data: {
         ...rest,
-        ...(price !== undefined ? { price: price ? parseFloat(price) : null } : {})
+        price: price !== undefined ? (price ? parseFloat(price) : null) : undefined,
+        sizes: sizes !== undefined ? sizes : undefined,
+        addons: addons !== undefined ? addons : undefined,
+        hasVariants: hasVariants !== undefined ? hasVariants : undefined
       }
     })
+    
+    console.log('[API] Updated menu item:', { id: item.id, sizes: item.sizes, addons: item.addons })
+    
+    // Clear export cache so preview sites get fresh data
+    if (clearExportCache) clearExportCache(clientId)
+    
     res.json(item)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -118,11 +155,14 @@ router.put('/:clientId/menu-items/:id', async (req, res) => {
 
 router.delete('/:clientId/menu-items/:id', async (req, res) => {
   try {
+    const clientId = req.params.clientId
     await prisma.menuItem.delete({ where: { id: req.params.id } })
     log({
       action: 'MENU_ITEM_DELETED', entity: 'MenuItem',
-      userId: req.user.id, userName: req.user.name, clientId: req.params.clientId
+      userId: req.user.id, userName: req.user.name, clientId
     })
+    // Clear export cache so preview sites get fresh data
+    if (clearExportCache) clearExportCache(clientId)
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })

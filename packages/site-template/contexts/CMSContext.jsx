@@ -204,18 +204,28 @@ function adaptCMSData(data) {
   });
 
   // Map menu categories and items
-  const menuItems = (rawMenuItems || []).map(item => ({
-    id: item.id,
-    categoryId: item.categoryId,
-    name: item.name,
-    description: item.description || '',
-    price: item.price || 0,
-    image: item.imageUrl || item.image || '',
-    isAvailable: item.isAvailable !== false,
-    isFeatured: item.isFeatured === true,
-    dietary: item.dietaryTags || [],
-    sortOrder: item.sortOrder || 0,
-  }));
+  const menuItems = (rawMenuItems || []).map(item => {
+    const sizes = item.sizes || [];
+    const addons = item.addons || [];
+    // Automatically set hasVariants if sizes or addons are present
+    const hasVariants = item.hasVariants === true || sizes.length > 0 || addons.length > 0;
+    
+    return {
+      id: item.id,
+      categoryId: item.categoryId,
+      name: item.name,
+      description: item.description || '',
+      price: item.price || 0,
+      image: item.imageUrl || item.image || '',
+      isAvailable: item.isAvailable !== false,
+      isFeatured: item.isFeatured === true,
+      dietary: item.dietaryTags || [],
+      sortOrder: item.sortOrder || 0,
+      sizes,
+      addons,
+      hasVariants,
+    };
+  });
 
   const mappedCategories = (menuCategories || []).map(cat => ({
     id: cat.id,
