@@ -4,10 +4,10 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "build": "node node_modules/prisma/build/index.js generate && node node_modules/prisma/build/index.js db push --skip-generate",
+    "build": "npx prisma generate",
     "start": "node src/index.js",
     "prisma:generate": "npx prisma generate",
-    "prisma:push": "npx prisma db push",
+    "prisma:push": "npx prisma db push --accept-data-loss",
     "prisma:seed": "node prisma/seed.js",
     "check:netlify": "node scripts/check-netlify-config.js",
     "debug:env": "node scripts/debug-env.js"
