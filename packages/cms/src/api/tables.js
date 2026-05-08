@@ -14,3 +14,6 @@ export const deleteTable = (clientId, locationId, tableId) =>
 
 export const generateQRCode = (clientId, locationId, tableId) =>
   api.post(`/clients/${clientId}/locations/${locationId}/tables/${tableId}/qrcode`).then(r => r.data)
+
+export const getMaxPartySize = (clientId, locationId) =>
+  api.get(`/clients/${clientId}/locations/${locationId}/max-party-size`).then(r => r.data)

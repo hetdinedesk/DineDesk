@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { deployClient, getDeploys, createNetlifySite, getNetlifyDeploys, deleteNetlifySite } from '../api/deployment'
 import { getLocations } from '../api/locations'
-import { getTables, createTable, deleteTable, generateQRCode } from '../api/tables'
+import { getTables, createTable, deleteTable, generateQRCode, getMaxPartySize } from '../api/tables'
 import { QRCodeSVG } from 'qrcode.react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -4346,6 +4346,13 @@ function TableManagementConfig({ clientId, config, setHasUnsavedChanges, activeK
     staleTime: 1000 * 30
   })
 
+  const { data: maxPartyData } = useQuery({
+    queryKey: ['maxPartySize', clientId, selectedLocation],
+    queryFn: () => getMaxPartySize(clientId, selectedLocation),
+    enabled: !!selectedLocation && activeTab === 'reservations',
+    staleTime: 1000 * 30
+  })
+
   useEffect(() => {
     if (locations.length > 0 && !selectedLocation) {
       setSelectedLocation(locations[0].id)
@@ -4600,7 +4607,20 @@ function TableManagementConfig({ clientId, config, setHasUnsavedChanges, activeK
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                     {inp('Min Party Size', 'minParty', 'e.g. 1')}
-                    {inp('Max Party Size', 'maxParty', 'e.g. 20')}
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                        textTransform:'uppercase', letterSpacing:'0.08em',
+                        display:'block', marginBottom:5 }}>Max Party Size</label>
+                      <div style={{
+                        padding:'9px 11px', background:C.panel,
+                        border:`1px solid ${C.border}`, borderRadius:7, color:C.t0, fontSize:13
+                      }}>
+                        {maxPartyData ? maxPartyData.maxPartySize : 'Loading...'}
+                      </div>
+                      <div style={{ fontSize:11, color:C.t3, marginTop:4 }}>
+                        Based on available table capacities
+                      </div>
+                    </div>
                     {inp('Advance Notice (hours)', 'advanceNotice', 'e.g. 2',
                       { hint: 'How many hours ahead a booking can be made' })}
                     {inp('Max Days Ahead', 'maxDaysAhead', 'e.g. 60',

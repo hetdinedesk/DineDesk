@@ -249,6 +249,52 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/qrcode', authentic
   }
 })
 
+// GET - Get max party size based on available tables
+router.get('/:clientId/locations/:locationId/max-party-size', async (req, res) => {
+  try {
+    const clientId = getClientId(req)
+    const { locationId } = req.params
+
+    // Get all active tables, ordered by capacity descending
+    const tables = await prisma.restaurantTable.findMany({
+      where: { clientId, locationId, isActive: true },
+      orderBy: { capacity: 'desc' }
+    })
+
+    if (tables.length === 0) {
+      return res.json({ maxPartySize: 0, availableCapacities: [] })
+    }
+
+    // Get tables with active bookings (excluding completed/cancelled)
+    const tablesWithBookings = await prisma.restaurantTable.findMany({
+      where: {
+        clientId,
+        locationId,
+        isActive: true,
+        booking: {
+          status: { in: ['pending', 'confirmed'] }
+        }
+      },
+      select: { id: true, capacity: true }
+    })
+
+    const bookedTableIds = tablesWithBookings.map(t => t.id)
+
+    // Find the highest capacity table that's not booked
+    const availableTables = tables.filter(t => !bookedTableIds.includes(t.id))
+    const maxPartySize = availableTables.length > 0 ? availableTables[0].capacity : tables[0].capacity
+
+    res.json({
+      maxPartySize,
+      availableCapacities: tables.map(t => t.capacity),
+      bookedCapacities: tablesWithBookings.map(t => t.capacity)
+    })
+  } catch (err) {
+    console.error('[TABLES] Max party size error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET - Get table by QR code (public endpoint for customer scanning)
 router.get('/qr/:clientId/:locationId/:tableNumber', async (req, res) => {
   try {
