@@ -160,6 +160,139 @@ router.get('/:id/bookings/availability', async (req, res) => {
   }
 })
 
+// Create booking for preview site
+router.post('/:id/bookings', async (req, res) => {
+  try {
+    const clientId = req.params.id
+    const { locationId, customerName, customerEmail, customerPhone, partySize, bookingDate, bookingTime, notes, confirmationMethod, tableId, autoAssignTable = false } = req.body
+
+    // Validate required fields
+    if (!customerName || !partySize || !bookingDate || !bookingTime || !confirmationMethod) {
+      return res.status(400).json({ error: 'Missing required fields' })
+    }
+
+    // Get client config to check maxTables
+    const siteConfig = await prisma.siteConfig.findUnique({
+      where: { id: clientId },
+      select: { booking: true }
+    })
+
+    const maxTables = siteConfig?.booking?.maxTables || 20
+
+    // Handle table assignment
+    let assignedTableId = tableId
+    
+    if (!assignedTableId && autoAssignTable && locationId) {
+      // Auto-assign the best fit table based on party size
+      const suitableTables = await prisma.restaurantTable.findMany({
+        where: {
+          clientId,
+          locationId,
+          capacity: { gte: parseInt(partySize) },
+          isActive: true,
+          bookingId: null // Not already booked
+        },
+        orderBy: { capacity: 'asc' } // Sort by capacity
+      })
+      
+      // Find the table with the smallest capacity that can accommodate the party
+      const bestFitTable = suitableTables.length > 0 ? suitableTables[0] : null
+      
+      if (bestFitTable) {
+        assignedTableId = bestFitTable.id
+      }
+    }
+
+    // If a table is specified, validate it's available
+    if (assignedTableId && locationId) {
+      const table = await prisma.restaurantTable.findFirst({
+        where: {
+          id: assignedTableId,
+          clientId,
+          locationId,
+          isActive: true
+        }
+      })
+      
+      if (!table) {
+        return res.status(400).json({ error: 'Table not found or inactive' })
+      }
+      
+      if (table.capacity < parseInt(partySize)) {
+        return res.status(400).json({ error: 'Table capacity insufficient for party size' })
+      }
+      
+      // Check if table is already booked for this time slot
+      const existingTableBooking = await prisma.booking.findFirst({
+        where: {
+          tableId: assignedTableId,
+          bookingDate: new Date(bookingDate),
+          bookingTime,
+          status: { in: ['pending', 'confirmed'] }
+        }
+      })
+      
+      if (existingTableBooking) {
+        return res.status(400).json({ error: 'Table already booked for this time slot' })
+      }
+    }
+
+    // Check availability - count existing bookings for the same date/time and location
+    const where = {
+      clientId,
+      bookingDate: new Date(bookingDate),
+      bookingTime,
+      status: { in: ['pending', 'confirmed'] }
+    }
+
+    // If locationId is provided, filter by location
+    if (locationId) {
+      where.locationId = locationId
+    }
+
+    const existingBookings = await prisma.booking.count({ where })
+
+    if (existingBookings >= maxTables) {
+      return res.status(400).json({ error: 'No tables available for this time slot' })
+    }
+
+    // Create booking
+    const booking = await prisma.booking.create({
+      data: {
+        clientId,
+        locationId,
+        customerName,
+        customerEmail,
+        customerPhone,
+        partySize: parseInt(partySize),
+        bookingDate: new Date(bookingDate),
+        bookingTime,
+        notes,
+        confirmationMethod,
+        tableId: assignedTableId || null,
+        status: 'pending'
+      },
+      include: {
+        location: true,
+        table: true
+      }
+    })
+
+    // If a table was assigned, update the table with the booking reference
+    if (assignedTableId) {
+      await prisma.restaurantTable.update({
+        where: { id: assignedTableId },
+        data: { bookingId: booking.id }
+      })
+    }
+
+    res.json(booking)
+  } catch (error) {
+    console.error('Booking creation error:', error)
+    res.status(500).json({ error: 'Failed to create booking' })
+  }
+})
+
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
