@@ -40,7 +40,8 @@ router.post('/', async (req, res) => {
       loyaltyCustomerId,
       pointsUsed = 0,
       rewardUsed = null,
-      discountAmount = 0
+      discountAmount = 0,
+      paymentPreference = 'pay_at_table'
     } = req.body
 
     // Validate required fields
