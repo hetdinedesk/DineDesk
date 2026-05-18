@@ -5,15 +5,17 @@ import { CMSProvider } from '../contexts/CMSContext'
 import { useState, useEffect } from 'react'
 import { Suspense } from 'react'
 
-// Dynamic theme loading
+// Dynamic theme loading with loading state
 function DynamicMenuTemplate({ themeKey, data, page, banner }) {
   const [Header, setHeader] = useState(null)
   const [Footer, setFooter] = useState(null)
   const [MenuTemplate, setMenuTemplate] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const theme = themeKey || 'theme-d1'
-    
+    setLoading(true)
+
     Promise.all([
       import(`../components/${theme}/Header`),
       import(`../components/${theme}/Footer`),
@@ -22,6 +24,7 @@ function DynamicMenuTemplate({ themeKey, data, page, banner }) {
       setHeader(() => headerModule.Header)
       setFooter(() => footerModule.Footer)
       setMenuTemplate(() => templateModule.default)
+      setLoading(false)
     }).catch(() => {
       // Fallback to theme-d1
       Promise.all([
@@ -32,9 +35,29 @@ function DynamicMenuTemplate({ themeKey, data, page, banner }) {
         setHeader(() => headerModule.Header)
         setFooter(() => footerModule.Footer)
         setMenuTemplate(() => templateModule.default)
+        setLoading(false)
       })
     })
   }, [themeKey])
+
+  // Show loading state while components are being loaded
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f5f5f5'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>
+            Loading menu...
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
