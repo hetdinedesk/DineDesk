@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle, Table } from 'lucide-react'
+import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle, Table, Calendar } from 'lucide-react'
 import { getOrders, updateOrderStatus } from '../api/orders'
 import { getLocations } from '../api/locations'
 import { toggleOrdering } from '../api/config'
 import { getTables, updateTableBookingStatus } from '../api/tables'
+import { getBookings, updateBookingStatus, deleteBooking } from '../api/bookings'
 import { C } from '../theme'
 
 const STATUS_COLORS = {
@@ -272,9 +273,45 @@ export default function OperationsSection({ clientId }) {
         ['completed', 'cancelled'].includes(o.status)
       )
     ),
-    enabled: !!selectedLocation, // Always fetch, not just when tab is active
+    enabled: !!selectedLocation,
     staleTime: 60 * 1000, // 1 minute for history
     gcTime: 10 * 60 * 1000 // Keep for 10 minutes
+  })
+
+  // Fetch bookings
+  const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
+    queryKey: ['bookings', clientId, selectedLocation],
+    queryFn: () => getBookings(clientId).then(data =>
+      data.filter(b => !selectedLocation || b.locationId === selectedLocation)
+    ),
+    enabled: !!selectedLocation,
+    refetchInterval: 30000, // Poll every 30 seconds
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000
+  })
+
+  // Update booking status mutation
+  const updateBookingStatusMutation = useMutation({
+    mutationFn: ({ bookingId, status }) => updateBookingStatus(bookingId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['bookings', clientId, selectedLocation])
+    },
+    onError: (error) => {
+      console.error('[CMS] Booking status update failed:', error)
+      alert('Failed to update booking status: ' + error.message)
+    }
+  })
+
+  // Delete booking mutation
+  const deleteBookingMutation = useMutation({
+    mutationFn: (bookingId) => deleteBooking(bookingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['bookings', clientId, selectedLocation])
+    },
+    onError: (error) => {
+      console.error('[CMS] Booking deletion failed:', error)
+      alert('Failed to delete booking: ' + error.message)
+    }
   })
 
   // Update order status mutation
@@ -465,7 +502,7 @@ export default function OperationsSection({ clientId }) {
         display: 'flex',
         flexShrink: 0
       }}>
-        {['live', 'history', 'tables', 'analytics', 'customers'].map(tab => (
+        {['live', 'history', 'bookings', 'tables', 'analytics', 'customers'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -484,6 +521,7 @@ export default function OperationsSection({ clientId }) {
           >
             {tab === 'live' && `Live Orders (${liveOrders.length})`}
             {tab === 'history' && `Order History (${historyOrders.length})`}
+            {tab === 'bookings' && `Bookings (${bookings.length})`}
             {tab === 'tables' && 'Tables'}
             {tab === 'analytics' && 'Analytics'}
             {tab === 'customers' && 'Customers'}
@@ -608,6 +646,16 @@ export default function OperationsSection({ clientId }) {
             historyOrders={historyOrders}
             onOrderClick={setSelectedOrder}
             onStatusChange={handleStatusChange}
+          />
+        )}
+
+        {/* Bookings */}
+        {activeTab === 'bookings' && (
+          <BookingsSection
+            bookings={bookings}
+            isLoading={bookingsLoading}
+            onStatusChange={(bookingId, status) => updateBookingStatusMutation.mutate({ bookingId, status })}
+            onDelete={deleteBookingMutation.mutate}
           />
         )}
 
@@ -1925,6 +1973,169 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
           <div style={{ fontSize: 12, marginTop: 4, color: C.t2 }}>
             Add tables in Config {'>'} Table Management
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Bookings Section Component
+function BookingsSection({ bookings, isLoading, onStatusChange, onDelete }) {
+  const [filter, setFilter] = useState('all')
+
+  const filteredBookings = bookings.filter(booking => {
+    if (filter === 'all') return true
+    return booking.status === filter
+  })
+
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  const STATUS_COLORS = {
+    pending: '#FFA500',
+    confirmed: '#00FF00',
+    cancelled: '#FF0000'
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.t0 }}>Bookings</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: C.t3 }}>
+            View and manage table bookings
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {['all', 'pending', 'confirmed', 'cancelled'].map(status => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              style={{
+                padding: '8px 16px',
+                border: `1px solid ${filter === status ? C.acc : C.border}`,
+                background: filter === status ? `${C.acc}20` : 'transparent',
+                color: filter === status ? C.acc : C.t2,
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textTransform: 'capitalize'
+              }}
+            >
+              {status} ({bookings.filter(b => status === 'all' || b.status === status).length})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>Loading bookings...</div>
+      ) : filteredBookings.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>
+          {filter === 'all' ? 'No bookings yet. Bookings made from your site will appear here.' : `No ${filter} bookings`}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 16 }}>
+          {filteredBookings.map(booking => (
+            <div key={booking.id} style={{
+              background: C.panel,
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+              padding: 20
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.t0 }}>{booking.customerName}</div>
+                  <div style={{ fontSize: 12, color: C.t2 }}>{booking.customerPhone}</div>
+                </div>
+                <span style={{
+                  padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                  background: `${STATUS_COLORS[booking.status]}20`,
+                  color: STATUS_COLORS[booking.status]
+                }}>
+                  {booking.status}
+                </span>
+              </div>
+
+              <div style={{ fontSize: 12, color: C.t2, marginBottom: 8 }}>
+                <div>📅 {formatDate(booking.bookingDate)} at {booking.bookingTime}</div>
+                <div>👥 Party of {booking.partySize}</div>
+                {booking.location && <div>📍 {booking.location.name}</div>}
+                {booking.table && <div>🪑 Table {booking.table.tableNumber}</div>}
+              </div>
+
+              {booking.notes && (
+                <div style={{ fontSize: 12, color: C.t2, marginBottom: 12, fontStyle: 'italic' }}>
+                  "{booking.notes}"
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                {booking.status === 'pending' && (
+                  <button
+                    onClick={() => onStatusChange(booking.id, 'confirmed')}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      background: C.green,
+                      border: 'none',
+                      borderRadius: 6,
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit'
+                    }}
+                  >
+                    Confirm
+                  </button>
+                )}
+                {booking.status === 'pending' && (
+                  <button
+                    onClick={() => onStatusChange(booking.id, 'cancelled')}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      background: C.red,
+                      border: 'none',
+                      borderRadius: 6,
+                      color: '#fff',
+                      fontWeight: 600,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (confirm('Delete this booking?')) {
+                      onDelete(booking.id)
+                    }
+                  }}
+                  style={{
+                    padding: '8px',
+                    background: 'transparent',
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 6,
+                    color: C.t2,
+                    fontWeight: 600,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
