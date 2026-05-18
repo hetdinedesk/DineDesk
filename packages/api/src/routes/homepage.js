@@ -30,7 +30,6 @@ router.get('/', async (req, res) => {
     }))
     res.json(sectionsWithDepartments)
   } catch (err) {
-    console.error('Get homepage error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -86,7 +85,6 @@ router.put('/', async (req, res) => {
     })
     res.json({ success: true })
   } catch (err) {
-    console.error('Save homepage error:', err)
     res.status(500).json({ error: err.message })
   }
 })

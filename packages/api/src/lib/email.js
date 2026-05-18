@@ -4,14 +4,7 @@ const sgMail = require('@sendgrid/mail')
 let transporter = null
 
 function getTransporter(config) {
-  console.log('[EMAIL] getTransporter called')
-  console.log('[EMAIL] smtpHost:', config.smtpHost)
-  console.log('[EMAIL] smtpUser:', config.smtpUser)
-  console.log('[EMAIL] smtpPort:', config.smtpPort)
-  console.log('[EMAIL] smtpPassword set:', !!config.smtpPassword)
-  
   if (config.smtpHost && config.smtpUser && config.smtpPassword) {
-    console.log('[EMAIL] Creating SMTP transporter...')
     // Force port 465 with SSL for cloud platforms like Railway
     const port = config.smtpPort === '465' ? 465 : 465
     const transporter = nodemailer.createTransport({
@@ -26,10 +19,8 @@ function getTransporter(config) {
         rejectUnauthorized: false // Allow self-signed certificates
       }
     })
-    console.log('[EMAIL] Transporter created successfully on port', port, 'with SSL')
     return transporter
   }
-  console.log('[EMAIL] Missing SMTP credentials, returning null')
   return null
 }
 
@@ -267,37 +258,24 @@ function generateEnquiryEmailHtml(enquiry, clientName, clientData = {}) {
 }
 
 async function sendOrderConfirmation(order, clientName, notificationConfig, clientData = {}, locationData = {}) {
-  console.log('[EMAIL] sendOrderConfirmation called')
-  console.log('[EMAIL] sendCustomerReceipt:', notificationConfig?.sendCustomerReceipt)
-  console.log('[EMAIL] notificationConfig:', JSON.stringify(notificationConfig, null, 2))
-  
   if (!notificationConfig?.sendCustomerReceipt) {
-    console.log('[EMAIL] Customer receipt disabled, skipping')
     return { success: false, message: 'Customer receipt disabled' }
   }
 
   try {
     // Try SendGrid first
     if (notificationConfig.sendgridApiKey) {
-      console.log('[EMAIL] Using SendGrid for customer receipt')
-      console.log('[EMAIL] SendGrid API key present:', !!notificationConfig.sendgridApiKey)
-      console.log('[EMAIL] SendGrid from email:', notificationConfig.sendgridFrom || notificationConfig.smtpFrom)
       return await sendSendGridEmail(order, clientName, 'customer', notificationConfig, clientData, locationData)
     }
     
     // Fallback to SMTP
-    console.log('[EMAIL] No SendGrid key, trying SMTP')
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
-      console.log('[EMAIL] SMTP not configured, using fallback')
       return sendFallbackEmail(order, clientName, 'customer', clientData, locationData)
     }
 
     const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
     const html = generateCustomerReceiptHtml(order, clientName, clientData, locationData)
-
-    console.log('[EMAIL] Attempting to send customer receipt to:', order.customerEmail)
-    console.log('[EMAIL] From:', fromEmail)
     
     try {
       await Promise.race([
@@ -311,55 +289,38 @@ async function sendOrderConfirmation(order, clientName, notificationConfig, clie
           setTimeout(() => reject(new Error('Email sending timeout after 10 seconds')), 10000)
         )
       ])
-      console.log('[EMAIL] Customer receipt sent successfully')
       return { success: true, message: 'Customer receipt sent' }
     } catch (err) {
-      console.error('[EMAIL] SMTP failed, using fallback:', err.message)
       return sendFallbackEmail(order, clientName, 'customer', clientData, locationData)
     }
   } catch (err) {
-    console.error('[EMAIL] Failed to send customer receipt:', err)
     return { success: false, message: err.message }
   }
 }
 
 async function sendRestaurantNotification(order, clientName, notificationConfig, restaurantEmail) {
-  console.log('[EMAIL] sendRestaurantNotification called')
-  console.log('[EMAIL] sendRestaurantNotification:', notificationConfig?.sendRestaurantNotification)
-  console.log('[EMAIL] restaurantEmail:', restaurantEmail)
-  
   if (!notificationConfig?.sendRestaurantNotification) {
-    console.log('[EMAIL] Restaurant notification disabled, skipping')
     return { success: false, message: 'Restaurant notification disabled' }
   }
 
   if (!restaurantEmail) {
-    console.log('[EMAIL] No restaurant email configured')
     return { success: false, message: 'No restaurant email configured' }
   }
 
   try {
     // Try SendGrid first
     if (notificationConfig.sendgridApiKey) {
-      console.log('[EMAIL] Using SendGrid for restaurant notification')
-      console.log('[EMAIL] SendGrid API key present:', !!notificationConfig.sendgridApiKey)
-      console.log('[EMAIL] SendGrid from email:', notificationConfig.sendgridFrom || notificationConfig.smtpFrom)
       return await sendSendGridEmail(order, clientName, 'restaurant', notificationConfig, {}, {}, restaurantEmail)
     }
     
     // Fallback to SMTP
-    console.log('[EMAIL] No SendGrid key, trying SMTP')
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
-      console.log('[EMAIL] SMTP not configured, using fallback')
       return sendFallbackEmail(order, clientName, 'restaurant', {}, {}, restaurantEmail)
     }
 
     const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
     const html = generateRestaurantNotificationHtml(order, clientName)
-
-    console.log('[EMAIL] Attempting to send restaurant notification to:', restaurantEmail)
-    console.log('[EMAIL] From:', fromEmail)
     
     try {
       await Promise.race([
@@ -373,24 +334,18 @@ async function sendRestaurantNotification(order, clientName, notificationConfig,
           setTimeout(() => reject(new Error('Email sending timeout after 10 seconds')), 10000)
         )
       ])
-      console.log('[EMAIL] Restaurant notification sent successfully')
       return { success: true, message: 'Restaurant notification sent' }
     } catch (err) {
-      console.error('[EMAIL] SMTP failed, using fallback:', err.message)
       return sendFallbackEmail(order, clientName, 'restaurant', {}, {}, restaurantEmail)
     }
   } catch (err) {
-    console.error('[EMAIL] Failed to send restaurant notification:', err)
     return { success: false, message: err.message }
   }
 }
 
 // SendGrid email function
 async function sendSendGridEmail(order, clientName, type, notificationConfig, clientData = {}, locationData = {}, restaurantEmail = null) {
-  console.log('[EMAIL] Using SendGrid for:', type)
-  
   if (!notificationConfig.sendgridApiKey) {
-    console.log('[EMAIL] SendGrid API key not configured')
     return sendFallbackEmail(order, clientName, type, clientData, locationData, restaurantEmail)
   }
 
@@ -413,48 +368,33 @@ async function sendSendGridEmail(order, clientName, type, notificationConfig, cl
       html: html
     }
 
-    console.log('[EMAIL] Sending via SendGrid to:', toEmail)
     await sgMail.send(msg)
-    console.log('[EMAIL] SendGrid email sent successfully')
     
     return { success: true, message: 'Email sent via SendGrid' }
   } catch (err) {
-    console.error('[EMAIL] SendGrid failed:', err.message)
     return sendFallbackEmail(order, clientName, type, clientData, locationData, restaurantEmail)
   }
 }
 
-// Fallback email function for when SMTP fails
+// Fallback email function for when SMTP/SendGrid fails
 async function sendFallbackEmail(order, clientName, type, clientData = {}, locationData = {}, restaurantEmail = null) {
-  console.log('[EMAIL] Using fallback email method for:', type)
+  // Log the failure for debugging - in production, implement a retry queue
+  const emailData = {
+    clientName,
+    orderNumber: order.orderNumber,
+    customerName: order.customerName,
+    customerEmail: order.customerEmail,
+    restaurantEmail: restaurantEmail || order.customerEmail,
+    type,
+    timestamp: new Date().toISOString(),
+    reason: 'No email provider configured or all providers failed'
+  }
   
-  try {
-    // Use a simple HTTP email service or log the email
-    const emailData = {
-      clientName,
-      orderNumber: order.orderNumber,
-      customerName: order.customerName,
-      customerEmail: order.customerEmail,
-      customerPhone: order.customerPhone,
-      restaurantEmail: restaurantEmail || order.customerEmail,
-      orderType: order.orderType,
-      total: order.total,
-      items: order.items,
-      type, // 'customer' or 'restaurant'
-      timestamp: new Date().toISOString()
-    }
-
-    // Store email in logs for now (you can integrate with SendGrid/Mailgun later)
-    console.log('[FALLBACK EMAIL] Email data:', JSON.stringify(emailData, null, 2))
-    
-    // For now, we'll just log it and return success
-    // In production, you would send this to a real email service
-    console.log(`[FALLBACK EMAIL] ${type === 'customer' ? 'Customer receipt' : 'Restaurant notification'} would be sent to ${emailData.restaurantEmail}`)
-    
-    return { success: true, message: `Email sent via fallback method` }
-  } catch (err) {
-    console.error('[EMAIL] Fallback email failed:', err)
-    return { success: false, message: err.message }
+  // Return failure so calling code knows email wasn't sent
+  return { 
+    success: false, 
+    message: 'Email delivery failed - no configured email provider available',
+    data: emailData
   }
 }
 

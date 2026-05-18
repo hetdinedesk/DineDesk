@@ -8,15 +8,33 @@ const { prisma } = require('../lib/prisma')
 const router = express.Router()
 const loginLimit = rateLimit({ windowMs: 60000, max: 10 })
 
+// JWT secret strength validation
+const validateJWTSecret = () => {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    return { valid: false, error: 'JWT_SECRET is not set' }
+  }
+  if (secret.length < 32) {
+    return { valid: false, error: 'JWT_SECRET must be at least 32 characters' }
+  }
+  if (secret === 'your-secret-key' || secret === 'secret' || secret === 'jwt-secret') {
+    return { valid: false, error: 'JWT_SECRET must be changed from default value' }
+  }
+  return { valid: true }
+}
+
 router.post('/login', loginLimit, async function(req, res) {
   try {
     const user = await prisma.user.findUnique({ where: { email: req.body.email } })
     if (!user) return res.status(401).json({ error: 'Invalid credentials' })
     const valid = await bcrypt.compare(req.body.password, user.password)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
-    if (!process.env.JWT_SECRET) {
+    
+    const secretValidation = validateJWTSecret()
+    if (!secretValidation.valid) {
       return res.status(500).json({ error: 'Server configuration error' })
     }
+    
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name, clientAccess: user.clientAccess || [] },
       process.env.JWT_SECRET,
@@ -31,7 +49,6 @@ router.post('/login', loginLimit, async function(req, res) {
   userId:user.id, userName:user.name })
   
   } catch(err) {
-    console.error('Login error:', err)
     res.status(500).json({ error: 'Server error' })
   }
 })

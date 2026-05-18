@@ -10,6 +10,7 @@
     "build": "npm install --prefix packages/site-template && npm run build --prefix packages/site-template"
   },
   "dependencies": {
-    "lucide-react": "^1.7.0"
+    "lucide-react": "^1.7.0",
+    "qrcode.react": "^4.2.0"
   }
 }

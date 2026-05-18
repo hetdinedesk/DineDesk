@@ -16,7 +16,7 @@ try {
   )
   analyticsClient = new BetaAnalyticsDataClient({ credentials })
 } catch (e) {
-  console.warn('GA4: could not parse service account key', e.message)
+  // GA4 service account key not configured
 }
 
 router.get('/', async (req, res) => {
@@ -75,7 +75,6 @@ router.get('/', async (req, res) => {
       }))
     })
   } catch (err) {
-    console.error('GA4 error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })

@@ -1178,7 +1178,6 @@ function FooterSectionsPanel ({ clientId, data, qc }) {
       // Reload data to get updated state
       qc.invalidateQueries({ queryKey: ['navbar', clientId] })
     } catch (err) {
-      console.error('Failed to assign link:', err)
       alert('Failed to assign link. Please try again.')
     }
   }

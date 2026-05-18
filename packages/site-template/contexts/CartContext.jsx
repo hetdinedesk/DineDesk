@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { getCurrentTableInfo, shouldUseDineInOrdering, getOrderType, getPaymentPreference } from '../lib/tableDetection';
 
 const CART_STORAGE_KEY = 'dinedesk_cart';
 const CART_EXPIRY_MINUTES = 10;
@@ -13,9 +14,10 @@ export const useCart = () => {
   return context;
 };
 
-export const CartProvider = ({ children, ordering = {} }) => {
+export const CartProvider = ({ children, ordering = {}, query = {} }) => {
   const [items, setItems] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [tableInfo, setTableInfo] = useState(null);
 
   const isEnabled = ordering?.enabled === true;
   const taxRate = ordering?.taxRate || 0;
@@ -39,8 +41,35 @@ export const CartProvider = ({ children, ordering = {} }) => {
         }
       }
     } catch (error) {
-      console.error('Failed to load cart from localStorage:', error);
+      // Failed to load cart from localStorage
     }
+  }, []);
+
+  // Load table information on mount
+  useEffect(() => {
+    const loadTableInfo = async () => {
+      try {
+        const currentTableInfo = await getCurrentTableInfo(query);
+        setTableInfo(currentTableInfo);
+      } catch (error) {
+        // Failed to load table info
+      }
+    };
+    
+    loadTableInfo();
+  }, [query]);
+
+  // Helper functions for table ordering
+  const isTableOrdering = shouldUseDineInOrdering(tableInfo);
+  const orderType = getOrderType(tableInfo);
+  const paymentPreference = getPaymentPreference(tableInfo);
+
+  const updateTableInfo = useCallback((info) => {
+    setTableInfo(info);
+  }, []);
+
+  const clearTableInfo = useCallback(() => {
+    setTableInfo(null);
   }, []);
 
   // Save cart to localStorage whenever items change
@@ -104,6 +133,10 @@ export const CartProvider = ({ children, ordering = {} }) => {
       taxLabel,
       total,
       ordering,
+      tableInfo,
+      isTableOrdering,
+      orderType,
+      paymentPreference,
       addItem,
       removeItem,
       updateQuantity,
@@ -111,6 +144,8 @@ export const CartProvider = ({ children, ordering = {} }) => {
       openCart,
       closeCart,
       toggleCart,
+      updateTableInfo,
+      clearTableInfo,
     }}>
       {children}
     </CartContext.Provider>

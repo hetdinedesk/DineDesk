@@ -16,6 +16,7 @@ import DashboardSection from './pages/DashboardSection'
 import OperationsSection from './pages/OperationsSection'
 import HomepageBanners from './pages/HomepageBanners'
 import { C } from './theme'
+import ErrorBoundary from './Components/ErrorBoundary'
 
 const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
@@ -440,13 +441,15 @@ export default function App() {
   return (
     <div className="cms-app" style={{ width:'100%', flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/site-admin/*" element={<SiteAdminApp />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/*" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
-          </Routes>
-        </BrowserRouter>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/site-admin/*" element={<SiteAdminApp />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/*" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
+            </Routes>
+          </BrowserRouter>
+        </ErrorBoundary>
       </QueryClientProvider>
     </div>
   )

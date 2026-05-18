@@ -197,7 +197,6 @@ function MenuItemsTab({ clientId }) {
         hasVariants: (newItem.sizes?.length > 0) || (newItem.addons?.length > 0),
         ...(categoryId ? { categoryId } : {})
       }
-      console.log('[CMS] Sending update with data:', updateData)
       return apiFetch(`/clients/${clientId}/menu-items/${editingId}`, 'PUT', updateData)
     },
     onSuccess: () => {
@@ -334,7 +333,6 @@ function MenuItemsTab({ clientId }) {
       }, 2000)
       
     } catch (err) {
-      console.error('JSON upload error:', err)
       setFormErr(err.message || 'Failed to process JSON file. Please check the format.')
       setIsProcessing(false)
       setProcessingStatus('')

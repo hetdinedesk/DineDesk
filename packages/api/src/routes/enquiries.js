@@ -1,9 +1,8 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../lib/prisma');
 const { sendEnquiryEmail } = require('../lib/email');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // POST /api/enquiries - Submit enquiry form
 router.post('/', async (req, res) => {
@@ -61,7 +60,6 @@ router.post('/', async (req, res) => {
     );
 
     if (!emailResult.success) {
-      console.error('[ENQUIRY] Failed to send email:', emailResult.message);
       // Still return success to user, but log the error
       // This prevents exposing SMTP configuration issues to users
     }
@@ -71,10 +69,9 @@ router.post('/', async (req, res) => {
       message: 'Enquiry submitted successfully' 
     });
   } catch (error) {
-    console.error('[ENQUIRY] Error submitting enquiry:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to submit enquiry' 
+      message: 'Failed to submit enquiry'
     });
   }
 });

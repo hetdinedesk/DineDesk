@@ -13,25 +13,38 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const corsOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
-  : [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:3001',
-      'http://localhost:3000'
-    ]
+  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+  : process.env.NODE_ENV === 'production'
+    ? [] // Require explicit CORS origins in production
+    : [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:3001',
+        'http://localhost:3000'
+      ]
+
+// Validate CORS origins in production
+if (process.env.NODE_ENV === 'production' && corsOrigins.length === 0) {
+  console.warn('⚠️  WARNING: CORS_ORIGINS not set in production. Only Netlify domains and same-origin requests will be allowed.')
+}
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow all Netlify domains (*.netlify.app) plus configured origins
-    const isNetlify = origin && origin.endsWith('.netlify.app')
-    const isConfigured = corsOrigins.includes(origin)
-    const isLocal = !origin // Allow requests with no origin (like mobile apps, curl)
-    
-    if (isNetlify || isConfigured || isLocal) {
-      callback(null, true)
+    // In production, require explicit CORS origins or Netlify domains
+    if (process.env.NODE_ENV === 'production') {
+      const isNetlify = origin && origin.endsWith('.netlify.app')
+      const isConfigured = corsOrigins.includes(origin)
+      const isSameOrigin = !origin // Allow requests with no origin (server-to-server, mobile apps)
+      
+      if (isNetlify || isConfigured || isSameOrigin) {
+        callback(null, true)
+      } else {
+        console.warn(`🚫 CORS blocked request from origin: ${origin}`)
+        callback(new Error(`CORS: Origin ${origin} not allowed`))
+      }
     } else {
-      callback(new Error('Not allowed by CORS'))
+      // In development, allow all origins
+      callback(null, true)
     }
   },
   credentials: true,

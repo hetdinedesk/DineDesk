@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import '../styles/theme-d1/index.css'
 import '../styles/theme-d2/index.css'
 import '../styles/theme-d3/index.css'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 // Dynamic theme loading
 function ThemeLoader({ themeKey, children }) {
@@ -128,16 +129,18 @@ export default function App({ Component, pageProps }) {
       {/* Theme CSS */}
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
-      <CartProvider ordering={data.ordering}>
-        <ThemeLoader themeKey={themeKey}>
-          {(CartDrawer) => (
-            <>
-              <Component {...pageProps}/>
-              {CartDrawer && <CartDrawer />}
-            </>
-          )}
-        </ThemeLoader>
-      </CartProvider>
+      <ErrorBoundary>
+        <CartProvider ordering={data.ordering}>
+          <ThemeLoader themeKey={themeKey}>
+            {(CartDrawer) => (
+              <>
+                <Component {...pageProps}/>
+                {CartDrawer && <CartDrawer />}
+              </>
+            )}
+          </ThemeLoader>
+        </CartProvider>
+      </ErrorBoundary>
     </>
   )
 }

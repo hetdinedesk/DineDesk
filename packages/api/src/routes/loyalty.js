@@ -33,7 +33,6 @@ router.get('/customers/:phone', async (req, res) => {
 
     res.json({ exists: true, customer })
   } catch (err) {
-    console.error('Customer lookup error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -85,7 +84,6 @@ router.post('/customers', async (req, res) => {
 
     res.json(customer)
   } catch (err) {
-    console.error('Customer creation error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -111,7 +109,6 @@ router.get('/config', async (req, res) => {
 
     res.json(config)
   } catch (err) {
-    console.error('Get loyalty config error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -140,12 +137,11 @@ router.post('/config', authenticateToken, async (req, res) => {
 
     res.json(config)
   } catch (err) {
-    console.error('Update loyalty config error:', err)
     res.status(500).json({ error: err.message })
   }
 })
 
-// Legacy routes for compatibility with current production API
+// Legacy routes for compatibility with current production API (DEPRECATED - use /config instead)
 // GET /api/clients/:clientId/loyalty/config - Get loyalty config (old path)
 router.get('/clients/:clientId/loyalty/config', async (req, res) => {
   try {
@@ -167,7 +163,6 @@ router.get('/clients/:clientId/loyalty/config', async (req, res) => {
 
     res.json(config)
   } catch (err) {
-    console.error('Get loyalty config error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -196,7 +191,6 @@ router.post('/clients/:clientId/loyalty/config', authenticateToken, async (req, 
 
     res.json(config)
   } catch (err) {
-    console.error('Update loyalty config error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -213,7 +207,6 @@ router.get('/rewards', async (req, res) => {
 
     res.json(rewards)
   } catch (err) {
-    console.error('Get rewards error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -253,7 +246,6 @@ router.post('/rewards', authenticateToken, async (req, res) => {
 
     res.json(reward)
   } catch (err) {
-    console.error('Create reward error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -278,7 +270,6 @@ router.patch('/rewards/:rewardId', authenticateToken, async (req, res) => {
 
     res.json(reward)
   } catch (err) {
-    console.error('Update reward error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -295,7 +286,6 @@ router.delete('/rewards/:rewardId', authenticateToken, async (req, res) => {
 
     res.json({ success: true })
   } catch (err) {
-    console.error('Delete reward error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -350,7 +340,6 @@ router.post('/redeem', async (req, res) => {
       pointsDeducted: reward.pointsRequired
     })
   } catch (err) {
-    console.error('Redeem reward error:', err)
     res.status(500).json({ error: err.message })
   }
 })

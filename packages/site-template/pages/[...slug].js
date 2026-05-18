@@ -6,42 +6,30 @@ import DOMPurify from 'dompurify'
 import { useState, useEffect } from 'react'
 import { Suspense } from 'react'
 
-// Clean HTML content - strip complex structures, keep basic text elements
+// DOMPurify configuration for allowed tags and attributes
+const DOMPURIFY_CONFIG = {
+  ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'br', 'a', 'span'],
+  ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+  ALLOW_DATA_ATTR: false,
+  SANITIZE_DOM: true,
+  KEEP_CONTENT: true
+}
+
+// Clean HTML content using DOMPurify for security
 const cleanPageContent = (html) => {
   if (!html) return ''
   
-  // Create a temporary div to parse HTML
-  const tempDiv = typeof document !== 'undefined' ? document.createElement('div') : { innerText: '' }
-  if (typeof document !== 'undefined') {
-    tempDiv.innerHTML = html
+  // DOMPurify only works in browser, not SSR
+  if (typeof window !== 'undefined' && DOMPurify) {
+    return DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
   }
   
-  // Extract text content but preserve basic structure
-  // We'll rebuild clean HTML with only allowed elements
-  const allowedTags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'br', 'a']
-  
-  let cleanHtml = html
-  
-  // Remove all div, section, article, etc. tags but keep their content
-  cleanHtml = cleanHtml.replace(/<(div|section|article|aside|header|footer|nav|main|figure|figcaption|span)([^>]*)>([\s\S]*?)<\/\1>/gi, '$3')
-  
-  // Remove grid, flex, and layout-related classes
-  cleanHtml = cleanHtml.replace(/\sclass="[^"]*?(grid|flex|col|row|gap|padding|margin|w-|h-|min-|max-|bg-|text-|shadow|rounded|border|transform|opacity)[^"]*"/gi, '')
-  
-  // Remove inline styles
-  cleanHtml = cleanHtml.replace(/\sstyle="[^"]*"/gi, '')
-  
-  // Remove empty paragraphs
-  cleanHtml = cleanHtml.replace(/<p>\s*<\/p>/gi, '')
-  cleanHtml = cleanHtml.replace(/<p><\/p>/gi, '')
-  
-  // Clean up extra whitespace
-  cleanHtml = cleanHtml.replace(/\s+/g, ' ')
-  
-  // Ensure paragraphs are properly wrapped
-  cleanHtml = cleanHtml.replace(/([^.!?])\n([^<])/g, '$1<p>$2')
-  
-  return cleanHtml
+  // Server-side fallback: basic HTML escaping
+  // Remove script tags and event handlers as basic protection
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript:/gi, '')
 }
 
 // Dynamic theme loading for templates

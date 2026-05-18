@@ -1,5 +1,6 @@
 const { log } = require('../lib/activityLog')
 const express = require('express')
+const rateLimit = require('express-rate-limit')
 const { prisma } = require('../lib/prisma')
 const { authenticateToken, requireRole } = require('../middleware/auth')
 const { validateSiteConfig } = require('../lib/validation')
@@ -10,12 +11,51 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const fs = require('fs')
 const path = require('path')
 
+// Rate limiting for public endpoints
+const availabilityLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+const bookingCreationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 bookings per 15 minutes per IP
+  message: { error: 'Too many booking attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
 // Generate short random ID (8 characters)
 const generateShortId = () => {
   return Math.random().toString(36).substring(2, 10)
 }
 
-const upload = multer({ storage: multer.memoryStorage() })
+// File upload configuration with validation
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    files: 1 // Only 1 file per request
+  },
+  fileFilter: (req, file, cb) => {
+    // Whitelist allowed MIME types
+    const allowedMimes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml'
+    ]
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true)
+    } else {
+      cb(new Error(`Invalid file type. Allowed types: ${allowedMimes.join(', ')}`), false)
+    }
+  }
+})
 
 // ═══════════════════════════════════════════════════════════
 // Storage Configuration
@@ -91,8 +131,8 @@ function clearExportCache(clientId) {
 // MUST stay above router.use(authenticateToken)
 // ═══════════════════════════════════════════════════════════════
 
-// Check booking availability for preview site
-router.get('/:id/bookings/availability', async (req, res) => {
+// Check booking availability for preview site - with rate limiting
+router.get('/:id/bookings/availability', availabilityLimiter, async (req, res) => {
   try {
     const clientId = req.params.id
     const { date, time, locationId } = req.query
@@ -160,8 +200,8 @@ router.get('/:id/bookings/availability', async (req, res) => {
   }
 })
 
-// Create booking for preview site
-router.post('/:id/bookings', async (req, res) => {
+// Create booking for preview site - with rate limiting
+router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
   try {
     const clientId = req.params.id
     const { locationId, customerName, customerEmail, customerPhone, partySize, bookingDate, bookingTime, notes, confirmationMethod, tableId, autoAssignTable = false } = req.body
@@ -269,12 +309,11 @@ router.post('/:id/bookings', async (req, res) => {
         bookingTime,
         notes,
         confirmationMethod,
-        tableId: assignedTableId || null,
         status: 'pending'
       },
       include: {
         location: true,
-        table: true
+        tables: true
       }
     })
 

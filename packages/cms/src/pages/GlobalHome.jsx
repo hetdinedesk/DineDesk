@@ -54,7 +54,6 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
     })
       .then(d => { setClients(Array.isArray(d) ? d : []); setLoadingClients(false) })
       .catch((err) => {
-        console.error('loadClients error:', err.message)
         setLoadingClients(false)
       })
   }
@@ -69,7 +68,6 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
     })
       .then(d => { setGroups(Array.isArray(d) ? d : []); setLoadingGroups(false) })
       .catch((err) => {
-        console.error('loadGroups error:', err.message)
         setLoadingGroups(false)
       })
   }

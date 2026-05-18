@@ -85,8 +85,6 @@ const getOrderProgressTime = (order) => {
   const diffMs = now - startTime
   const diffMins = Math.floor(diffMs / 60000)
   
-  console.log('Order progress for', order.id, 'status:', order.status, 'progress:', statusText)
-  
   return {
     statusText,
     progressPercent,

@@ -132,7 +132,6 @@ router.put('/', async (req, res) => {
     
     res.json({ success: true, count: flatItems.length })
   } catch (err) {
-    console.error('Save navigation error:', err)
     res.status(500).json({ error: err.message })
   }
 })

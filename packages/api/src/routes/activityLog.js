@@ -7,11 +7,28 @@ router.use(requireRole('SUPER_ADMIN'))
 
 router.get('/', async (req, res) => {
   try {
-    const logs = await prisma.activityLog.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 200
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 50
+    const skip = (page - 1) * limit
+
+    const [logs, total] = await Promise.all([
+      prisma.activityLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip
+      }),
+      prisma.activityLog.count()
+    ])
+
+    res.json({
+      logs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
     })
-    res.json(logs)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

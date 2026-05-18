@@ -42,7 +42,6 @@ router.get('/:clientId/locations/:locationId/tables', async (req, res) => {
     
     res.json(tables)
   } catch (err) {
-    console.error('[TABLES] Get tables error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -70,7 +69,6 @@ router.get('/:clientId/locations/:locationId/tables/:tableId', async (req, res) 
     
     res.json(table)
   } catch (err) {
-    console.error('[TABLES] Get table error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -123,7 +121,6 @@ router.post('/:clientId/locations/:locationId/tables', authenticateToken, async 
     
     res.status(201).json(table)
   } catch (err) {
-    console.error('[TABLES] Create table error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -173,7 +170,6 @@ router.put('/:clientId/locations/:locationId/tables/:tableId', authenticateToken
     
     res.json(table)
   } catch (err) {
-    console.error('[TABLES] Update table error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -213,7 +209,6 @@ router.delete('/:clientId/locations/:locationId/tables/:tableId', authenticateTo
     
     res.json({ success: true })
   } catch (err) {
-    console.error('[TABLES] Delete table error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -225,15 +220,12 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/booking-status', a
     const { locationId, tableId } = req.params
     const { isBooked, bookingId } = req.body
 
-    console.log('[TABLES] Booking status update:', { clientId, locationId, tableId, isBooked, bookingId })
-
     // Verify table belongs to client and location
     const table = await prisma.restaurantTable.findFirst({
       where: { id: tableId, clientId, locationId }
     })
 
     if (!table) {
-      console.log('[TABLES] Table not found:', { tableId, clientId, locationId })
       return res.status(404).json({ error: 'Table not found' })
     }
 
@@ -255,7 +247,6 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/booking-status', a
           }
         })
         actualBookingId = walkInBooking.id
-        console.log('[TABLES] Created walk-in booking:', walkInBooking.id)
       }
 
       // Update table with the booking ID
@@ -264,7 +255,6 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/booking-status', a
         data: { bookingId: actualBookingId }
       })
 
-      console.log('[TABLES] Table booked successfully:', updatedTable)
       res.json({ success: true, table: updatedTable })
     } else {
       // Unbook the table
@@ -273,12 +263,10 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/booking-status', a
         data: { bookingId: null }
       })
 
-      console.log('[TABLES] Table unbooked successfully:', updatedTable)
       res.json({ success: true, table: updatedTable })
     }
   } catch (err) {
-    console.error('[TABLES] Update booking status error:', err)
-    res.status(500).json({ error: err.message, details: err.stack })
+    res.status(500).json({ error: err.message })
   }
 })
 
@@ -308,7 +296,6 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/qrcode', authentic
     
     res.json({ qrCodeUrl, table: updatedTable })
   } catch (err) {
-    console.error('[TABLES] Generate QR code error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -354,7 +341,6 @@ router.get('/:clientId/locations/:locationId/max-party-size', async (req, res) =
       bookedCapacities: tablesWithBookings.map(t => t.capacity)
     })
   } catch (err) {
-    console.error('[TABLES] Max party size error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -396,7 +382,6 @@ router.get('/qr/:clientId/:locationId/:tableNumber', async (req, res) => {
       }
     })
   } catch (err) {
-    console.error('[TABLES] QR lookup error:', err)
     res.status(500).json({ error: err.message })
   }
 })

@@ -1,10 +1,29 @@
 const express = require('express')
+const rateLimit = require('express-rate-limit')
+const { authenticateToken } = require('../middleware/auth')
+const { prisma } = require('../lib/prisma')
+const { log } = require('../lib/activityLog')
 const router = express.Router()
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
 
-// Create a new booking
-router.post('/', async (req, res) => {
+// Rate limiting for public booking endpoints
+const bookingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per window per IP
+  message: { error: 'Too many booking attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+const availabilityLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  message: { error: 'Too many availability checks. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+// Create a new booking - with rate limiting
+router.post('/', bookingLimiter, async (req, res) => {
   try {
     const { clientId, locationId, customerName, customerEmail, customerPhone, partySize, bookingDate, bookingTime, notes, confirmationMethod, tableId, autoAssignTable = false } = req.body
 
@@ -94,39 +113,9 @@ router.post('/', async (req, res) => {
 
     const existingBookings = await prisma.booking.count({ where })
 
-    if (existingBookings >= actualMaxTables) {
+    if (existingBookings >= maxTables) {
       return res.status(400).json({ error: 'No tables available for this time slot' })
     }
-
-    // Get available tables for this time slot
-    const bookedTableIds = await prisma.booking.findMany({
-      where: {
-        clientId,
-        locationId,
-        bookingDate: new Date(date),
-        bookingTime: time,
-        status: { in: ['pending', 'confirmed'] }
-      },
-      select: { tableId: true }
-    })
-
-    const availableTables = await prisma.restaurantTable.findMany({
-      where: {
-        clientId,
-        locationId,
-        isActive: true,
-        id: { notIn: bookedTableIds.map(b => b.tableId).filter(Boolean) }
-      },
-      select: { id: true, tableNumber: true, capacity: true }
-    })
-
-    res.json({
-      available: true,
-      availableSlots: maxTables - existingBookings,
-      totalTables: actualMaxTables,
-      existingBookings,
-      availableTables
-    })
 
     // Create booking
     const booking = await prisma.booking.create({
@@ -257,13 +246,20 @@ router.get('/availability', async (req, res) => {
 
     const existingBookings = await prisma.booking.count({ where })
 
-    const availableTables = maxTables - existingBookings
+    // Calculate available tables
+    let availableTables = actualMaxTables - existingBookings
+    
+    // If no tables are configured, show 0 available
+    if (totalTables === 0) {
+      availableTables = 0
+    }
 
     res.json({
-      maxTables,
+      maxTables: actualMaxTables,
       existingBookings,
       availableTables,
-      isAvailable: availableTables > 0
+      isAvailable: availableTables > 0,
+      totalConfiguredTables: totalTables
     })
   } catch (error) {
     console.error('Availability check error:', error)

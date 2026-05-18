@@ -146,7 +146,7 @@ export default function ConfigSection({ clientId, user }) {
         }
       }
     } catch (err) {
-      console.warn('[Config] Failed to save active tab to sessionStorage:', err)
+      // Failed to save active tab to sessionStorage
     }
   }, [activeKey, clientId, navigate])
 
@@ -195,7 +195,6 @@ export default function ConfigSection({ clientId, user }) {
         default: return <div style={{color:C.t3}}>Coming soon.</div>
       }
     } catch (err) {
-      console.error('Render config error:', err)
       return (
         <div style={{ padding:40, background:C.card, borderRadius:12, border:`1px solid ${C.border}` }}>
           <h3 style={{ color:C.acc, marginBottom:10 }}>Section Error</h3>
@@ -411,9 +410,6 @@ function SiteSettings({ clientId, config, client, setHasUnsavedChanges }) {
     }).catch(() => {})
   },
   onError: (err) => {
-    console.error('Save failed:', err)
-    console.error('Error details:', err.response?.data)
-    
     const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
     alert(`Save failed: ${errorMsg}\n\nPlease try again.`)
   }
@@ -1091,13 +1087,11 @@ function SiteNotes({ clientId, config, setHasUnsavedChanges }) {
         const current = editor?.getHTML() || ''
         const updated = current.replace(localUrl, data.url)
         editor?.commands.setContent(updated, false)
-        console.log(`✅ Image uploaded: ${data.storage === 'local' ? 'Local storage' : 'R2'}`)
       } else {
         throw new Error(data.error || 'Upload failed')
       }
     } catch (err) {
       // Show error but keep local preview
-      console.error('Image upload failed:', err.message)
       // Don't replace the local URL - it will show as broken but that's better than nothing
     }
   }
@@ -1308,10 +1302,8 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange,
 
   const resizeImage = (file, width, height) => {
     return new Promise((resolve, reject) => {
-      console.log('Starting resize:', { originalSize: file.size, width, height })
       const img = new window.Image()
       img.onload = () => {
-        console.log('Image loaded:', { originalWidth: img.width, originalHeight: img.height })
         const canvas = document.createElement('canvas')
         canvas.width = parseInt(width)
         canvas.height = parseInt(height)
@@ -1319,17 +1311,14 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange,
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
         canvas.toBlob((blob) => {
           if (!blob) {
-            console.error('Failed to create blob from canvas')
             reject(new Error('Failed to resize image'))
             return
           }
           const resizedFile = new File([blob], file.name, { type: file.type })
-          console.log('Resize complete:', { originalSize: file.size, newSize: resizedFile.size })
           resolve(resizedFile)
         }, file.type)
       }
       img.onerror = (err) => {
-        console.error('Failed to load image:', err)
         reject(err)
       }
       img.src = URL.createObjectURL(file)
@@ -1340,25 +1329,18 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange,
     if (!file) return
     setUploading(true); setError(''); setProgress(0)
 
-    console.log('Upload started:', { fileName: file.name, fileSize: file.size, type: file.type })
-
     // Resize image if dimensions provided
     let finalFile = file
     if (resizeWidth && resizeHeight) {
-      console.log('Resize dimensions provided:', { resizeWidth, resizeHeight })
       try {
         setProgress(10)
         finalFile = await resizeImage(file, resizeWidth, resizeHeight)
-        console.log('Resize successful, new file size:', finalFile.size)
         setProgress(20)
       } catch (err) {
-        console.error('Resize failed:', err)
         setError('Failed to resize image')
         setUploading(false)
         return
       }
-    } else {
-      console.log('No resize dimensions provided, using original file')
     }
     
     // Validate file size (max 5MB)
@@ -1398,12 +1380,6 @@ function BrandUpload({ clientId, label, hint, accept='image/*', value, onChange,
       if (data.url) {
         setProgress(100)
         onChange(data.url)
-        // Show which storage was used
-        if (data.storage === 'local') {
-          console.log('✅ Image saved locally — configure R2 for production')
-        } else {
-          console.log('✅ Image uploaded to R2')
-        }
       } else {
         throw new Error('No URL returned from server')
       }
@@ -1601,9 +1577,6 @@ function BrandingConfig({ clientId, config, setHasUnsavedChanges }) {
       setHasUnsavedChanges(false)
     },
     onError: (err) => {
-      console.error('Branding save failed:', err)
-      console.error('Error details:', err.response?.data)
-      
       const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
       alert(`Save failed: ${errorMsg}\n\nPlease try again.`)
     }
@@ -2051,11 +2024,9 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
   const mutation = useMutation({
     mutationFn: () => {
       const data = { colours: { ...colours, theme: selected } }
-      console.log('[FRONTEND] Saving colours:', JSON.stringify(data.colours, null, 2))
       return saveConfig(clientId, data)
     },
     onSuccess: (response) => {
-      console.log('[FRONTEND] Save response colours:', JSON.stringify(response.colours, null, 2))
       qc.invalidateQueries(['config', clientId])
       savedColoursRef.current = colours
       savedSelectedRef.current = selected
@@ -2633,8 +2604,6 @@ function SocialLinksConfig({ clientId, config, setHasUnsavedChanges }) {
       setHasUnsavedChanges(false)
           },
     onError: (err) => {
-      console.error('Save failed:', err)
-      console.error('Error details:', err.response?.data)
       alert('Failed to save. Please try again.')
     }
   })
@@ -3093,7 +3062,6 @@ function HeaderConfig({ clientId, config, onNavigate, setHasUnsavedChanges }) {
       setHasUnsavedChanges(false)
           },
     onError: (err) => {
-      console.error('Save failed:', err)
       alert('Failed to save: ' + (err.response?.data?.error || err.message))
     }
   })
@@ -3594,9 +3562,6 @@ function ReviewsConfig({ clientId, config, setHasUnsavedChanges }) {
       setHasUnsavedChanges(false)
           },
     onError: (err) => {
-      console.error('Reviews save failed:', err)
-      console.error('Error details:', err.response?.data)
-      
       // Show user-friendly error message
       const errorMsg = err.response?.data?.error || err.message || 'Unknown error'
       alert(`Reviews save failed: ${errorMsg}\n\nPlease try again.`)
@@ -4349,7 +4314,7 @@ function TableManagementConfig({ clientId, config, setHasUnsavedChanges, activeK
   const { data: maxPartyData } = useQuery({
     queryKey: ['maxPartySize', clientId, selectedLocation],
     queryFn: () => getMaxPartySize(clientId, selectedLocation),
-    enabled: !!selectedLocation,
+    enabled: !!selectedLocation && activeTab === 'reservations',
     staleTime: 1000 * 30
   })
 
@@ -5056,7 +5021,6 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
           }
         }
       } catch (err) {
-        console.error('Polling error:', err)
         if (attempts < maxAttempts) {
           setTimeout(checkStatus, 10000)
         } else {
@@ -6063,7 +6027,7 @@ function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges, activeKey }) 
         savedRewardsRef.current = data.rewards || []
       }
     } catch (err) {
-      console.error('Failed to fetch loyalty config:', err)
+      // Failed to fetch loyalty config
     }
   }
 
@@ -6157,7 +6121,6 @@ function LoyaltyConfigUI({ clientId, config, setHasUnsavedChanges, activeKey }) 
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      console.error('Save failed:', err)
       setError(err.message || 'Failed to save loyalty configuration')
     } finally {
       setLoading(false)

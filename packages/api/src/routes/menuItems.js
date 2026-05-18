@@ -36,7 +36,6 @@ router.post('/:clientId/menu-categories', async (req, res) => {
     })
     res.json(cat)
   } catch (err) {
-    console.error('Create category error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -80,8 +79,6 @@ router.post('/:clientId/menu-items', async (req, res) => {
     const { categoryId, price, sizes, addons, hasVariants, ...rest } = req.body
     const clientId = req.params.clientId
     
-    console.log('[API] Creating menu item with:', { name: rest.name, sizes, addons, hasVariants })
-    
     const item = await prisma.menuItem.create({
       data: {
         ...rest,
@@ -94,8 +91,6 @@ router.post('/:clientId/menu-items', async (req, res) => {
       }
     })
     
-    console.log('[API] Created menu item:', { id: item.id, sizes: item.sizes, addons: item.addons })
-    
     // Clear export cache so preview sites get fresh data
     if (clearExportCache) clearExportCache(clientId)
     
@@ -105,7 +100,6 @@ router.post('/:clientId/menu-items', async (req, res) => {
     })
     res.json(item)
   } catch (err) {
-    console.error('Create menu item error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
@@ -129,8 +123,6 @@ router.put('/:clientId/menu-items/:id', async (req, res) => {
     const { price, sizes, addons, hasVariants, ...rest } = req.body
     const clientId = req.params.clientId
     
-    console.log('[API] Updating menu item:', { id: req.params.id, sizes, addons, hasVariants })
-    
     const item = await prisma.menuItem.update({
       where: { id: req.params.id },
       data: {
@@ -141,8 +133,6 @@ router.put('/:clientId/menu-items/:id', async (req, res) => {
         hasVariants: hasVariants !== undefined ? hasVariants : undefined
       }
     })
-    
-    console.log('[API] Updated menu item:', { id: item.id, sizes: item.sizes, addons: item.addons })
     
     // Clear export cache so preview sites get fresh data
     if (clearExportCache) clearExportCache(clientId)

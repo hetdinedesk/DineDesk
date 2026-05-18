@@ -1,25 +1,46 @@
+// Valid hex color regex
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/
+const SAFE_FONT_REGEX = /^[a-zA-Z0-9\s,\-']+$/
+
+// Sanitize color input - must be valid hex
+function sanitizeColor(color, defaultColor) {
+  if (!color || typeof color !== 'string') return defaultColor
+  const trimmed = color.trim()
+  if (!HEX_COLOR_REGEX.test(trimmed)) return defaultColor
+  return trimmed
+}
+
+// Sanitize font family input
+function sanitizeFont(font, defaultFont) {
+  if (!font || typeof font !== 'string') return defaultFont
+  const trimmed = font.trim()
+  if (!SAFE_FONT_REGEX.test(trimmed)) return defaultFont
+  // Prevent CSS injection by removing dangerous characters
+  return trimmed.replace(/[;{}]/g, '')
+}
+
 export function buildThemeCSS(colours, settings={}) {
   if (!colours) return ''
 
   const c = {
-    primary:    colours.primary    || '#C8823A',
-    secondary:  colours.secondary  || '#1C2B1A',
-    headerBg:   colours.headerBg   || '#ffffff',
-    headerText: colours.headerText || '#1A1A1A',
-    navBg:      colours.navBg      || '#1C2B1A',
-    navText:    colours.navText    || '#ffffff',
-    bodyBg:     colours.bodyBg     || '#ffffff',
-    bodyText:   colours.bodyText   || '#1A1A1A',
-    ctaBg:      colours.ctaBg      || '#C8823A',
-    ctaText:    colours.ctaText    || '#ffffff',
-    accentBg:   colours.accentBg   || '#F7F2EA',
-    utilityBeltBg: colours.utilityBeltBg || colours.primary,
-    utilityBeltText: colours.utilityBeltText || '#ffffff',
+    primary:    sanitizeColor(colours.primary, '#C8823A'),
+    secondary:  sanitizeColor(colours.secondary, '#1C2B1A'),
+    headerBg:   sanitizeColor(colours.headerBg, '#ffffff'),
+    headerText: sanitizeColor(colours.headerText, '#1A1A1A'),
+    navBg:      sanitizeColor(colours.navBg, '#1C2B1A'),
+    navText:    sanitizeColor(colours.navText, '#ffffff'),
+    bodyBg:     sanitizeColor(colours.bodyBg, '#ffffff'),
+    bodyText:   sanitizeColor(colours.bodyText, '#1A1A1A'),
+    ctaBg:      sanitizeColor(colours.ctaBg, '#C8823A'),
+    ctaText:    sanitizeColor(colours.ctaText, '#ffffff'),
+    accentBg:   sanitizeColor(colours.accentBg, '#F7F2EA'),
+    utilityBeltBg: sanitizeColor(colours.utilityBeltBg, colours.primary),
+    utilityBeltText: sanitizeColor(colours.utilityBeltText, '#ffffff'),
   }
 
   const fonts = {
-    heading: settings.fontFamily || 'Cormorant Garamond, serif',
-    body:    settings.bodyFont  || 'Inter, sans-serif'
+    heading: sanitizeFont(settings.fontFamily, 'Cormorant Garamond, serif'),
+    body:    sanitizeFont(settings.bodyFont, 'Inter, sans-serif')
   }
 
   return `

@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { MapPin, Menu, Home, Users, Tag, ShoppingCart, Settings, Layout, Image, PanelBottom, Building2, Megaphone, Store, CreditCard, Bell, Server, Wrench, Smartphone } from 'lucide-react'
 import LocationsList from '../Components/LocationsList'
-import NavbarSection from '../Components/NavbarSection'
-import TeamSection from '../Components/TeamSection'
+import NavbarSection from '../pages/NavbarSection'
+import TeamSection from '../pages/TeamSection'
+import HomepageBanners from './HomepageBanners'
+import PromoTiles from './PromoTiles'
+import WelcomeContent from './WelcomeContent'
 import Specials from '../pages/Specials'
-import OnlineOrderingSection from '../Components/OnlineOrderingSection'
+import OnlineOrderingSection from '../pages/OnlineOrderingSection'
+import HomepageBuilder from './HomepageBuilder'
 import { C } from '../theme'
 
 const LEFT = [
@@ -182,10 +186,10 @@ export default function CmsSection({ clientId, user }) {
     }
     if(lnav==='team') return <TeamSection clientId={clientId} subsection={rnav} />
     if(lnav==='homepage') {
-      if(rnav==='homepage-builder') return <div style={{color:C.t2,fontSize:14}}>Homepage Builder - Content coming soon.</div>
-      if(rnav==='promo-tiles') return <div style={{color:C.t2,fontSize:14}}>Promo Tiles - Content coming soon.</div>
-      if(rnav==='homepage-banners') return <div style={{color:C.t2,fontSize:14}}>Homepage Banners - Content coming soon.</div>
-      if(rnav==='content') return <div style={{color:C.t2,fontSize:14}}>Content - Content coming soon.</div>
+      if(rnav==='homepage-builder') return <HomepageBuilder clientId={clientId} />
+      if(rnav==='promo-tiles') return <PromoTiles clientId={clientId} />
+      if(rnav==='homepage-banners') return <HomepageBanners clientId={clientId} />
+      if(rnav==='content') return <WelcomeContent clientId={clientId} />
       return <div style={{color:C.t2,fontSize:14}}>Homepage section - Select a subsection from the sidebar.</div>
     }
     if(lnav==='specials') return <Specials clientId={clientId} />

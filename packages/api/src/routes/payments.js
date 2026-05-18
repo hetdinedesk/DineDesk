@@ -115,7 +115,6 @@ router.post('/create-intent', async (req, res) => {
       paymentIntentId: paymentIntent.id
     })
   } catch (err) {
-    console.error('Create PaymentIntent error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -127,7 +126,6 @@ router.post('/webhook', async (req, res) => {
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
 
     if (!endpointSecret) {
-      console.error('STRIPE_WEBHOOK_SECRET not configured — rejecting webhook')
       return res.status(500).json({ error: 'Webhook not configured' })
     }
 
@@ -136,7 +134,6 @@ router.post('/webhook', async (req, res) => {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
     } catch (err) {
-      console.error('Webhook signature verification failed:', err.message)
       return res.status(400).send(`Webhook Error: ${err.message}`)
     }
 
@@ -173,7 +170,6 @@ router.post('/webhook', async (req, res) => {
 
     res.json({ received: true })
   } catch (err) {
-    console.error('Webhook error:', err)
     res.status(500).json({ error: err.message })
   }
 })

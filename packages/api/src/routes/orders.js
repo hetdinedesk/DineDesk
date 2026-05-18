@@ -19,8 +19,6 @@ async function getNextOrderNumber(clientId) {
 
 // POST - Create order
 router.post('/', async (req, res) => {
-  console.log('[ORDER] Order creation endpoint hit')
-  console.log('[ORDER] Request body:', JSON.stringify(req.body, null, 2))
   try {
     const clientId = getClientId(req)
     const {
@@ -38,6 +36,7 @@ router.post('/', async (req, res) => {
       note,
       deliveryFee = 0,
       locationId,
+      tableId,
       loyaltyCustomerId,
       pointsUsed = 0,
       rewardUsed = null,
