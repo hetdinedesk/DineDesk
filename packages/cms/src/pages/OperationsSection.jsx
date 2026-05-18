@@ -143,7 +143,9 @@ export default function OperationsSection({ clientId }) {
       )
     ),
     refetchInterval: 5000, // Poll every 5 seconds for faster updates
-    enabled: !!selectedLocation
+    enabled: !!selectedLocation,
+    staleTime: 10 * 1000, // 10 seconds for live orders
+    gcTime: 5 * 60 * 1000 // Keep for 5 minutes
   })
 
   // Check for new orders and play notification sound
@@ -270,7 +272,9 @@ export default function OperationsSection({ clientId }) {
         ['completed', 'cancelled'].includes(o.status)
       )
     ),
-    enabled: !!selectedLocation && activeTab === 'history'
+    enabled: !!selectedLocation, // Always fetch, not just when tab is active
+    staleTime: 60 * 1000, // 1 minute for history
+    gcTime: 10 * 60 * 1000 // Keep for 10 minutes
   })
 
   // Update order status mutation

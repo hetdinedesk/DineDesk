@@ -23,8 +23,11 @@ const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes instead of 1 minute
+      gcTime: 10 * 60 * 1000, // Keep cache for 10 minutes
       refetchOnWindowFocus: false,
+      refetchOnMount: false, // Don't refetch on mount if data is fresh
+      refetchOnReconnect: true, // Refetch on reconnect
     },
   },
 })
@@ -34,11 +37,98 @@ function ProtectedRoute({ children }) {
   return token ? children : <Navigate to="/login" />
 }
 
+// Prefetch common site data in background for faster navigation
+const prefetchSiteData = async (siteId, token, queryClient) => {
+  try {
+    // Prefetch menu items
+    queryClient.prefetchQuery({
+      queryKey: ['menuItems', siteId],
+      queryFn: async () => {
+        const res = await fetch(`${API_URL}/clients/${siteId}/menuItems`, {
+          headers: { Authorization: 'Bearer ' + token }
+        })
+        if (!res.ok) throw new Error('Failed to fetch menu items')
+        return res.json()
+      },
+      staleTime: 5 * 60 * 1000
+    })
+
+    // Prefetch locations
+    queryClient.prefetchQuery({
+      queryKey: ['locations', siteId],
+      queryFn: async () => {
+        const res = await fetch(`${API_URL}/clients/${siteId}/locations`, {
+          headers: { Authorization: 'Bearer ' + token }
+        })
+        if (!res.ok) throw new Error('Failed to fetch locations')
+        return res.json()
+      },
+      staleTime: 10 * 60 * 1000
+    })
+
+    // Prefetch config
+    queryClient.prefetchQuery({
+      queryKey: ['config', siteId],
+      queryFn: async () => {
+        const res = await fetch(`${API_URL}/clients/${siteId}/config`, {
+          headers: { Authorization: 'Bearer ' + token }
+        })
+        if (!res.ok) throw new Error('Failed to fetch config')
+        return res.json()
+      },
+      staleTime: 5 * 60 * 1000
+    })
+
+    // Prefetch tables
+    queryClient.prefetchQuery({
+      queryKey: ['tables', siteId],
+      queryFn: async () => {
+        const res = await fetch(`${API_URL}/clients/${siteId}/tables`, {
+          headers: { Authorization: 'Bearer ' + token }
+        })
+        if (!res.ok) throw new Error('Failed to fetch tables')
+        return res.json()
+      },
+      staleTime: 10 * 60 * 1000
+    })
+
+    // Prefetch recent orders (last 50)
+    queryClient.prefetchQuery({
+      queryKey: ['orders', siteId, 'recent'],
+      queryFn: async () => {
+        const res = await fetch(`${API_URL}/clients/${siteId}/orders?limit=50`, {
+          headers: { Authorization: 'Bearer ' + token }
+        })
+        if (!res.ok) throw new Error('Failed to fetch orders')
+        return res.json()
+      },
+      staleTime: 30 * 1000 // Orders change more frequently
+    })
+
+    // Prefetch bookings
+    queryClient.prefetchQuery({
+      queryKey: ['bookings', siteId],
+      queryFn: async () => {
+        const res = await fetch(`${API_URL}/clients/${siteId}/bookings`, {
+          headers: { Authorization: 'Bearer ' + token }
+        })
+        if (!res.ok) throw new Error('Failed to fetch bookings')
+        return res.json()
+      },
+      staleTime: 2 * 60 * 1000 // Bookings change frequently
+    })
+
+  } catch (error) {
+    console.warn('Prefetch error (non-critical):', error.message)
+  }
+}
+
 function MainApp() {
   const navigate = useNavigate()
   const location = useLocation()
   const user = useAuthStore(s => s.user)
   const logout = useAuthStore(s => s.logout)
+  const qc = useQueryClient()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const isManager = user?.role === 'MANAGER'
   const canManageAll = isSuperAdmin || isManager
@@ -102,6 +192,9 @@ function MainApp() {
               setSiteNav(section)
               sessionStorage.setItem('dd_active_site', JSON.stringify(merged))
               sessionStorage.setItem('dd_site_nav', section)
+
+              // Prefetch common data in background for faster navigation
+              prefetchSiteData(siteId, token, qc)
               if (subsection) {
                 sessionStorage.setItem(`dd_${section}_subsection`, subsection)
               }
