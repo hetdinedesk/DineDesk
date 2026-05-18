@@ -328,17 +328,21 @@ export default function CustomTemplate({ data, page, banner }) {
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-6 pb-24">
         <div className={`grid gap-12 ${showEnquiryForm ? 'grid-cols-1 lg:grid-cols-2 items-stretch' : 'grid-cols-1'}`}>
-          {/* Content Column */}
+          {/* Content Column - Only shows CMS content, no auto location info */}
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
             className={`flex flex-col ${showEnquiryForm ? 'h-full' : ''}`}
           >
-            <div className={`bg-white rounded-[3rem] shadow-xl border border-[var(--color-secondary)]/10 ${showEnquiryForm ? 'p-10 lg:p-14 h-full flex flex-col' : 'p-8 lg:p-12'}`}>
+            <div className={`bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border border-gray-100 ${showEnquiryForm ? 'p-6 sm:p-10 lg:p-14 h-full flex flex-col' : 'p-6 sm:p-8 lg:p-12'}`}>
               <div
-                className={`prose prose-lg max-w-none text-[var(--color-secondary)]/80 leading-relaxed ${showEnquiryForm ? 'flex-1' : ''}`}
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
+                className={`prose prose-lg sm:prose-xl max-w-none text-gray-800 leading-relaxed ${showEnquiryForm ? 'flex-1' : ''}`}
+                style={{
+                  '--tw-prose-headings': 'var(--color-primary)',
+                  '--tw-prose-links': 'var(--color-secondary)',
+                  '--tw-prose-bold': 'var(--color-primary)',
+                }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cleanPageContent(content)) }}
               />
             </div>
           </motion.div>

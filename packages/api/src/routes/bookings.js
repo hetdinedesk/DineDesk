@@ -42,7 +42,25 @@ router.post('/', bookingLimiter, async (req, res) => {
 
     // Handle table assignment
     let assignedTableId = tableId
-    
+
+    // If no locationId provided, use the client's primary location
+    if (!locationId) {
+      const primaryLocation = await prisma.location.findFirst({
+        where: { clientId, isPrimary: true }
+      })
+      if (primaryLocation) {
+        locationId = primaryLocation.id
+      } else {
+        // Fallback to first location if no primary is set
+        const anyLocation = await prisma.location.findFirst({
+          where: { clientId }
+        })
+        if (anyLocation) {
+          locationId = anyLocation.id
+        }
+      }
+    }
+
     if (!assignedTableId && autoAssignTable && locationId) {
       // Auto-assign the best fit table based on party size
       const suitableTables = await prisma.restaurantTable.findMany({
@@ -55,10 +73,10 @@ router.post('/', bookingLimiter, async (req, res) => {
         },
         orderBy: { capacity: 'asc' } // Sort by capacity
       })
-      
+
       // Find the table with the smallest capacity that can accommodate the party
       const bestFitTable = suitableTables.length > 0 ? suitableTables[0] : null
-      
+
       if (bestFitTable) {
         assignedTableId = bestFitTable.id
       }

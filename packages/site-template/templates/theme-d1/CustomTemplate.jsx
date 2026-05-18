@@ -383,9 +383,14 @@ export default function CustomTemplate({ data, page, banner }) {
             animate={{ opacity: 1, x: 0 }}
             className={`flex flex-col ${showEnquiryForm ? 'h-full' : ''}`}
           >
-            <div className={`bg-white rounded-2xl shadow-xl ${showEnquiryForm ? 'p-6 sm:p-10 lg:p-14 h-full flex flex-col' : 'p-6 sm:p-8 lg:p-10'}`}>
+            <div className={`bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border border-gray-100 ${showEnquiryForm ? 'p-6 sm:p-10 lg:p-14 h-full flex flex-col' : 'p-6 sm:p-8 lg:p-12'}`}>
               <div
                 className={`prose prose-lg sm:prose-xl max-w-none text-gray-800 leading-relaxed ${showEnquiryForm ? 'flex-1' : ''}`}
+                style={{
+                  '--tw-prose-headings': 'var(--color-primary)',
+                  '--tw-prose-links': 'var(--color-secondary)',
+                  '--tw-prose-bold': 'var(--color-primary)',
+                }}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cleanPageContent(content)) }}
               />
             </div>

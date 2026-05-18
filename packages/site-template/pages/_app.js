@@ -40,7 +40,7 @@ export default function App({ Component, pageProps }) {
   const css       = buildThemeCSS(colours, settings)
   const isLive    = settings.indexing  === 'allowed'
   const siteName  = settings.displayName || settings.restaurantName || data.client?.name || 'Restaurant'
-  const faviconUrl = settings.favicon  || null
+  const faviconUrl = settings.favicon || colours.logoLight || colours.logoDark || null
   const themeKey  = data.themeKey || 'theme-d1'
 
   return (
@@ -53,7 +53,7 @@ export default function App({ Component, pageProps }) {
 
         {/* Favicon */}
         {faviconUrl && <link rel="icon" href={faviconUrl}/>}
-        {faviconUrl && <link rel="shortcut icon" href={faviconUrl}/>}
+        {faviconUrl && <link rel="apple-touch-icon" href={faviconUrl}/>}
         {!faviconUrl && <link rel="icon" href="/favicon.ico"/>}
 
         {/* Robots */}
