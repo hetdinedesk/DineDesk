@@ -502,7 +502,7 @@ export default function OperationsSection({ clientId }) {
         display: 'flex',
         flexShrink: 0
       }}>
-        {['live', 'history', 'bookings', 'tables', 'analytics', 'customers'].map(tab => (
+        {['live', 'history', 'tables', 'analytics', 'customers'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -521,7 +521,6 @@ export default function OperationsSection({ clientId }) {
           >
             {tab === 'live' && `Live Orders (${liveOrders.length})`}
             {tab === 'history' && `Order History (${historyOrders.length})`}
-            {tab === 'bookings' && `Bookings (${bookings.length})`}
             {tab === 'tables' && 'Tables'}
             {tab === 'analytics' && 'Analytics'}
             {tab === 'customers' && 'Customers'}
@@ -649,22 +648,12 @@ export default function OperationsSection({ clientId }) {
           />
         )}
 
-        {/* Bookings */}
-        {activeTab === 'bookings' && (
-          <BookingsSection
-            bookings={bookings}
-            isLoading={bookingsLoading}
-            onStatusChange={(bookingId, status) => updateBookingStatusMutation.mutate({ bookingId, status })}
-            onDelete={deleteBookingMutation.mutate}
-          />
-        )}
-
-        {/* Tables */}
+        {/* Tables (combined with Bookings) */}
         {activeTab === 'tables' && (
           <TablesTab
             clientId={clientId}
             selectedLocation={selectedLocation}
-            liveOrders={liveOrders}
+            bookings={bookings}
             queryClient={queryClient}
           />
         )}
@@ -681,6 +670,7 @@ export default function OperationsSection({ clientId }) {
         {activeTab === 'customers' && (
           <CustomersSection 
             historyOrders={historyOrders}
+            clientId={clientId}
           />
         )}
       </div>
@@ -1094,9 +1084,19 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
 }
 
 // Enhanced Customer Management Component (Loyalty Program)
-function CustomersSection({ historyOrders }) {
+function CustomersSection({ historyOrders, clientId }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState(null)
+  
+  // Fetch loyalty config
+  const { data: config } = useQuery({
+    queryKey: ['config', clientId],
+    queryFn: () => getLocations(clientId).then(() => ({})), // Simplified for now
+    enabled: false // Disable for now, will implement properly
+  })
+
+  // Points earning rate (default 1 point per dollar, configurable)
+  const pointsPerDollar = 1
   
   // Extract unique customers from orders (phone numbers as loyalty accounts)
   const customers = {}
@@ -1113,17 +1113,41 @@ function CustomersSection({ historyOrders }) {
         orderCount: 0,
         totalSpent: 0,
         loyaltyPoints: 0,
+        pointsEarned: 0,
+        pointsUsed: 0,
         lastOrder: order.createdAt,
         firstOrder: order.createdAt,
         orders: [],
-        averageOrderValue: 0
+        averageOrderValue: 0,
+        tier: 'Bronze'
       }
     }
     
     customers[key].orderCount += 1
     customers[key].totalSpent += order.total || 0
-    customers[key].loyaltyPoints += Math.floor((order.total || 0) * 0.1) // 10% of order value as points
+    
+    // Calculate points earned (1 point per dollar)
+    const pointsEarned = Math.floor((order.total || 0) * pointsPerDollar)
+    customers[key].pointsEarned += pointsEarned
+    
+    // Handle points used from order
+    if (order.pointsUsed) {
+      customers[key].pointsUsed += order.pointsUsed
+    }
+    
+    // Calculate net loyalty points
+    customers[key].loyaltyPoints = customers[key].pointsEarned - customers[key].pointsUsed
+    
     customers[key].orders.push(order)
+    
+    // Determine tier based on total spent
+    if (customers[key].totalSpent >= 1000) {
+      customers[key].tier = 'Gold'
+    } else if (customers[key].totalSpent >= 500) {
+      customers[key].tier = 'Silver'
+    } else {
+      customers[key].tier = 'Bronze'
+    }
     
     // Update first order date if earlier
     const orderDate = new Date(order.createdAt)
@@ -1161,18 +1185,30 @@ function CustomersSection({ historyOrders }) {
     })
   }
   
+  const getTierColor = (tier) => {
+    switch(tier) {
+      case 'Gold': return '#FFD700'
+      case 'Silver': return '#C0C0C0'
+      case 'Bronze': return '#CD7F32'
+      default: return '#999'
+    }
+  }
+  
   return (
     <div>
-      <h3 style={{ 
-        fontSize: '18px', 
-        fontWeight: 'bold', 
-        color: C.t0, 
-        marginBottom: '20px',
-        textTransform: 'uppercase',
-        letterSpacing: '0.07em'
-      }}>
-        Customer Loyalty Program
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.t0 }}>Customers</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: C.t3 }}>
+            View customer loyalty and order history
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: C.t3 }}>
+            {Object.keys(customers).length} total customers
+          </span>
+        </div>
+      </div>
       
       {/* Search */}
       <div style={{ marginBottom: 16 }}>
@@ -1199,7 +1235,7 @@ function CustomersSection({ historyOrders }) {
         overflow: 'hidden' 
       }}>
         {filteredCustomers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: C.t3 }}>
+          <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>
             No customers found
           </div>
         ) : (
@@ -1235,6 +1271,16 @@ function CustomersSection({ historyOrders }) {
                     }}>
                       {customer.name}
                     </div>
+                    <span style={{
+                      background: `${getTierColor(customer.tier)}20`,
+                      color: getTierColor(customer.tier),
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      fontSize: '10px',
+                      fontWeight: '600'
+                    }}>
+                      {customer.tier}
+                    </span>
                     <span style={{
                       background: C.acc,
                       color: 'white',
@@ -1307,7 +1353,7 @@ function CustomersSection({ historyOrders }) {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000
-        }}>
+        }} onClick={() => setSelectedCustomer(null)}>
           <div style={{
             background: C.panel,
             borderRadius: '12px',
@@ -1316,17 +1362,30 @@ function CustomersSection({ historyOrders }) {
             width: '90%',
             maxHeight: '80vh',
             overflowY: 'auto'
-          }}>
+          }} onClick={e => e.stopPropagation()}>
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ 
-                fontSize: '18px', 
-                fontWeight: 'bold', 
-                color: C.t0, 
-                margin: 0 
-              }}>
-                Customer Profile: {selectedCustomer.name}
-              </h3>
+              <div>
+                <h3 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: 'bold', 
+                  color: C.t0, 
+                  margin: 0,
+                  marginBottom: 4
+                }}>
+                  {selectedCustomer.name}
+                </h3>
+                <span style={{
+                  background: `${getTierColor(selectedCustomer.tier)}20`,
+                  color: getTierColor(selectedCustomer.tier),
+                  padding: '4px 12px',
+                  borderRadius: 12,
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}>
+                  {selectedCustomer.tier} Member
+                </span>
+              </div>
               <button
                 onClick={() => setSelectedCustomer(null)}
                 style={{
@@ -1365,13 +1424,13 @@ function CustomersSection({ historyOrders }) {
               
               <div style={{ padding: '12px', background: C.page, borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', fontWeight: '700', color: C.t3, textTransform: 'uppercase', marginBottom: 4 }}>
-                  Loyalty Stats
+                  Loyalty Points
                 </div>
                 <div style={{ fontSize: '16px', fontWeight: 'bold', color: C.acc, marginBottom: 4 }}>
                   {selectedCustomer.loyaltyPoints} Points
                 </div>
-                <div style={{ fontSize: '12px', color: C.t3 }}>
-                  Member since: {formatDate(selectedCustomer.firstOrder)}
+                <div style={{ fontSize: '11px', color: C.t3 }}>
+                  Earned: {selectedCustomer.pointsEarned} | Used: {selectedCustomer.pointsUsed}
                 </div>
               </div>
             </div>
@@ -1379,7 +1438,7 @@ function CustomersSection({ historyOrders }) {
             {/* Order Stats */}
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gridTemplateColumns: 'repeat(4, 1fr)', 
               gap: '12px', 
               marginBottom: '20px' 
             }}>
@@ -1387,7 +1446,7 @@ function CustomersSection({ historyOrders }) {
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.green, marginBottom: 4 }}>
                   {selectedCustomer.orderCount}
                 </div>
-                <div style={{ fontSize: '11px', color: C.t3 }}>Total Orders</div>
+                <div style={{ fontSize: '11px', color: C.t3 }}>Orders</div>
               </div>
               
               <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
@@ -1401,7 +1460,14 @@ function CustomersSection({ historyOrders }) {
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.t0, marginBottom: 4 }}>
                   ${selectedCustomer.averageOrderValue.toFixed(2)}
                 </div>
-                <div style={{ fontSize: '11px', color: C.t3 }}>Average Order</div>
+                <div style={{ fontSize: '11px', color: C.t3 }}>Avg Order</div>
+              </div>
+              
+              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: getTierColor(selectedCustomer.tier), marginBottom: 4 }}>
+                  {selectedCustomer.tier}
+                </div>
+                <div style={{ fontSize: '11px', color: C.t3 }}>Tier</div>
               </div>
             </div>
             
@@ -1796,8 +1862,8 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
   )
 }
 
-// ── Tables Tab ────────────────────────────────────────────────
-function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
+// ── Tables Tab (combined with Bookings) ────────────────────────────────────────────────
+function TablesTab({ clientId, selectedLocation, bookings, queryClient }) {
   const { data: tables = [], isLoading } = useQuery({
     queryKey: ['tables', clientId, selectedLocation],
     queryFn: () => getTables(clientId, selectedLocation),
@@ -1806,6 +1872,30 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
   })
 
   const updateBookingMutation = useMutation({
+    mutationFn: ({ bookingId, status }) => updateBookingStatus(bookingId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['bookings', clientId, selectedLocation])
+      queryClient.invalidateQueries(['tables', clientId, selectedLocation])
+    },
+    onError: (error) => {
+      console.error('[CMS] Booking status update failed:', error)
+      alert('Failed to update booking status: ' + error.message)
+    }
+  })
+
+  const deleteBookingMutation = useMutation({
+    mutationFn: (bookingId) => deleteBooking(bookingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['bookings', clientId, selectedLocation])
+      queryClient.invalidateQueries(['tables', clientId, selectedLocation])
+    },
+    onError: (error) => {
+      console.error('[CMS] Booking deletion failed:', error)
+      alert('Failed to delete booking: ' + error.message)
+    }
+  })
+
+  const updateTableBookingMutation = useMutation({
     mutationFn: ({ tableId, isBooked, bookingId }) =>
       updateTableBookingStatus(clientId, selectedLocation, tableId, { isBooked, bookingId }),
     onSuccess: () => {
@@ -1820,25 +1910,13 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
   const toggleBooking = (tableId, currentBookingId) => {
     if (currentBookingId) {
       // Unbook the table
-      updateBookingMutation.mutate({
+      updateTableBookingMutation.mutate({
         tableId,
         isBooked: false
       })
     } else {
-      // Check if table has active dine-in orders before allowing walk-in
-      const hasDineInOrders = liveOrders.some(o => 
-        o.tableId === tableId && 
-        ['new', 'accepted', 'preparing', 'ready'].includes(o.status)
-      )
-      
-      if (hasDineInOrders) {
-        // Table has active dine-in orders, don't allow walk-in booking
-        alert('This table has active dine-in orders. Walk-in booking is not allowed to prevent cross-booking.')
-        return
-      }
-      
       // Book the table for walk-in (API will create a real booking record)
-      updateBookingMutation.mutate({
+      updateTableBookingMutation.mutate({
         tableId,
         isBooked: true
       })
@@ -1857,21 +1935,37 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
     return <div style={{ textAlign: 'center', padding: 40 }}>Loading tables...</div>
   }
 
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  const STATUS_COLORS = {
+    pending: '#FFA500',
+    confirmed: '#00FF00',
+    cancelled: '#FF0000'
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.t0 }}>Tables</h2>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.t0 }}>Tables & Bookings</h2>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: C.t3 }}>
-            View orders by table and manage walk-in bookings
+            Manage tables and view assigned bookings
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 16 }}>
         {tables.map(table => {
-          const tableOrders = liveOrders.filter(o => o.tableId === table.id)
           const isBooked = !!table.bookingId
+          const tableBooking = bookings.find(b => b.id === table.bookingId)
+          const upcomingBookings = bookings.filter(b => 
+            b.tableId === table.id && 
+            b.status !== 'cancelled' &&
+            new Date(b.bookingDate) >= new Date()
+          )
 
           return (
             <div key={table.id} style={{
@@ -1891,7 +1985,7 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
                     background: isBooked ? `${C.amber}20` : `${C.green}20`,
                     color: isBooked ? C.amber : C.green
                   }}>
-                    {isBooked ? 'Booked' : 'Available'}
+                    {isBooked ? 'Occupied' : 'Available'}
                   </span>
                   <span style={{
                     padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
@@ -1903,48 +1997,111 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
                 </div>
               </div>
 
-              {/* Orders for this table */}
-              {tableOrders.length > 0 ? (
+              {/* Current/Upcoming Bookings */}
+              {(tableBooking || upcomingBookings.length > 0) && (
                 <div style={{ background: C.card, borderRadius: 8, padding: 12, marginBottom: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, marginBottom: 8 }}>
-                    Active Orders ({tableOrders.length})
+                    Bookings ({(tableBooking ? 1 : 0) + upcomingBookings.length})
                   </div>
-                  {tableOrders.map(order => (
-                    <div key={order.id} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '8px 0', borderBottom: `1px solid ${C.border2}`
+                  {tableBooking && (
+                    <div style={{
+                      padding: '8px',
+                      background: `${C.amber}20`,
+                      borderRadius: 6,
+                      marginBottom: 8
                     }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: C.t0 }}>
-                          #{order.orderNumber}
-                        </div>
-                        <div style={{ fontSize: 11, color: C.t2 }}>
-                          {order.orderType} • ${order.total}
-                        </div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.t0, marginBottom: 4 }}>
+                        {tableBooking.customerName}
                       </div>
-                      <span style={{
-                        padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
-                        background: `${STATUS_COLORS[order.status]}20`,
-                        color: STATUS_COLORS[order.status]
-                      }}>
-                        {STATUS_LABELS[order.status]}
-                      </span>
+                      <div style={{ fontSize: 11, color: C.t2, marginBottom: 4 }}>
+                        {formatDate(tableBooking.bookingDate)} at {tableBooking.bookingTime}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.t2, marginBottom: 8 }}>
+                        Party of {tableBooking.partySize}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {tableBooking.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => updateBookingMutation.mutate({ bookingId: tableBooking.id, status: 'confirmed' })}
+                              style={{
+                                flex: 1,
+                                padding: '6px',
+                                background: C.green,
+                                border: 'none',
+                                borderRadius: 4,
+                                color: '#fff',
+                                fontWeight: 600,
+                                fontSize: 11,
+                                cursor: 'pointer',
+                                fontFamily: 'inherit'
+                              }}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => updateBookingMutation.mutate({ bookingId: tableBooking.id, status: 'cancelled' })}
+                              style={{
+                                flex: 1,
+                                padding: '6px',
+                                background: C.red,
+                                border: 'none',
+                                borderRadius: 4,
+                                color: '#fff',
+                                fontWeight: 600,
+                                fontSize: 11,
+                                cursor: 'pointer',
+                                fontFamily: 'inherit'
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm('Release this table from booking?')) {
+                            }}
+                          }
+                          style={{
+                            padding: '6px',
+                            background: 'transparent',
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 4,
+                            color: C.t2,
+                            fontWeight: 600,
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            fontFamily: 'inherit'
+                          }}
+                        >
+                          Release
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {upcomingBookings.filter(b => b.id !== tableBooking?.id).map(booking => (
+                    <div key={booking.id} style={{
+                      padding: '8px',
+                      background: C.page,
+                      borderRadius: 6,
+                      marginBottom: 4
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.t0, marginBottom: 2 }}>
+                        {booking.customerName}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.t2 }}>
+                        {formatDate(booking.bookingDate)} at {booking.bookingTime} • Party of {booking.partySize}
+                      </div>
                     </div>
                   ))}
-                </div>
-              ) : (
-                <div style={{
-                  background: C.card, borderRadius: 8, padding: 12, marginBottom: 12,
-                  textAlign: 'center', fontSize: 12, color: C.t3
-                }}>
-                  No active orders
                 </div>
               )}
 
               {/* Walk-in booking toggle */}
               <button
                 onClick={() => toggleBooking(table.id, table.bookingId)}
-                disabled={updateBookingMutation.isPending}
+                disabled={updateTableBookingMutation.isPending}
                 style={{
                   width: '100%',
                   padding: '10px',
@@ -1956,7 +2113,7 @@ function TablesTab({ clientId, selectedLocation, liveOrders, queryClient }) {
                   fontSize: 13,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
-                  opacity: updateBookingMutation.isPending ? 0.5 : 1
+                  opacity: updateTableBookingMutation.isPending ? 0.5 : 1
                 }}
               >
                 {isBooked ? 'Mark as Available' : 'Mark as Booked (Walk-in)'}
