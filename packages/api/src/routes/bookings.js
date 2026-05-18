@@ -268,13 +268,14 @@ router.get('/availability', async (req, res) => {
 })
 
 // Get all bookings for a client
-router.get('/:clientId', async (req, res) => {
+router.get('/:clientId/bookings', async (req, res) => {
   try {
     const { clientId } = req.params
     const bookings = await prisma.booking.findMany({
       where: { clientId },
       include: {
-        location: true
+        location: true,
+        table: true
       },
       orderBy: { bookingDate: 'desc' }
     })

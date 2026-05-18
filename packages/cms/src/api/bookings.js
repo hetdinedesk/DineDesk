@@ -1,7 +1,7 @@
 import api from './client'
 
 export const getBookings = (clientId) =>
-  api.get(`/bookings/${clientId}`).then(r => r.data)
+  api.get(`/clients/${clientId}/bookings`).then(r => r.data)
 
 export const getLocationBookings = (locationId) =>
   api.get(`/bookings/location/${locationId}`).then(r => r.data)
