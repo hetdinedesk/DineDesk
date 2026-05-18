@@ -780,6 +780,15 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           <Phone size={14} color={C.t2} />
           <span style={{ fontSize: 13, color: C.t2 }}>{order.customerPhone}</span>
         </div>
+        {/* Table Number for QR/Table Orders */}
+        {order.tableId && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <Table size={14} color={C.acc} />
+            <span style={{ fontSize: 13, color: C.acc, fontWeight: 600 }}>
+              Table {order.tableNumber || order.tableId}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Order Progress */}
@@ -839,9 +848,9 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
       </div>
 
       {/* Total */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         paddingTop: 12,
         borderTop: `1px solid ${C.border}20`
@@ -852,9 +861,16 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
             {formatCurrency(order.total)}
           </span>
         </div>
-        <span style={{ fontSize: 11, color: C.t3, textTransform: 'capitalize' }}>
-          {order.orderType}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {!order.tableId && (
+            <>
+              <MapPin size={12} color={C.t2} />
+              <span style={{ fontSize: 11, color: C.t2, textTransform: 'capitalize' }}>
+                {order.orderType}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Accept/Decline buttons for new orders */}
