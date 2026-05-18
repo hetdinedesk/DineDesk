@@ -48,7 +48,9 @@ router.post('/', async (req, res) => {
       smtpPort: client.settings?.smtpPort || 587,
       smtpUser: client.settings?.smtpUser,
       smtpPassword: client.settings?.smtpPassword,
-      smtpFrom: client.settings?.smtpFrom
+      smtpFrom: client.settings?.smtpFrom,
+      sendgridApiKey: client.settings?.sendgridApiKey,
+      sendgridFrom: client.settings?.sendgridFrom
     };
 
     // Send email

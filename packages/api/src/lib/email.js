@@ -399,33 +399,52 @@ async function sendFallbackEmail(order, clientName, type, clientData = {}, locat
 }
 
 async function sendEnquiryEmail(enquiry, clientName, notificationConfig, clientData = {}) {
-  if (!notificationConfig?.smtpHost || !notificationConfig?.smtpUser || !notificationConfig?.smtpPassword) {
-    return { success: false, message: 'SMTP not configured' }
+  // Get recipient email from client settings or primary email
+  const toEmail = clientData.email || clientData.settings?.email || clientData.settings?.defaultEmail || notificationConfig.smtpFrom
+
+  if (!toEmail) {
+    return { success: false, message: 'No recipient email configured' }
   }
 
   try {
-    const emailTransporter = getTransporter(notificationConfig)
-    if (!emailTransporter) {
-      return { success: false, message: 'Failed to create email transporter' }
+    // Try SendGrid first
+    if (notificationConfig.sendgridApiKey) {
+      sgMail.setApiKey(notificationConfig.sendgridApiKey)
+
+      const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
+
+      const msg = {
+        to: toEmail,
+        from: notificationConfig.sendgridFrom || notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`,
+        subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
+        html: html
+      }
+
+      await sgMail.send(msg)
+      return { success: true, message: 'Enquiry email sent via SendGrid' }
     }
 
-    const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
-    const toEmail = clientData.email || clientData.settings?.defaultEmail || notificationConfig.smtpFrom
+    // Fallback to SMTP
+    if (notificationConfig?.smtpHost && notificationConfig?.smtpUser && notificationConfig?.smtpPassword) {
+      const emailTransporter = getTransporter(notificationConfig)
+      if (!emailTransporter) {
+        return { success: false, message: 'Failed to create email transporter' }
+      }
 
-    if (!toEmail) {
-      return { success: false, message: 'No recipient email configured' }
+      const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
+      const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
+
+      await emailTransporter.sendMail({
+        from: fromEmail,
+        to: toEmail,
+        subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
+        html
+      })
+
+      return { success: true, message: 'Enquiry email sent via SMTP' }
     }
 
-    const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
-
-    await emailTransporter.sendMail({
-      from: fromEmail,
-      to: toEmail,
-      subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
-      html
-    })
-
-    return { success: true, message: 'Enquiry email sent' }
+    return { success: false, message: 'No email provider configured (SendGrid or SMTP)' }
   } catch (err) {
     console.error('[EMAIL] Failed to send enquiry email:', err)
     return { success: false, message: err.message }
