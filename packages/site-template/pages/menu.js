@@ -4,6 +4,7 @@ import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
 import { useState, useEffect } from 'react'
 import { Suspense } from 'react'
+import { FloatingCartIcon } from '../components/theme-d1/FloatingCartIcon'
 
 // Dynamic theme loading with loading state
 function DynamicMenuTemplate({ themeKey, data, page, banner }) {
@@ -111,6 +112,7 @@ export default function Page({ data, template }) {
       <Suspense fallback={<div>Loading...</div>}>
         <DynamicMenuTemplate themeKey={template} data={data} page={page} banner={banner} />
       </Suspense>
+      <FloatingCartIcon />
     </CMSProvider>
   )
 }
