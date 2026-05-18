@@ -19,8 +19,11 @@ api.interceptors.response.use(
   function(err) {
     if (err.response) {
       if (err.response.status === 401) {
-        localStorage.removeItem('dd_token')
-        window.location.href = '/login'
+        // Only redirect if not already on login page to prevent redirect loop
+        if (window.location.pathname !== '/login') {
+          localStorage.removeItem('dd_token')
+          window.location.href = '/login'
+        }
       }
       // Note: 404 errors are handled by individual components/pages.
       // Do NOT clear session or redirect here — it causes redirect loops.

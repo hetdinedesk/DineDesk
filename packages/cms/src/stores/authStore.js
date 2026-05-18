@@ -15,7 +15,10 @@ export const useAuthStore = create((set) => ({
   logout: () => {
     localStorage.removeItem('dd_token')
     set({ user: null, token: null })
-    window.location.href = '/login'
+    // Only redirect if not already on login page to prevent redirect loop
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
   },
 
   loadUser: async () => {
