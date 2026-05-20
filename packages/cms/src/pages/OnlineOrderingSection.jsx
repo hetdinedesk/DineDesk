@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle } from 'lucide-react'
+import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle, CheckCircle, ExternalLink, Unlink, RefreshCw } from 'lucide-react'
 import { getConfig, saveConfig } from '../api/config'
-import { getPayments, savePayments } from '../api/payments'
+import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe } from '../api/payments'
 import { C } from '../theme'
 
 const labelStyle = { display:'block', fontSize:12, fontWeight:600, color:C.t2, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.5px' }
@@ -407,128 +407,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
       )}
 
       {subsection === 'payment-settings' && (
-        <>
-          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-              <CreditCard size={16} style={{ color:C.acc }} />
-              <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Stripe Configuration</span>
-            </div>
-
-            <ToggleSwitch
-              label='Test Mode'
-              checked={paymentForm.testMode}
-              onChange={() => updatePayment('testMode', !paymentForm.testMode)}
-            />
-            <p style={{ fontSize:12, color:C.t3, margin:'4px 0 12px' }}>
-              Use test keys for development. Switch to live keys for production.
-            </p>
-
-            {paymentForm.testMode ? (
-              <>
-                <div style={{ marginBottom:12 }}>
-                  <label style={labelStyle}>Test Secret Key</label>
-                  <input
-                    type='password'
-                    value={paymentForm.testSecretKey || ''}
-                    onChange={e => updatePayment('testSecretKey', e.target.value)}
-                    style={inputStyle}
-                    placeholder='sk_test_...'
-                  />
-                </div>
-                <div style={{ marginBottom:12 }}>
-                  <label style={labelStyle}>Test Publishable Key</label>
-                  <input
-                    type='text'
-                    value={paymentForm.testPublishableKey || ''}
-                    onChange={e => updatePayment('testPublishableKey', e.target.value)}
-                    style={inputStyle}
-                    placeholder='pk_test_...'
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ marginBottom:12 }}>
-                  <label style={labelStyle}>Live Secret Key</label>
-                  <input
-                    type='password'
-                    value={paymentForm.liveSecretKey || ''}
-                    onChange={e => updatePayment('liveSecretKey', e.target.value)}
-                    style={inputStyle}
-                    placeholder='sk_live_...'
-                  />
-                </div>
-                <div style={{ marginBottom:12 }}>
-                  <label style={labelStyle}>Live Publishable Key</label>
-                  <input
-                    type='text'
-                    value={paymentForm.livePublishableKey || ''}
-                    onChange={e => updatePayment('livePublishableKey', e.target.value)}
-                    style={inputStyle}
-                    placeholder='pk_live_...'
-                  />
-                </div>
-              </>
-            )}
-
-            <div style={{ marginBottom:12 }}>
-              <label style={labelStyle}>Currency</label>
-              <select
-                value={paymentForm.currency || 'AUD'}
-                onChange={e => updatePayment('currency', e.target.value)}
-                style={selectStyle}
-              >
-                <option value='AUD'>AUD - Australian Dollar</option>
-                <option value='USD'>USD - US Dollar</option>
-                <option value='GBP'>GBP - British Pound</option>
-                <option value='EUR'>EUR - Euro</option>
-                <option value='NZD'>NZD - New Zealand Dollar</option>
-                <option value='CAD'>CAD - Canadian Dollar</option>
-              </select>
-            </div>
-          </div>
-
-          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-              <DollarSign size={16} style={{ color:C.acc }} />
-              <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Cash Payment</span>
-            </div>
-
-            <ToggleSwitch
-              label='Enable Cash / Pay at Pickup'
-              checked={paymentForm.cashEnabled}
-              onChange={() => updatePayment('cashEnabled', !paymentForm.cashEnabled)}
-            />
-
-            {paymentForm.cashEnabled && (
-              <div style={{ marginTop:12 }}>
-                <label style={labelStyle}>Payment Label</label>
-                <input
-                  type='text'
-                  value={paymentForm.cashLabel || ''}
-                  onChange={e => updatePayment('cashLabel', e.target.value)}
-                  style={inputStyle}
-                  placeholder='Pay at Pickup'
-                />
-                <p style={hintStyle}>Text shown to customers for the cash payment option</p>
-              </div>
-            )}
-          </div>
-
-          <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:20 }}>
-            <button onClick={() => paymentMutation.mutate()} disabled={paymentMutation.isPending || !hasPaymentChanges}
-              style={{
-                padding:'10px 28px', background: (paymentMutation.isPending || !hasPaymentChanges) ? C.card : C.acc,
-                border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
-                cursor: (paymentMutation.isPending || !hasPaymentChanges) ? 'not-allowed' : 'pointer', fontFamily:'inherit',
-                boxShadow: (paymentMutation.isPending || !hasPaymentChanges) ? 'none' : `0 4px 16px ${C.acc}50`
-              }}>
-              {paymentMutation.isPending ? 'Saving…' : 'Save Payment Settings'}
-            </button>
-            {paymentMutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
-            {paymentMutation.isError && <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Failed</span>}
-          </div>
-        </>
+        <StripeConnectPanel clientId={clientId} paymentConfig={paymentConfig} paymentForm={paymentForm} updatePayment={updatePayment} paymentMutation={paymentMutation} hasPaymentChanges={hasPaymentChanges} />
       )}
 
       {subsection === 'notifications' && (
@@ -885,5 +764,240 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
         </>
       )}
     </div>
+  )
+}
+
+function StripeConnectPanel({ clientId, paymentConfig, paymentForm, updatePayment, paymentMutation, hasPaymentChanges }) {
+  const qc = useQueryClient()
+  const [connectLoading, setConnectLoading] = useState(false)
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [disconnectLoading, setDisconnectLoading] = useState(false)
+  const [connectError, setConnectError] = useState(null)
+
+  const { data: connectStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
+    queryKey: ['stripeConnect', clientId],
+    queryFn: () => getStripeConnectStatus(clientId),
+    enabled: !!clientId,
+    refetchInterval: false
+  })
+
+  const isConnected = connectStatus?.status === 'connected'
+  const isPending = connectStatus?.status === 'pending'
+
+  const handleConnect = async () => {
+    setConnectLoading(true)
+    setConnectError(null)
+    try {
+      const { url } = await createStripeConnectLink(clientId)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      // Poll status after a short delay so user sees update when they return
+      setTimeout(() => refetchStatus(), 3000)
+    } catch (err) {
+      setConnectError(err?.response?.data?.error || err.message || 'Failed to start Stripe Connect')
+    } finally {
+      setConnectLoading(false)
+    }
+  }
+
+  const handleDashboard = async () => {
+    setLoginLoading(true)
+    try {
+      const { url } = await createStripeLoginLink(clientId)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setConnectError(err?.response?.data?.error || err.message || 'Failed to open Stripe dashboard')
+    } finally {
+      setLoginLoading(false)
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!window.confirm('Disconnect Stripe? Customers will no longer be able to pay by card until you reconnect.')) return
+    setDisconnectLoading(true)
+    setConnectError(null)
+    try {
+      await disconnectStripe(clientId)
+      qc.invalidateQueries({ queryKey: ['stripeConnect', clientId] })
+      qc.invalidateQueries({ queryKey: ['payments', clientId] })
+    } catch (err) {
+      setConnectError(err?.response?.data?.error || err.message || 'Failed to disconnect')
+    } finally {
+      setDisconnectLoading(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Stripe Connect card */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 24px', marginBottom:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+          <CreditCard size={16} style={{ color:C.acc }} />
+          <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Stripe Payments</span>
+        </div>
+        <p style={{ fontSize:13, color:C.t3, marginBottom:20, marginTop:4 }}>
+          Connect your Stripe account so customers can pay by card. You keep 100% of revenue — funds go directly to your Stripe account.
+        </p>
+
+        {statusLoading ? (
+          <div style={{ display:'flex', alignItems:'center', gap:8, color:C.t3, fontSize:13 }}>
+            <RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }} />
+            Checking connection…
+          </div>
+        ) : isConnected ? (
+          <>
+            {/* Connected state */}
+            <div style={{ background:'#052e16', border:'1px solid #166534', borderRadius:10, padding:'16px 18px', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                <CheckCircle size={18} style={{ color:'#4ade80' }} />
+                <span style={{ fontSize:14, fontWeight:700, color:'#4ade80' }}>Stripe Connected</span>
+              </div>
+              {connectStatus?.businessName && (
+                <div style={{ fontSize:13, color:'#86efac', marginBottom:4 }}>
+                  <strong>Account:</strong> {connectStatus.businessName}
+                </div>
+              )}
+              {connectStatus?.email && (
+                <div style={{ fontSize:13, color:'#86efac', marginBottom:4 }}>
+                  <strong>Email:</strong> {connectStatus.email}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:8, marginTop:4, flexWrap:'wrap' }}>
+                <span style={{ fontSize:11, background: connectStatus?.chargesEnabled ? '#166534' : '#7f1d1d', color: connectStatus?.chargesEnabled ? '#4ade80' : '#fca5a5', padding:'2px 8px', borderRadius:20, fontWeight:600 }}>
+                  {connectStatus?.chargesEnabled ? '✓ Charges enabled' : '✗ Charges disabled'}
+                </span>
+                <span style={{ fontSize:11, background: connectStatus?.payoutsEnabled ? '#166534' : '#78350f', color: connectStatus?.payoutsEnabled ? '#4ade80' : '#fcd34d', padding:'2px 8px', borderRadius:20, fontWeight:600 }}>
+                  {connectStatus?.payoutsEnabled ? '✓ Payouts enabled' : '⚠ Payouts pending'}
+                </span>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+              <button onClick={handleDashboard} disabled={loginLoading}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 18px', background:'#6366f1', border:'none', borderRadius:8, color:'#fff', fontWeight:600, fontSize:13, cursor: loginLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                <ExternalLink size={14} />
+                {loginLoading ? 'Opening…' : 'Open Stripe Dashboard'}
+              </button>
+              <button onClick={() => refetchStatus()}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', background:C.card, border:`1px solid ${C.border2}`, borderRadius:8, color:C.t1, fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                <RefreshCw size={14} />
+                Refresh
+              </button>
+              <button onClick={handleDisconnect} disabled={disconnectLoading}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', background:'transparent', border:'1px solid #ef4444', borderRadius:8, color:'#ef4444', fontWeight:600, fontSize:13, cursor: disconnectLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                <Unlink size={14} />
+                {disconnectLoading ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+          </>
+        ) : isPending ? (
+          <>
+            {/* Pending / onboarding incomplete state */}
+            <div style={{ background:'#1c1407', border:'1px solid #92400e', borderRadius:10, padding:'14px 18px', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                <AlertTriangle size={16} style={{ color:'#fbbf24' }} />
+                <span style={{ fontSize:13, fontWeight:700, color:'#fbbf24' }}>Onboarding Incomplete</span>
+              </div>
+              <p style={{ fontSize:12, color:'#fcd34d', margin:0 }}>
+                Your Stripe account has been created but you haven't finished setting it up. Click below to complete onboarding.
+              </p>
+            </div>
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+              <button onClick={handleConnect} disabled={connectLoading}
+                style={{ display:'flex', alignItems:'center', gap:8, padding:'11px 22px', background:'#635bff', border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14, cursor: connectLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit', boxShadow:'0 4px 16px #635bff50' }}>
+                <CreditCard size={16} />
+                {connectLoading ? 'Opening Stripe…' : 'Continue Stripe Setup'}
+              </button>
+              <button onClick={handleDisconnect} disabled={disconnectLoading}
+                style={{ padding:'11px 16px', background:'transparent', border:`1px solid ${C.border2}`, borderRadius:8, color:C.t2, fontWeight:600, fontSize:13, cursor: disconnectLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                {disconnectLoading ? 'Cancelling…' : 'Cancel'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Not connected state */}
+            <div style={{ background:'#0f172a', border:`1px solid ${C.border}`, borderRadius:10, padding:'16px 18px', marginBottom:16 }}>
+              <p style={{ fontSize:13, color:C.t2, margin:'0 0 8px', fontWeight:600 }}>How it works:</p>
+              <ol style={{ fontSize:13, color:C.t3, margin:0, paddingLeft:18, lineHeight:1.8 }}>
+                <li>Click <strong style={{ color:C.t1 }}>Connect Stripe</strong> below</li>
+                <li>Create a new Stripe account or log into an existing one</li>
+                <li>Complete the short onboarding (takes ~2 min)</li>
+                <li>You're done — card payments go directly to your account</li>
+              </ol>
+            </div>
+            <button onClick={handleConnect} disabled={connectLoading}
+              style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 24px', background:'#635bff', border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:15, cursor: connectLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit', boxShadow:'0 4px 20px #635bff60' }}>
+              <CreditCard size={18} />
+              {connectLoading ? 'Opening Stripe…' : 'Connect Stripe'}
+            </button>
+          </>
+        )}
+
+        {connectError && (
+          <div style={{ marginTop:12, padding:'10px 14px', background:'#450a0a', border:'1px solid #ef4444', borderRadius:8, fontSize:13, color:'#fca5a5' }}>
+            {connectError}
+          </div>
+        )}
+      </div>
+
+      {/* Currency + Cash options (always visible) */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+          <DollarSign size={16} style={{ color:C.acc }} />
+          <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Payment Options</span>
+        </div>
+
+        <div style={{ marginBottom:14 }}>
+          <label style={labelStyle}>Currency</label>
+          <select
+            value={paymentForm.currency || 'AUD'}
+            onChange={e => updatePayment('currency', e.target.value)}
+            style={selectStyle}
+          >
+            <option value='AUD'>AUD - Australian Dollar</option>
+            <option value='USD'>USD - US Dollar</option>
+            <option value='GBP'>GBP - British Pound</option>
+            <option value='EUR'>EUR - Euro</option>
+            <option value='NZD'>NZD - New Zealand Dollar</option>
+            <option value='CAD'>CAD - Canadian Dollar</option>
+          </select>
+        </div>
+
+        <ToggleSwitch
+          label='Enable Cash / Pay at Pickup'
+          checked={paymentForm.cashEnabled}
+          onChange={() => updatePayment('cashEnabled', !paymentForm.cashEnabled)}
+        />
+
+        {paymentForm.cashEnabled && (
+          <div style={{ marginTop:12 }}>
+            <label style={labelStyle}>Cash Payment Label</label>
+            <input
+              type='text'
+              value={paymentForm.cashLabel || ''}
+              onChange={e => updatePayment('cashLabel', e.target.value)}
+              style={inputStyle}
+              placeholder='Pay at Pickup'
+            />
+            <p style={hintStyle}>Text shown to customers for the cash payment option</p>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:20 }}>
+        <button onClick={() => paymentMutation.mutate()} disabled={paymentMutation.isPending || !hasPaymentChanges}
+          style={{
+            padding:'10px 28px', background: (paymentMutation.isPending || !hasPaymentChanges) ? C.card : C.acc,
+            border:'none', borderRadius:8, color:'#fff', fontWeight:700, fontSize:14,
+            cursor: (paymentMutation.isPending || !hasPaymentChanges) ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+            boxShadow: (paymentMutation.isPending || !hasPaymentChanges) ? 'none' : `0 4px 16px ${C.acc}50`
+          }}>
+          {paymentMutation.isPending ? 'Saving…' : 'Save Payment Options'}
+        </button>
+        {paymentMutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
+        {paymentMutation.isError && <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Failed</span>}
+      </div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </>
   )
 }

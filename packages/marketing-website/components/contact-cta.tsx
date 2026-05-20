@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { useInView } from 'framer-motion'
 import { useRef, useState } from 'react'
-import { Send, ArrowRight, Mail, Phone, Clock, CheckCircle2, Loader2 } from 'lucide-react'
+import { Send, ArrowRight, Mail, Clock, CheckCircle2, Loader2 } from 'lucide-react'
 
 export function ContactCTA() {
   const ref = useRef(null)
@@ -14,10 +14,37 @@ export function ContactCTA() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsSubmitting(false)
-    setIsSubmitted(true)
+
+    const form = e.target as HTMLFormElement
+    const formData = {
+      name: (form.elements.namedItem('name') as HTMLInputElement).value,
+      restaurantName: (form.elements.namedItem('restaurantName') as HTMLInputElement).value,
+      email: (form.elements.namedItem('email') as HTMLInputElement).value,
+      phone: (form.elements.namedItem('phone') as HTMLInputElement)?.value || '',
+      type: (form.elements.namedItem('type') as HTMLSelectElement)?.value || '',
+      message: (form.elements.namedItem('message') as HTMLTextAreaElement).value,
+    }
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+
+      if (response.ok) {
+        setIsSubmitted(true)
+        form.reset()
+      } else {
+        console.error('Failed to send email')
+        alert('Failed to send message. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error)
+      alert('Failed to send message. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -87,7 +114,7 @@ export function ContactCTA() {
                 </div>
                 <div>
                   <p className="text-white/50 text-sm">Email us</p>
-                  <p className="text-white">hello@dinedesk.io</p>
+                  <p className="text-white">dinedesk.support@gmail.com</p>
                 </div>
               </div>
               
@@ -136,6 +163,7 @@ export function ContactCTA() {
                     <div>
                       <label className="block text-sm text-white/70 mb-2">Your Name</label>
                       <input
+                        name="name"
                         type="text"
                         required
                         className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-dine-orange/50 transition-colors"
@@ -145,6 +173,7 @@ export function ContactCTA() {
                     <div>
                       <label className="block text-sm text-white/70 mb-2">Restaurant Name</label>
                       <input
+                        name="restaurantName"
                         type="text"
                         required
                         className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-dine-orange/50 transition-colors"
@@ -157,6 +186,7 @@ export function ContactCTA() {
                     <div>
                       <label className="block text-sm text-white/70 mb-2">Email</label>
                       <input
+                        name="email"
                         type="email"
                         required
                         className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-dine-orange/50 transition-colors"
@@ -166,6 +196,7 @@ export function ContactCTA() {
                     <div>
                       <label className="block text-sm text-white/70 mb-2">Phone</label>
                       <input
+                        name="phone"
                         type="tel"
                         className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-dine-orange/50 transition-colors"
                         placeholder="(555) 123-4567"
@@ -176,6 +207,7 @@ export function ContactCTA() {
                   <div>
                     <label className="block text-sm text-white/70 mb-2">Restaurant Type</label>
                     <select
+                      name="type"
                       className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-dine-orange/50 transition-colors appearance-none cursor-pointer"
                     >
                       <option value="" className="bg-dine-dark">Select type...</option>
@@ -191,6 +223,7 @@ export function ContactCTA() {
                   <div>
                     <label className="block text-sm text-white/70 mb-2">Tell Us More</label>
                     <textarea
+                      name="message"
                       rows={4}
                       className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-dine-orange/50 transition-colors resize-none"
                       placeholder="What features are you interested in? Any specific requirements?"

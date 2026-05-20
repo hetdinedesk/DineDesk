@@ -20,7 +20,12 @@ router.get('/', authenticateToken, async (req, res) => {
     const maskedConfig = { ...cfg }
     if (maskedConfig.testSecretKey) maskedConfig.testSecretKey = maskedConfig.testSecretKey.slice(0, 8) + '••••••••'
     if (maskedConfig.liveSecretKey) maskedConfig.liveSecretKey = maskedConfig.liveSecretKey.slice(0, 8) + '••••••••'
-    res.json({ ...payment, config: maskedConfig })
+    res.json({
+      ...payment,
+      config: maskedConfig,
+      stripeConnectStatus: payment.stripeConnectStatus || 'not_connected',
+      stripeAccountId: payment.stripeAccountId || null
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -83,26 +88,42 @@ router.post('/create-intent', async (req, res) => {
       return res.status(400).json({ error: 'Stripe is not configured for this client' })
     }
 
-    const config = paymentGateway.config || {}
-    const stripeSecretKey = paymentGateway.testMode
-      ? config.testSecretKey
-      : config.liveSecretKey
+    const useCurrency = currency || paymentGateway.currency || 'aud'
+    let paymentIntent
 
-    if (!stripeSecretKey) {
-      return res.status(400).json({ error: 'Stripe secret key is not configured' })
-    }
-
-    const stripe = new Stripe(stripeSecretKey)
-
-    // Create PaymentIntent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to cents
-      currency: currency || paymentGateway.currency || 'aud',
-      metadata: { orderId },
-      automatic_payment_methods: {
-        enabled: true
+    // --- Stripe Connect path (preferred) ---
+    if (paymentGateway.stripeAccountId && paymentGateway.stripeConnectStatus === 'connected') {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(500).json({ error: 'Platform Stripe key not configured' })
       }
-    })
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100),
+        currency: useCurrency.toLowerCase(),
+        metadata: { orderId, clientId },
+        automatic_payment_methods: { enabled: true },
+        on_behalf_of: paymentGateway.stripeAccountId,
+        transfer_data: { destination: paymentGateway.stripeAccountId }
+      })
+    } else {
+      // --- Legacy manual keys path ---
+      const config = paymentGateway.config || {}
+      const stripeSecretKey = paymentGateway.testMode
+        ? config.testSecretKey
+        : config.liveSecretKey
+
+      if (!stripeSecretKey) {
+        return res.status(400).json({ error: 'Stripe is not connected. Please connect your Stripe account in Payment Settings.' })
+      }
+
+      const stripe = new Stripe(stripeSecretKey)
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100),
+        currency: useCurrency.toLowerCase(),
+        metadata: { orderId },
+        automatic_payment_methods: { enabled: true }
+      })
+    }
 
     // Update order with stripePaymentIntentId
     await prisma.order.update({

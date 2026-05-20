@@ -2,19 +2,38 @@ import { useRouter } from 'next/router';
 
 /**
  * Get the site ID from the current URL or environment
+ * Prefers environment variables (production) over query params (preview)
  */
 export const getSiteId = (router) => {
-  return router.query.site || process.env.SITE_ID || '';
+  const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '';
+  const querySiteId = router.query.site || '';
+  
+  // If environment variable is set, use it (production)
+  // Otherwise, use query param (preview mode)
+  return envSiteId || querySiteId;
+};
+
+/**
+ * Check if we're in production mode (site ID from environment)
+ */
+export const isProductionMode = (router) => {
+  return !!(process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID);
 };
 
 /**
  * Append site ID query parameter to internal URLs
+ * Only appends in preview mode (no environment variable set)
  * @param {string} url - The URL to modify
  * @param {string} siteId - The site ID to append
- * @returns {string} The URL with site ID appended
+ * @param {boolean} isProd - Whether we're in production mode
+ * @returns {string} The URL with site ID appended (if not production)
  */
-export const withSiteParam = (url, siteId) => {
+export const withSiteParam = (url, siteId, isProd = false) => {
   if (!url || url === '#') return url;
+  
+  // In production mode, don't append site param
+  if (isProd) return url;
+  
   if (!siteId) return url;
   
   // Skip external links
@@ -31,7 +50,7 @@ export const withSiteParam = (url, siteId) => {
 };
 
 /**
- * Custom Link component that preserves site ID
+ * Custom Link component that preserves site ID in preview mode
  */
 import Link from 'next/link';
 import { useCMS } from '../contexts/CMSContext';
@@ -40,8 +59,9 @@ export const SiteLink = ({ href, children, ...props }) => {
   const router = useRouter();
   const { rawData } = useCMS();
   const siteId = getSiteId(router) || rawData?.client?.id || '';
+  const prodMode = isProductionMode(router);
   
-  const finalHref = withSiteParam(href, siteId);
+  const finalHref = withSiteParam(href, siteId, prodMode);
   
   return (
     <Link href={finalHref} {...props}>

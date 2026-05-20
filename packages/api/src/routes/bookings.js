@@ -293,7 +293,7 @@ router.get('/:clientId/bookings', async (req, res) => {
       where: { clientId },
       include: {
         location: true,
-        table: true
+        tables: true
       },
       orderBy: { bookingDate: 'desc' }
     })

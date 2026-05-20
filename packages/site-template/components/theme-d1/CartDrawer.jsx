@@ -37,10 +37,12 @@ export default function CartDrawer() {
 
   const handleCheckout = () => {
     closeCart()
-    const siteId = router.query.site || process.env.SITE_ID || ''
+    const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+    const isProd = !!envSiteId
+    const siteId = isProd ? '' : (router.query.site || '')
     
     // Add table information to checkout URL if available
-    let checkoutUrl = `/checkout?site=${siteId}`
+    let checkoutUrl = isProd ? '/checkout' : `/checkout?site=${siteId}`
     if (isTableOrdering && tableInfo) {
       checkoutUrl += `&tableId=${tableInfo.tableId}&orderType=${orderType}&paymentPreference=${paymentPreference}`
     }

@@ -14,9 +14,11 @@ export default function CartDrawer() {
 
   const handleCheckout = () => {
     closeCart()
-    const siteId = router.query.site || process.env.SITE_ID || ''
+    const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+    const isProd = !!envSiteId
+    const siteId = isProd ? '' : (router.query.site || '')
     if (router.pathname !== '/checkout') {
-      router.push(`/checkout?site=${siteId}`)
+      router.push(isProd ? '/checkout' : `/checkout?site=${siteId}`)
     }
   }
 

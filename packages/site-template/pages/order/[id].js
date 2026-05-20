@@ -34,10 +34,10 @@ export async function getServerSideProps({ query }) {
   const rawSite = query.site
   const siteId = (rawSite && rawSite !== 'undefined' && rawSite.trim() !== '')
     ? rawSite
-    : (process.env.SITE_ID || '')
+    : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
   const template = data?.themeKey || data?.colours?.theme || process.env.SITE_TEMPLATE || 'theme-d1'
-  return { props: { data, orderId: id, template } }
+  return { props: { data, template, orderId: id } }
 }
 
 const statusConfig = {
@@ -285,7 +285,9 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
   const fetchOrder = async () => {
     try {
-      const siteId = router.query.site
+      const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+      const isProd = !!envSiteId
+      const siteId = isProd ? envSiteId : (router.query.site || '')
       const clientId = data?.client?.id
 
       if (!clientId) {
@@ -357,7 +359,12 @@ export default function OrderStatusPage({ data, orderId, template }) {
                 <p className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">{error || 'This order could not be found.'}</p>
               </div>
               <button
-                onClick={() => router.push(`/?site=${router.query.site}`)}
+                onClick={() => {
+                  const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+                  const isProd = !!envSiteId
+                  const siteId = isProd ? '' : (router.query.site || '')
+                  router.push(isProd ? '/' : `/?site=${siteId}`)
+                }}
                 className="px-8 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg inline-flex items-center gap-3"
               >
                 <ArrowLeft width={18} height={18} strokeWidth={2} />
@@ -702,7 +709,12 @@ export default function OrderStatusPage({ data, orderId, template }) {
         {/* Actions */}
         <div className="flex justify-center gap-4 mt-12">
           <button
-            onClick={() => router.push(`/?site=${router.query.site}`)}
+            onClick={() => {
+              const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+              const isProd = !!envSiteId
+              const siteId = isProd ? '' : (router.query.site || '')
+              router.push(isProd ? '/' : `/?site=${siteId}`)
+            }}
             className="px-8 py-4 bg-white border border-[var(--color-secondary)]/20 rounded-full font-body font-bold text-sm text-[var(--color-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
           >
             Return Home

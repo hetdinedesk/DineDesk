@@ -35,7 +35,7 @@ export async function getServerSideProps({ query }) {
   const rawSite = query.site
   const siteId = (rawSite && rawSite !== 'undefined' && rawSite.trim() !== '')
     ? rawSite
-    : (process.env.SITE_ID || '')
+    : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
   const template = data?.themeKey || data?.colours?.theme || process.env.SITE_TEMPLATE || 'theme-d1'
   return { props: { data, template } }
@@ -186,7 +186,12 @@ export default function CheckoutPage({ data, template }) {
                   <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">ADD ITEMS FROM THE MENU</p>
                 </div>
                 <button
-                  onClick={() => router.push(`/menu?site=${router.query.site}`)}
+                  onClick={() => {
+                    const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+                    const isProd = !!envSiteId
+                    const siteId = isProd ? '' : (router.query.site || '')
+                    router.push(isProd ? '/menu' : `/menu?site=${siteId}`)
+                  }}
                   className="px-8 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg inline-flex items-center gap-3"
                 >
                   <ArrowLeft width={18} height={18} strokeWidth={2} />
@@ -293,7 +298,9 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     setError(null)
 
     try {
-      const siteId = router.query.site
+      const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+      const isProd = !!envSiteId
+      const siteId = isProd ? envSiteId : (router.query.site || '')
       const clientId = data?.client?.id
 
       if (!clientId) {
@@ -387,8 +394,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   }
 
   const handlePaymentSuccess = (paymentIntent) => {
-    const siteId = router.query.site
-    router.push(`/order/${orderId}?site=${siteId}`)
+    const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+    const isProd = !!envSiteId
+    const siteId = isProd ? '' : (router.query.site || '')
+    router.push(isProd ? `/order/${orderId}` : `/order/${orderId}?site=${siteId}`)
     // Clear cart after redirect to prevent empty cart flash
     setTimeout(() => clearCart(), 100)
   }
@@ -506,7 +515,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
-                  onClick={() => router.push('/?site=' + router.query.site)}
+                  onClick={() => {
+                    const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+                    const isProd = !!envSiteId
+                    const siteId = isProd ? '' : (router.query.site || '')
+                    router.push(isProd ? '/' : `/?site=${siteId}`)
+                  }}
                   className="px-8 py-3 bg-[var(--color-primary)] text-white rounded-lg font-semibold hover:bg-[var(--color-primary)]/90 transition-colors"
                 >
                   Return to Menu

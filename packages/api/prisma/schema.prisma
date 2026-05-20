@@ -462,18 +462,20 @@ model AlertPopup {
 }
 
 model PaymentGateway {
-  id          String  @id @default(cuid())
-  clientId    String  @unique
-  provider    String  @default("stripe")
-  config      Json
-  isActive    Boolean @default(false)
-  currency    String  @default("AUD")
-  taxRate     Float   @default(0.1)
-  cashEnabled Boolean @default(true)
-  cashLabel   String  @default("Pay at Pickup")
-  testMode    Boolean @default(true)
-  orders      Order[]
-  client      Client  @relation(fields: [clientId], references: [id])
+  id                   String  @id @default(cuid())
+  clientId             String  @unique
+  provider             String  @default("stripe")
+  config               Json
+  isActive             Boolean @default(false)
+  currency             String  @default("AUD")
+  taxRate              Float   @default(0.1)
+  cashEnabled          Boolean @default(true)
+  cashLabel            String  @default("Pay at Pickup")
+  testMode             Boolean @default(true)
+  stripeAccountId      String?
+  stripeConnectStatus  String  @default("not_connected")
+  orders               Order[]
+  client               Client  @relation(fields: [clientId], references: [id])
 
   @@index([clientId])
 }

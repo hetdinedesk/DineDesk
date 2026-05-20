@@ -74,11 +74,9 @@ export async function getServerSideProps({ query }) {
   const rawSite = query.site
   const siteId = (rawSite && rawSite !== 'undefined' && rawSite.trim() !== '')
     ? rawSite
-    : (process.env.SITE_ID || '')
+    : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
   const data = await getSiteData(siteId)
-
-  const template = data.colours?.theme || process.env.SITE_TEMPLATE || 'theme-d1'
-
+  const template = data?.themeKey || data?.colours?.theme || process.env.SITE_TEMPLATE || 'theme-d1'
   return { props: { data, template } }
 }
 

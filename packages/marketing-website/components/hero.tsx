@@ -1,7 +1,8 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ArrowRight, Play, Sparkles, Zap, Shield } from 'lucide-react'
+import { ArrowRight, Sparkles, Zap, Shield } from 'lucide-react'
+import Link from 'next/link'
 
 export function Hero() {
   return (
@@ -94,20 +95,20 @@ export function Hero() {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
             >
-              <a
-                href="#contact"
+              <Link
+                href="/contact"
                 className="group relative px-8 py-4 rounded-full bg-gradient-to-r from-dine-orange to-dine-coral text-white font-semibold overflow-hidden btn-shine flex items-center justify-center gap-2"
               >
-                <span className="relative z-10">Get Started Free</span>
+                <span className="relative z-10">Get Started Today</span>
                 <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
-              </a>
-              <a
-                href="#demo"
+              </Link>
+              <Link
+                href="/how-it-works"
                 className="group px-8 py-4 rounded-full glass text-white font-semibold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
               >
-                <Play className="w-5 h-5" />
-                Watch Demo
-              </a>
+                See How It Works
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </motion.div>
 
             {/* Trust Indicators */}
@@ -119,7 +120,7 @@ export function Hero() {
             >
               <div className="flex items-center gap-2 text-white/60 text-sm">
                 <Zap className="w-4 h-4 text-dine-orange" />
-                <span>5-min setup</span>
+                <span>We do all the setup</span>
               </div>
               <div className="flex items-center gap-2 text-white/60 text-sm">
                 <Shield className="w-4 h-4 text-dine-orange" />
@@ -127,7 +128,7 @@ export function Hero() {
               </div>
               <div className="flex items-center gap-2 text-white/60 text-sm">
                 <Sparkles className="w-4 h-4 text-dine-orange" />
-                <span>No credit card required</span>
+                <span>No long-term contracts</span>
               </div>
             </motion.div>
           </div>
@@ -233,12 +234,10 @@ export function Hero() {
                 <div className="glass rounded-xl p-3">
                   <div className="bg-white rounded-lg p-2">
                     <div className="grid grid-cols-5 gap-0.5">
-                      {Array.from({ length: 25 }).map((_, i) => (
+                      {[1,1,1,1,1, 1,0,0,0,1, 1,0,1,0,1, 1,0,0,0,1, 1,1,1,1,1].map((filled, i) => (
                         <div
                           key={i}
-                          className={`w-full aspect-square rounded-sm ${
-                            Math.random() > 0.5 ? 'bg-dine-dark' : 'bg-transparent'
-                          }`}
+                          className={`w-full aspect-square rounded-sm ${filled ? 'bg-dine-dark' : 'bg-transparent'}`}
                         />
                       ))}
                     </div>
