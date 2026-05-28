@@ -489,7 +489,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
               )}
             </nav>
 
-            {/* Mobile Menu Button - Left */}
+            {/* Mobile Menu Button - Right */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 rounded-lg transition-colors hover:bg-white/10"
@@ -498,7 +498,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
 
-            {/* Cart - Right */}
+            {/* Cart - Left */}
             {orderingEnabled && (
               <button
                 onClick={toggleCart}
@@ -516,94 +516,94 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
             )}
           </div>
         </div>
-
-        {/* Mobile Sidebar Navigation */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setMobileMenuOpen(false)}
-                className="fixed inset-0 bg-black/50 z-[60]"
-              />
-              {/* Sidebar */}
-              <motion.div
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'tween', duration: 0.3 }}
-                className="fixed top-0 right-0 h-full w-80 max-w-full z-[70] shadow-2xl"
-                style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}
-              >
-                {/* Close Button */}
-                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
-                  <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Menu</span>
-                  <button
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`p-2 rounded-lg transition-colors ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'}`}
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-
-                <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
-                  {activeNavItems.map((item) => {
-                    const itemChildren = buildChildrenMap(navigation)[item.id] || [];
-                    const hrefRaw = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
-                    const href = withSiteParam(hrefRaw);
-                    const isActive = router.asPath === hrefRaw || router.asPath === href;
-                    return (
-                      <React.Fragment key={item.id}>
-                        <Link
-                          href={href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`block px-3 py-3 text-base font-medium transition-colors rounded-md ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} ${isActive ? (isDark ? 'bg-white/20 font-semibold' : 'bg-gray-100 font-semibold') : ''}`}
-                        >
-                          {item.label}
-                        </Link>
-                        {itemChildren.length > 0 && itemChildren.map(child => (
-                          <Link key={child.id} href={withSiteParam(child.url) || '#'}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`block px-6 py-2 text-sm font-medium transition-colors rounded-md ${router.asPath === child.url ? (isDark ? 'text-white bg-white/10' : 'text-gray-900 bg-gray-100') : (isDark ? 'text-white/70 hover:text-white hover:bg-white/5' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')}`}
-                          >{child.label}</Link>
-                        ))}
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {/* Mobile CTAs */}
-                  {(booking?.showOrderBtn || booking?.showInHeader) && (
-                    <div className="pt-4 border-t mt-4 space-y-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
-                      {booking?.showOrderBtn && booking?.orderUrl && (
-                        <Link
-                          href={withSiteParam(booking.orderUrl) || '#'}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-white text-gray-900 hover:bg-gray-100"
-                        >
-                          {booking.orderLabel || 'Order Online'}
-                        </Link>
-                      )}
-                      {booking?.showInHeader && (
-                        <BookingButton
-                          booking={{ ...booking, clientId: rawData?.client?.id }}
-                          locations={rawData?.client?.locations || []}
-                          className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-secondary)] text-white hover:opacity-90"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          {booking.bookLabel || 'Book a Table'}
-                        </BookingButton>
-                      )}
-                    </div>
-                  )}
-                </nav>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
       </header>
+
+      {/* Mobile Sidebar Navigation - Outside header to avoid backdrop-blur clipping */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/50 z-[60]"
+            />
+            {/* Sidebar */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="fixed top-0 right-0 h-full w-80 max-w-full z-[70] shadow-2xl"
+              style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}
+            >
+              {/* Close Button */}
+              <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Menu</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`p-2 rounded-lg transition-colors ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'}`}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+                {activeNavItems.map((item) => {
+                  const itemChildren = buildChildrenMap(navigation)[item.id] || [];
+                  const hrefRaw = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
+                  const href = withSiteParam(hrefRaw);
+                  const isActive = router.asPath === hrefRaw || router.asPath === href;
+                  return (
+                    <React.Fragment key={item.id}>
+                      <Link
+                        href={href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`block px-3 py-3 text-base font-medium transition-colors rounded-md ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} ${isActive ? (isDark ? 'bg-white/20 font-semibold' : 'bg-gray-100 font-semibold') : ''}`}
+                      >
+                        {item.label}
+                      </Link>
+                      {itemChildren.length > 0 && itemChildren.map(child => (
+                        <Link key={child.id} href={withSiteParam(child.url) || '#'}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`block px-6 py-2 text-sm font-medium transition-colors rounded-md ${router.asPath === child.url ? (isDark ? 'text-white bg-white/10' : 'text-gray-900 bg-gray-100') : (isDark ? 'text-white/70 hover:text-white hover:bg-white/5' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')}`}
+                        >{child.label}</Link>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+
+                {/* Mobile CTAs */}
+                {(booking?.showOrderBtn || booking?.showInHeader) && (
+                  <div className="pt-4 border-t mt-4 space-y-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                    {booking?.showOrderBtn && booking?.orderUrl && (
+                      <Link
+                        href={withSiteParam(booking.orderUrl) || '#'}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-white text-gray-900 hover:bg-gray-100"
+                      >
+                        {booking.orderLabel || 'Order Online'}
+                      </Link>
+                    )}
+                    {booking?.showInHeader && (
+                      <BookingButton
+                        booking={{ ...booking, clientId: rawData?.client?.id }}
+                        locations={rawData?.client?.locations || []}
+                        className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-secondary)] text-white hover:opacity-90"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {booking.bookLabel || 'Book a Table'}
+                      </BookingButton>
+                    )}
+                  </div>
+                )}
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -654,122 +654,126 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
               </span>
             </Link>
 
-            {/* Mobile Menu Button - Left */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg transition-colors hover:bg-white/10"
-              style={{ color: headerTextColor }}
-            >
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
+            {/* Right side: Cart and Menu buttons grouped */}
+            <div className="flex items-center gap-2">
+              {/* Cart */}
+              {orderingEnabled && (
+                <button
+                  onClick={toggleCart}
+                  className="relative p-2 rounded-lg transition-colors hover:bg-white/10"
+                  style={{ color: headerTextColor }}
+                  aria-label="Shopping cart"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--color-secondary)] text-white text-xs font-bold flex items-center justify-center">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+              )}
 
-            {/* Cart - Right */}
-            {orderingEnabled && (
+              {/* Menu Button */}
               <button
-                onClick={toggleCart}
-                className="relative p-2 rounded-lg transition-colors hover:bg-white/10"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 rounded-lg transition-colors hover:bg-white/10"
                 style={{ color: headerTextColor }}
-                aria-label="Shopping cart"
+                aria-label="Open menu"
               >
-                <ShoppingCart className="w-5 h-5" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--color-secondary)] text-white text-xs font-bold flex items-center justify-center">
-                    {totalItems}
-                  </span>
-                )}
+                {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
-            )}
+            </div>
           </div>
         </div>
-
-        {/* Sidebar Navigation */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setMobileMenuOpen(false)}
-                className="fixed inset-0 bg-black/50 z-[60]"
-              />
-              {/* Sidebar */}
-              <motion.div
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'tween', duration: 0.3 }}
-                className="fixed top-0 right-0 h-full w-80 max-w-full z-[70] shadow-2xl"
-                style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}
-              >
-                {/* Close Button */}
-                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
-                  <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Menu</span>
-                  <button
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`p-2 rounded-lg transition-colors ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'}`}
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-
-                <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
-                  {activeNavItems.map((item) => {
-                    const itemChildren = buildChildrenMap(navigation)[item.id] || [];
-                    // Redirect to first child page when heading is clicked
-                    const hrefRaw = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
-                    const href = withSiteParam(hrefRaw);
-                    const isActive = router.asPath === hrefRaw || router.asPath === href;
-                    return (
-                      <React.Fragment key={item.id}>
-                        <Link
-                          href={href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`block px-3 py-3 text-base font-medium transition-colors rounded-md ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} ${isActive ? (isDark ? 'bg-white/20 font-semibold' : 'bg-gray-100 font-semibold') : ''}`}
-                        >
-                          {item.label}
-                        </Link>
-                        {itemChildren.length > 0 && itemChildren.map(child => (
-                          <Link key={child.id} href={withSiteParam(child.url) || '#'}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`block px-6 py-2 text-sm font-medium transition-colors rounded-md ${router.asPath === child.url ? (isDark ? 'text-white bg-white/10' : 'text-gray-900 bg-gray-100') : (isDark ? 'text-white/70 hover:text-white hover:bg-white/5' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')}`}
-                          >{child.label}</Link>
-                        ))}
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {/* CTAs */}
-                  {(booking?.showOrderBtn || booking?.showInHeader) && (
-                    <div className="pt-4 border-t mt-4 space-y-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
-                      {booking?.showOrderBtn && booking?.orderUrl && (
-                        <Link
-                          href={withSiteParam(booking.orderUrl) || '#'}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-white text-gray-900 hover:bg-gray-100"
-                        >
-                          {booking.orderLabel || 'Order Online'}
-                        </Link>
-                      )}
-                      {booking?.showInHeader && (
-                        <BookingButton
-                          booking={{ ...booking, clientId: rawData?.client?.id }}
-                          locations={rawData?.client?.locations || []}
-                          className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-primary)] text-white hover:opacity-90"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          {booking.bookLabel || 'Book a Table'}
-                        </BookingButton>
-                      )}
-                    </div>
-                  )}
-                </nav>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
       </header>
+
+      {/* Sidebar Navigation - Outside header to avoid backdrop-blur clipping */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/50 z-[60]"
+            />
+            {/* Sidebar */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="fixed top-0 right-0 h-full w-80 max-w-full z-[70] shadow-2xl"
+              style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}
+            >
+              {/* Close Button */}
+              <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Menu</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`p-2 rounded-lg transition-colors ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'}`}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+                {activeNavItems.map((item) => {
+                  const itemChildren = buildChildrenMap(navigation)[item.id] || [];
+                  // Redirect to first child page when heading is clicked
+                  const hrefRaw = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
+                  const href = withSiteParam(hrefRaw);
+                  const isActive = router.asPath === hrefRaw || router.asPath === href;
+                  return (
+                    <React.Fragment key={item.id}>
+                      <Link
+                        href={href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`block px-3 py-3 text-base font-medium transition-colors rounded-md ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} ${isActive ? (isDark ? 'bg-white/20 font-semibold' : 'bg-gray-100 font-semibold') : ''}`}
+                      >
+                        {item.label}
+                      </Link>
+                      {itemChildren.length > 0 && itemChildren.map(child => (
+                        <Link key={child.id} href={withSiteParam(child.url) || '#'}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`block px-6 py-2 text-sm font-medium transition-colors rounded-md ${router.asPath === child.url ? (isDark ? 'text-white bg-white/10' : 'text-gray-900 bg-gray-100') : (isDark ? 'text-white/70 hover:text-white hover:bg-white/5' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')}`}
+                        >{child.label}</Link>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+
+                {/* CTAs */}
+                {(booking?.showOrderBtn || booking?.showInHeader) && (
+                  <div className="pt-4 border-t mt-4 space-y-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                    {booking?.showOrderBtn && booking?.orderUrl && (
+                      <Link
+                        href={withSiteParam(booking.orderUrl) || '#'}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-white text-gray-900 hover:bg-gray-100"
+                      >
+                        {booking.orderLabel || 'Order Online'}
+                      </Link>
+                    )}
+                    {booking?.showInHeader && (
+                      <BookingButton
+                        booking={{ ...booking, clientId: rawData?.client?.id }}
+                        locations={rawData?.client?.locations || []}
+                        className="block w-full px-4 py-3 text-center rounded-md text-sm font-bold bg-[var(--color-primary)] text-white hover:opacity-90"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {booking.bookLabel || 'Book a Table'}
+                      </BookingButton>
+                    )}
+                  </div>
+                )}
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

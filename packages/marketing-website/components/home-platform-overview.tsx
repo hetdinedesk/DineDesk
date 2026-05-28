@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useInView } from 'framer-motion'
-import { useRef } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Globe,
@@ -86,17 +86,34 @@ const platformFeatures = [
     description: 'Super Admin, Manager and Editor roles. Control exactly who can access orders, menu items, content, config and deployment settings.',
     color: 'from-cyan-500 to-blue-500',
   },
-  {
-    icon: Globe,
-    title: 'Netlify Deployment',
-    description: 'One-click deployment to Netlify with automatic SSL. Custom domains supported. Cloudflare R2 for fast image and media storage.',
-    color: 'from-lime-500 to-green-500',
-  },
 ]
 
 export function HomePlatformOverview() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [scrollPosition, setScrollPosition] = useState(0)
+
+  // Auto-scroll on mobile
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (scrollRef.current && window.innerWidth < 640) {
+        const maxScroll = scrollRef.current.scrollWidth - scrollRef.current.clientWidth
+        setScrollPosition(prev => {
+          const nextPosition = prev + 1
+          return nextPosition >= maxScroll ? 0 : nextPosition
+        })
+      }
+    }, 50)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollPosition
+    }
+  }, [scrollPosition])
 
   return (
     <section className="relative py-28 overflow-hidden">
@@ -138,24 +155,34 @@ export function HomePlatformOverview() {
           </motion.p>
         </div>
 
-        {/* Feature Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mb-12">
-          {platformFeatures.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: index * 0.06 }}
-              className="group glass rounded-2xl p-5 card-hover relative overflow-hidden"
-            >
-              <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                <feature.icon className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="text-base font-display font-bold text-white mb-2">{feature.title}</h3>
-              <p className="text-sm text-white/55 leading-relaxed">{feature.description}</p>
-              <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-            </motion.div>
-          ))}
+        {/* Feature Grid - Desktop / Horizontal Scroll - Mobile */}
+        <div 
+          ref={scrollRef}
+          className="mb-12"
+        >
+          <div className="flex overflow-x-auto gap-5 pb-4 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:overflow-visible sm:pb-0"
+            style={{ 
+              scrollBehavior: 'smooth',
+              WebkitOverflowScrolling: 'touch'
+            }}
+          >
+            {platformFeatures.map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 30 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.5, delay: index * 0.06 }}
+                className="group glass rounded-2xl p-5 card-hover relative overflow-hidden flex-shrink-0 w-[280px] sm:w-auto"
+              >
+                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                  <feature.icon className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-base font-display font-bold text-white mb-2">{feature.title}</h3>
+                <p className="text-sm text-white/55 leading-relaxed">{feature.description}</p>
+                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+              </motion.div>
+            ))}
+          </div>
         </div>
 
         {/* CTA */}

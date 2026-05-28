@@ -10,28 +10,33 @@ function DynamicSpecialsTemplate({ themeKey, data, page, banner }) {
   const [Header, setHeader] = useState(null)
   const [Footer, setFooter] = useState(null)
   const [SpecialsTemplate, setSpecialsTemplate] = useState(null)
+  const [FloatingCartIcon, setFloatingCartIcon] = useState(null)
 
   useEffect(() => {
     const theme = themeKey || 'theme-d1'
-    
+
     Promise.all([
       import(`../components/${theme}/Header`),
       import(`../components/${theme}/Footer`),
-      import(`../templates/${theme}/SpecialsTemplate`)
-    ]).then(([headerModule, footerModule, templateModule]) => {
+      import(`../templates/${theme}/SpecialsTemplate`),
+      import(`../components/${theme}/FloatingCartIcon`)
+    ]).then(([headerModule, footerModule, templateModule, cartModule]) => {
       setHeader(() => headerModule.Header)
       setFooter(() => footerModule.Footer)
       setSpecialsTemplate(() => templateModule.default)
+      setFloatingCartIcon(() => cartModule.default)
     }).catch(() => {
       // Fallback to theme-d1
       Promise.all([
         import('../components/theme-d1/Header'),
         import('../components/theme-d1/Footer'),
-        import('../templates/theme-d1/SpecialsTemplate')
-      ]).then(([headerModule, footerModule, templateModule]) => {
+        import('../templates/theme-d1/SpecialsTemplate'),
+        import('../components/theme-d1/FloatingCartIcon')
+      ]).then(([headerModule, footerModule, templateModule, cartModule]) => {
         setHeader(() => headerModule.Header)
         setFooter(() => footerModule.Footer)
         setSpecialsTemplate(() => templateModule.default)
+        setFloatingCartIcon(() => cartModule.default)
       })
     })
   }, [themeKey])
@@ -41,6 +46,7 @@ function DynamicSpecialsTemplate({ themeKey, data, page, banner }) {
       {Header && <Header />}
       {SpecialsTemplate && <SpecialsTemplate data={data} page={page} banner={banner} />}
       {Footer && <Footer />}
+      {FloatingCartIcon && <FloatingCartIcon />}
     </>
   )
 }

@@ -270,7 +270,14 @@ export default function LocationForm({
     },
     onSuccess: (data) => {
       qc.invalidateQueries(['locations', clientId])
+      // Update form state with the returned data to ensure images are persisted
+      setForm(prev => ({
+        ...prev,
+        exteriorImages: data.exteriorImages || [],
+        galleryImages: data.galleryImages || []
+      }))
       clearPendingImages()
+      setSaving(false)
       onSave?.(data)
       onClose()
     },
@@ -286,9 +293,9 @@ export default function LocationForm({
     setSaving(true)
     
     // Always include current image state - use pending if changed, otherwise form
-    // Check if pendingImages has been modified (has any keys with values)
-    const hasPendingExterior = 'exteriorImages' in pendingImages
-    const hasPendingGallery = 'galleryImages' in pendingImages
+    // Check if pendingImages arrays actually have items (not just key exists)
+    const hasPendingExterior = pendingImages.exteriorImages?.length > 0
+    const hasPendingGallery = pendingImages.galleryImages?.length > 0
     
     const saveData = {
       ...form,
@@ -455,7 +462,7 @@ export default function LocationForm({
             clientId={clientId}
             label="Exterior Photos"
             hint="Restaurant exterior - first image will be primary. Add multiple angles and views."
-            value={pendingImages.exteriorImages.length > 0 ? pendingImages.exteriorImages : (form.exteriorImages || [])}
+            value={pendingImages.exteriorImages?.length > 0 ? pendingImages.exteriorImages : (form.exteriorImages || [])}
             onChange={v => setImageField('exteriorImages', v)}
             aspect={16/9}
             maxImages={8}

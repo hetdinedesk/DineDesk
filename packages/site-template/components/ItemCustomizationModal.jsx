@@ -143,7 +143,7 @@ export default function ItemCustomizationModal({ item, isOpen, onClose, onAddToC
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl z-[9999] max-h-[90vh] overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl z-[9999] max-h-[90vh] overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
@@ -162,7 +162,7 @@ export default function ItemCustomizationModal({ item, isOpen, onClose, onAddToC
             </div>
 
             {/* Content */}
-            <div className="overflow-y-auto max-h-[calc(90vh-200px)] p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Sizes Section */}
               {hasSizes && (
                 <div>

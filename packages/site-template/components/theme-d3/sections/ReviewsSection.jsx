@@ -57,7 +57,18 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
     }, []);
 
   // For carousel, show all available unique reviews
-  const activeReviews = uniqueReviews;
+  const activeReviews = uniqueReviews.sort((a, b) => {
+    // Sort by date (most recent first)
+    const dateA = a.date ? new Date(a.date).getTime() : 0;
+    const dateB = b.date ? new Date(b.date).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  // Truncate review text to a reasonable length
+  const truncateReview = (text, maxLength = 150) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength).trim() + '...';
+  };
 
   if (activeReviews.length === 0) return null;
 
@@ -154,45 +165,49 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
         )}
 
         {/* Reviews Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-8">
           {activeReviews.map((review, index) => (
             <motion.div
               key={review.id || `review-${index}`}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
-              className="group relative p-12 rounded-[40px] hover:bg-opacity-10 transition-all duration-700"
+              transition={{ delay: index * 0.05 }}
+              className="group relative p-8 rounded-[32px] hover:bg-opacity-10 transition-all duration-700"
               style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}
             >
-              <Quote className="absolute top-10 right-10 w-16 h-16" style={{ color: 'var(--color-primary)', opacity: 0.2 }} />
-              
+              <Quote className="absolute top-6 right-6 w-12 h-12" style={{ color: 'var(--color-primary)', opacity: 0.2 }} />
+
               {/* Star Rating */}
-              <div className="flex gap-1 mb-10">
+              <div className="flex gap-1 mb-6">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
-                    width={14}
-                    height={14}
+                    width={12}
+                    height={12}
                     strokeWidth={2}
                     className={`${
                       i < review.rating
-                        ? 'fill-[var(--color-primary)] text-[var(--color-primary)]'
-                        : (alternate ? 'text-white/30' : 'text-black/20')
+                        ? alternate
+                          ? 'fill-amber-400 text-amber-400'
+                          : 'fill-[var(--color-primary)] text-[var(--color-primary)]'
+                        : alternate
+                          ? 'text-amber-400/30'
+                          : 'text-black/20'
                     }`}
                   />
                 ))}
               </div>
-              
-              {/* Review Content */}
-              <p className="text-xl font-serif italic leading-relaxed mb-12" style={{ color: textColor, opacity: 0.9 }}>
-                "{review.content}"
+
+              {/* Review Content - Truncated */}
+              <p className="text-base font-serif italic leading-relaxed mb-8" style={{ color: textColor, opacity: 0.9 }}>
+                "{truncateReview(review.content, 120)}"
               </p>
               
               {/* Author Info */}
-              <div className="flex items-center gap-6 pt-10" style={{ borderTop: `1px solid ${alternate ? 'rgba(248, 246, 243, 0.1)' : 'rgba(44, 44, 44, 0.1)'}` }}>
+              <div className="flex items-center gap-4 pt-6" style={{ borderTop: `1px solid ${alternate ? 'rgba(248, 246, 243, 0.1)' : 'rgba(44, 44, 44, 0.1)'}` }}>
                 {getAuthorAvatar(review) ? (
-                  <div className="w-16 h-16 rounded-full overflow-hidden shadow-xl" style={{ border: `2px solid var(--color-primary)`, opacity: 0.3 }}>
+                  <div className="w-12 h-12 rounded-full overflow-hidden shadow-xl" style={{ border: alternate ? '2px solid rgba(251, 191, 36, 0.5)' : '2px solid var(--color-primary)', opacity: alternate ? 1 : 0.3 }}>
                     <img
                       src={getAuthorAvatar(review)}
                       alt={review.author}
@@ -200,16 +215,19 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
                     />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-primary)', opacity: 0.2 }}>
-                    <span className="font-bold text-xl" style={{ color: 'var(--color-primary)' }}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: alternate ? 'rgba(251, 191, 36, 0.2)' : 'var(--color-primary)', opacity: alternate ? 1 : 0.2 }}>
+                    <span className="font-bold text-lg" style={{ color: alternate ? '#fbbf24' : 'var(--color-primary)' }}>
                       {review.author?.charAt(0)?.toUpperCase() || 'G'}
                     </span>
                   </div>
                 )}
-                <div>
-                  <h4 className="font-serif text-2xl italic" style={{ color: textColor }}>{review.author}</h4>
-                  <p className="text-[10px] font-sans font-bold uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--color-primary)' }}>
+                <div className="flex-1">
+                  <h4 className="font-serif text-lg italic" style={{ color: textColor }}>{review.author}</h4>
+                  <p className="text-[9px] font-sans font-bold uppercase tracking-[0.15em] mt-1" style={{ color: alternate ? '#fbbf24' : 'var(--color-primary)' }}>
                     {getAuthorRole(review)}
+                  </p>
+                  <p className="text-[9px] font-sans mt-1" style={{ color: textColor, opacity: 0.6 }}>
+                    {formatDate(review.date)}
                   </p>
                 </div>
               </div>

@@ -43,10 +43,13 @@ const formatDate = (dateStr) => {
   const diffMs = now - date
   const diffMins = Math.floor(diffMs / 60000)
 
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
-  return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' })
+  const timeStr = date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
+  const dateDisplay = date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' })
+
+  if (diffMins < 1) return `Just now (${timeStr})`
+  if (diffMins < 60) return `${diffMins}m ago (${timeStr})`
+  if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago (${timeStr})`
+  return `${dateDisplay} ${timeStr}`
 }
 
 const formatCurrency = (amount) => {
@@ -55,37 +58,43 @@ const formatCurrency = (amount) => {
 
 const getOrderProgressTime = (order) => {
   if (!order.acceptedAt && !order.preparingAt && !order.readyAt) return null
-  
+
   const now = new Date()
   let startTime = order.createdAt
   let statusText = ''
   let progressPercent = 0
-  
-  // Match customer site status labels exactly
-  if (order.acceptedAt) {
-    startTime = new Date(order.acceptedAt)
+
+  // Check order.status first to determine current state, then use timestamps
+  if (order.status === 'completed' || order.completedAt) {
+    startTime = order.completedAt ? new Date(order.completedAt) : startTime
+    statusText = 'Completed'
+    progressPercent = 100
+  } else if (order.status === 'ready' || order.readyAt) {
+    startTime = order.readyAt ? new Date(order.readyAt) : startTime
+    statusText = 'Ready'
+    progressPercent = 75
+  } else if (order.status === 'preparing' || order.preparingAt) {
+    startTime = order.preparingAt ? new Date(order.preparingAt) : startTime
+    statusText = 'Preparing'
+    progressPercent = 50
+  } else if (order.status === 'accepted' || order.acceptedAt) {
+    startTime = order.acceptedAt ? new Date(order.acceptedAt) : startTime
     statusText = 'Order Accepted'
     progressPercent = 25
   }
-  if (order.preparingAt) {
-    startTime = new Date(order.preparingAt)
-    statusText = 'Preparing'
-    progressPercent = 50
+
+  // Don't show time elapsed for completed orders
+  if (order.status === 'completed' || order.completedAt) {
+    return {
+      statusText,
+      progressPercent,
+      timeElapsed: null
+    }
   }
-  if (order.readyAt) {
-    startTime = new Date(order.readyAt)
-    statusText = 'Ready for Pickup'
-    progressPercent = 75
-  }
-  if (order.completedAt) {
-    startTime = new Date(order.completedAt)
-    statusText = 'Completed'
-    progressPercent = 100
-  }
-  
+
   const diffMs = now - startTime
   const diffMins = Math.floor(diffMs / 60000)
-  
+
   return {
     statusText,
     progressPercent,
@@ -93,7 +102,7 @@ const getOrderProgressTime = (order) => {
   }
 }
 
-export default function OperationsSection({ clientId }) {
+export default function OperationsSection({ clientId, user: userProp }) {
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [orderingEnabled, setOrderingEnabled] = useState(true)
   const [activeTab, setActiveTab] = useState('live')
@@ -103,8 +112,14 @@ export default function OperationsSection({ clientId }) {
   const audioRef = useRef(null)
   
   // Check if current user is a client
-  const user = JSON.parse(localStorage.getItem('dd_user') || '{}')
+  const user = userProp || JSON.parse(localStorage.getItem('dd_user') || '{}')
   const isClient = user.role === 'CLIENT'
+  const isSuperAdmin = user.role === 'SUPER_ADMIN'
+
+  // Get user's allowed location IDs for this client
+  const userAccessEntry = user?.clientAccess?.[clientId]
+  const userLocationIds = Array.isArray(userAccessEntry) ? [] : (userAccessEntry?.locationIds || [])
+  const hasLocationRestriction = !isSuperAdmin && userLocationIds.length > 0
 
   // Fetch config to get initial ordering state
   const { data: config } = useQuery({
@@ -121,11 +136,16 @@ export default function OperationsSection({ clientId }) {
   }, [config])
 
   // Fetch locations
-  const { data: locations = [], isLoading: locationsLoading } = useQuery({
+  const { data: allLocations = [], isLoading: locationsLoading } = useQuery({
     queryKey: ['locations', clientId],
     queryFn: () => getLocations(clientId),
     staleTime: 1000 * 60 * 5
   })
+
+  // Filter locations based on user access
+  const locations = hasLocationRestriction
+    ? allLocations.filter(loc => userLocationIds.includes(loc.id))
+    : allLocations
 
   // Set default location on load
   useEffect(() => {
@@ -249,18 +269,54 @@ export default function OperationsSection({ clientId }) {
   }
 
   const showBrowserNotification = (orderCount) => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('New Order Received', {
-        body: `${orderCount} new order${orderCount > 1 ? 's' : ''} received`,
-        icon: '/favicon.ico'
-      })
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        const notification = new Notification('New Order Received', {
+          body: `${orderCount} new order${orderCount > 1 ? 's' : ''} received`,
+          icon: '/favicon.ico',
+          tag: 'new-order', // Prevent duplicate notifications
+          requireInteraction: true, // Keep notification visible until user interacts
+          badge: '/favicon.ico'
+        })
+
+        // Focus window when notification is clicked
+        notification.onclick = () => {
+          window.focus()
+          notification.close()
+        }
+      } else if (Notification.permission === 'default') {
+        // Request permission if not granted
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            showBrowserNotification(orderCount)
+          }
+        })
+      }
     }
   }
+
+  // Update document title with new order count
+  useEffect(() => {
+    const newOrderCount = liveOrders?.filter(o => o.status === 'new').length || 0
+    const originalTitle = document.title
+
+    if (newOrderCount > 0) {
+      document.title = `(${newOrderCount}) New Order${newOrderCount > 1 ? 's' : ''} - Operations`
+    } else {
+      document.title = originalTitle
+    }
+
+    return () => {
+      document.title = originalTitle
+    }
+  }, [liveOrders?.filter(o => o.status === 'new').length])
 
   // Request notification permission on mount
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+      Notification.requestPermission().then(permission => {
+        console.log('Notification permission:', permission)
+      })
     }
   }, [])
 
@@ -421,31 +477,6 @@ export default function OperationsSection({ clientId }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {/* Order Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Power size={16} color={orderingEnabled ? C.green : C.red} />
-            <button
-              onClick={handleToggleOrdering}
-              disabled={toggleOrderingMutation.isPending}
-              style={{
-                padding: '8px 16px',
-                background: orderingEnabled ? `${C.green}20` : `${C.red}20`,
-                border: `1px solid ${orderingEnabled ? C.green : C.red}`,
-                borderRadius: 8,
-                color: orderingEnabled ? C.green : C.red,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: toggleOrderingMutation.isPending ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}
-            >
-              {orderingEnabled ? 'Orders Open' : 'Orders Closed'}
-            </button>
-          </div>
-
           {/* Notification Badge */}
           <div style={{ position: 'relative' }}>
             <Bell size={20} color={C.t2} />
@@ -648,7 +679,7 @@ export default function OperationsSection({ clientId }) {
           />
         )}
 
-        {/* Tables (combined with Bookings) */}
+        {/* Tables with Bookings */}
         {activeTab === 'tables' && (
           <TablesTab
             clientId={clientId}
@@ -700,10 +731,13 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
     const diffMs = now - date
     const diffMins = Math.floor(diffMs / 60000)
     
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
-    return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' })
+    const timeStr = date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
+    const dateDisplay = date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' })
+    
+    if (diffMins < 1) return `Just now (${timeStr})`
+    if (diffMins < 60) return `${diffMins}m ago (${timeStr})`
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago (${timeStr})`
+    return `${dateDisplay} ${timeStr}`
   }
 
   const formatCurrency = (amount) => {
@@ -743,6 +777,13 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           <div style={{ fontSize: 12, color: C.t3, marginTop: 2 }}>
             {formatDate(order.createdAt)}
           </div>
+          {order.pickupTime && (
+            <div style={{ fontSize: 11, color: C.acc, fontWeight: 600, marginTop: 2 }}>
+              🕐 Scheduled: {new Date(order.pickupTime).toLocaleString('en-AU', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+              })}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{
@@ -810,7 +851,7 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
                   marginBottom: 4
                 }}>
                   <span style={{ fontSize: 12, color: C.t2 }}>
-                    {progress.statusText} - {progress.timeElapsed}
+                    {progress.statusText}{progress.timeElapsed ? ` - ${progress.timeElapsed}` : ''}
                   </span>
                 </div>
                 <div style={{
@@ -938,31 +979,72 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
   )
 }
 
-// Analytics Dashboard Component - Fixed orders count display
+// Analytics Dashboard Component with time period filtering
 function AnalyticsSection({ liveOrders, historyOrders }) {
-  // Calculate today's metrics
-  const today = new Date()
-  today.setHours(0, 0, 0, 0) // Set to start of day
-  
-  const todayOrders = [...liveOrders, ...historyOrders].filter(order => {
+  const [timePeriod, setTimePeriod] = useState('today')
+
+  // Helper function to get date range for time period
+  const getDateRange = (period) => {
+    const now = new Date()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    switch (period) {
+      case 'today':
+        return { start: today, end: new Date(today.getTime() + 24 * 60 * 60 * 1000) }
+      case 'yesterday':
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        return { start: yesterday, end: today }
+      case 'currentWeek':
+        const currentWeekStart = new Date(today)
+        const dayOfWeek = currentWeekStart.getDay()
+        const diff = currentWeekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+        currentWeekStart.setDate(diff)
+        return { start: currentWeekStart, end: new Date(today.getTime() + 24 * 60 * 60 * 1000) }
+      case 'lastWeek':
+        const lastWeekEnd = new Date(today)
+        const lastWeekDay = lastWeekEnd.getDay()
+        const lastWeekDiff = lastWeekEnd.getDate() - lastWeekDay + (lastWeekDay === 0 ? -6 : 1)
+        const lastWeekStart = new Date(lastWeekEnd)
+        lastWeekStart.setDate(lastWeekDiff - 7)
+        lastWeekEnd.setDate(lastWeekDiff)
+        return { start: lastWeekStart, end: lastWeekEnd }
+      case 'currentMonth':
+        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+        return { start: currentMonthStart, end: new Date(today.getTime() + 24 * 60 * 60 * 1000) }
+      case 'lastMonth':
+        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 1)
+        return { start: lastMonthStart, end: lastMonthEnd }
+      case 'all':
+        return { start: new Date(0), end: new Date(today.getTime() + 24 * 60 * 60 * 1000) }
+      default:
+        return { start: today, end: new Date(today.getTime() + 24 * 60 * 60 * 1000) }
+    }
+  }
+
+  // Filter orders based on selected time period (exclude 'new' orders from analytics)
+  const { start, end } = getDateRange(timePeriod)
+  const filteredOrders = [...liveOrders, ...historyOrders].filter(order => {
     if (!order.createdAt) return false
+    if (order.status === 'new') return false // Exclude new orders from analytics
     const orderDate = new Date(order.createdAt)
-    orderDate.setHours(0, 0, 0, 0) // Set to start of day
-    return orderDate.getTime() === today.getTime()
+    return orderDate >= start && orderDate < end
   })
-  
-  // Calculate revenue from all orders (paid and unpaid for business insights)
-  const todayRevenue = todayOrders
+
+  // Calculate revenue from filtered orders
+  const periodRevenue = filteredOrders
     .reduce((sum, order) => sum + (order.total || 0), 0)
-  
-  const todayOrderCount = todayOrders.length
-  
-  // Calculate average order value from all orders (not just paid ones)
-  const averageOrderValue = todayOrderCount > 0 ? todayRevenue / todayOrderCount : 0
-  
+
+  const periodOrderCount = filteredOrders.length
+
+  // Calculate average order value
+  const averageOrderValue = periodOrderCount > 0 ? periodRevenue / periodOrderCount : 0
+
   // Calculate top selling items
   const itemCounts = {}
-  todayOrders.forEach(order => {
+  filteredOrders.forEach(order => {
     if (order.items && Array.isArray(order.items)) {
       order.items.forEach(item => {
         if (!item) return
@@ -972,24 +1054,65 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
       })
     }
   })
-  
+
   const topItems = Object.entries(itemCounts)
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5)
     .map(([name, count]) => ({ name, count }))
-  
+
+  const periodLabels = {
+    today: 'Today',
+    yesterday: 'Yesterday',
+    currentWeek: 'This Week',
+    lastWeek: 'Last Week',
+    currentMonth: 'This Month',
+    lastMonth: 'Last Month',
+    all: 'All Time'
+  }
+
   return (
     <div>
-      <h3 style={{ 
-        fontSize: '18px', 
-        fontWeight: 'bold', 
-        color: C.t0, 
-        marginBottom: '20px',
-        textTransform: 'uppercase',
-        letterSpacing: '0.07em'
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '20px' 
       }}>
-        Today's Analytics
-      </h3>
+        <h3 style={{ 
+          fontSize: '18px', 
+          fontWeight: 'bold', 
+          color: C.t0, 
+          margin: 0,
+          textTransform: 'uppercase',
+          letterSpacing: '0.07em'
+        }}>
+          Analytics
+        </h3>
+        
+        {/* Time Period Selector */}
+        <select
+          value={timePeriod}
+          onChange={(e) => setTimePeriod(e.target.value)}
+          style={{
+            padding: '8px 12px',
+            background: C.input,
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            color: C.t0,
+            fontSize: 13,
+            fontFamily: 'inherit',
+            cursor: 'pointer'
+          }}
+        >
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="currentWeek">This Week</option>
+          <option value="lastWeek">Last Week</option>
+          <option value="currentMonth">This Month</option>
+          <option value="lastMonth">Last Month</option>
+          <option value="all">All Time</option>
+        </select>
+      </div>
       
       {/* Metrics Grid */}
       <div style={{ 
@@ -1010,9 +1133,9 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
             color: C.green, 
             marginBottom: '8px' 
           }}>
-            {todayOrderCount}
+            {periodOrderCount}
           </div>
-          <div style={{ fontSize: '14px', color: C.t2 }}>Orders Today</div>
+          <div style={{ fontSize: '14px', color: C.t2 }}>Orders {periodLabels[timePeriod]}</div>
         </div>
         
         <div style={{ 
@@ -1027,9 +1150,9 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
             color: C.acc, 
             marginBottom: '8px' 
           }}>
-            ${todayRevenue.toFixed(2)}
+            ${periodRevenue.toFixed(2)}
           </div>
-          <div style={{ fontSize: '14px', color: C.t2 }}>Revenue Today</div>
+          <div style={{ fontSize: '14px', color: C.t2 }}>Revenue {periodLabels[timePeriod]}</div>
         </div>
         
         <div style={{ 
@@ -1060,7 +1183,7 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
           textTransform: 'uppercase',
           letterSpacing: '0.07em'
         }}>
-          Top Selling Items Today
+          Top Selling Items {periodLabels[timePeriod]}
         </h4>
         <div style={{ 
           background: C.card, 
@@ -1069,7 +1192,7 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
         }}>
           {topItems.length === 0 ? (
             <div style={{ textAlign: 'center', color: C.t3, padding: '20px' }}>
-              No items sold today
+              No items sold {periodLabels[timePeriod].toLowerCase()}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1710,7 +1833,13 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
               Order #{order.orderNumber}
             </h2>
             <div style={{ fontSize: 13, color: C.t3, marginTop: 4 }}>
-              {formatDate(order.createdAt)}
+              Received: {new Date(order.createdAt).toLocaleString('en-AU', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
             </div>
           </div>
           <button
@@ -1975,18 +2104,52 @@ function TablesTab({ clientId, selectedLocation, bookings, queryClient }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 16 }}>
         {tables.map(table => {
-          const isBooked = !!table.bookingId
-          const tableBooking = bookings.find(b => b.id === table.bookingId)
-          const upcomingBookings = bookings.filter(b => 
-            b.tableId === table.id && 
-            b.status !== 'cancelled' &&
-            new Date(b.bookingDate) >= new Date()
-          )
+          const now = new Date()
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+
+          // Check if there's a current walk-in booking
+          const hasWalkinBooking = !!table.bookingId
+          const currentWalkinBooking = bookings.find(b => b.id === table.bookingId)
+
+          // Check if there's an upcoming booking that should mark the table as occupied
+          // Occupied if booking time is within 10 minutes from now
+          const upcomingOccupyingBooking = bookings.find(b => {
+            if (b.status === 'cancelled' || b.tableId !== table.id) return false
+            const [year, month, day] = b.bookingDate.substring(0, 10).split('-')
+            const bookingDay = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+            if (bookingDay < today) return false // Past date
+
+            const [hours, minutes] = b.bookingTime.split(':')
+            const bookingTime = new Date(bookingDay)
+            bookingTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+
+            // Occupied if booking is within 10 minutes from now
+            const minutesUntilBooking = (bookingTime - now) / 60000
+            return minutesUntilBooking <= 10 && minutesUntilBooking > -45 // Within 10 min before, up to 45 min after
+          })
+
+          const isCurrentlyOccupied = hasWalkinBooking || !!upcomingOccupyingBooking
+          // All non-cancelled bookings assigned to this table, sorted soonest first
+          const upcomingBookings = bookings
+            .filter(b => {
+              if (b.status === 'cancelled') return false
+              if (b.tableId !== table.id) return false
+              // Parse date as local date (strip time component)
+              const [year, month, day] = b.bookingDate.substring(0, 10).split('-')
+              const bookingDay = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+              return bookingDay >= today
+            })
+            .sort((a, b) => {
+              const da = a.bookingDate.substring(0, 10) + 'T' + a.bookingTime
+              const db = b.bookingDate.substring(0, 10) + 'T' + b.bookingTime
+              return da.localeCompare(db)
+            })
 
           return (
             <div key={table.id} style={{
               background: C.panel,
-              border: `1px solid ${isBooked ? `${C.amber}40` : C.border}`,
+              border: `1px solid ${isCurrentlyOccupied ? `${C.amber}40` : C.border}`,
               borderRadius: 12,
               padding: 20
             }}>
@@ -1998,10 +2161,10 @@ function TablesTab({ clientId, selectedLocation, bookings, queryClient }) {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <span style={{
                     padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                    background: isBooked ? `${C.amber}20` : `${C.green}20`,
-                    color: isBooked ? C.amber : C.green
+                    background: isCurrentlyOccupied ? `${C.amber}20` : `${C.green}20`,
+                    color: isCurrentlyOccupied ? C.amber : C.green
                   }}>
-                    {isBooked ? 'Occupied' : 'Available'}
+                    {isCurrentlyOccupied ? 'Occupied' : 'Available'}
                   </span>
                   <span style={{
                     padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
@@ -2013,102 +2176,95 @@ function TablesTab({ clientId, selectedLocation, bookings, queryClient }) {
                 </div>
               </div>
 
-              {/* Current/Upcoming Bookings */}
-              {(tableBooking || upcomingBookings.length > 0) && (
-                <div style={{ background: C.card, borderRadius: 8, padding: 12, marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, marginBottom: 8 }}>
-                    Bookings ({(tableBooking ? 1 : 0) + upcomingBookings.length})
+              {/* Current Occupying Booking (walk-in or upcoming reservation) */}
+              {(currentWalkinBooking || upcomingOccupyingBooking) && (
+                <div style={{ background: `${C.amber}10`, borderRadius: 8, padding: 12, marginBottom: 12, border: `1px solid ${C.amber}30` }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, marginBottom: 8 }}>
+                    CURRENTLY OCCUPIED BY
                   </div>
-                  {tableBooking && (
-                    <div style={{
-                      padding: '8px',
-                      background: `${C.amber}20`,
-                      borderRadius: 6,
-                      marginBottom: 8
-                    }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.t0, marginBottom: 4 }}>
-                        {tableBooking.customerName}
-                      </div>
-                      <div style={{ fontSize: 11, color: C.t2, marginBottom: 4 }}>
-                        {formatDate(tableBooking.bookingDate)} at {tableBooking.bookingTime}
-                      </div>
-                      <div style={{ fontSize: 11, color: C.t2, marginBottom: 8 }}>
-                        Party of {tableBooking.partySize}
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {tableBooking.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => updateBookingMutation.mutate({ bookingId: tableBooking.id, status: 'confirmed' })}
-                              style={{
-                                flex: 1,
-                                padding: '6px',
-                                background: C.green,
-                                border: 'none',
-                                borderRadius: 4,
-                                color: '#fff',
-                                fontWeight: 600,
-                                fontSize: 11,
-                                cursor: 'pointer',
-                                fontFamily: 'inherit'
-                              }}
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => updateBookingMutation.mutate({ bookingId: tableBooking.id, status: 'cancelled' })}
-                              style={{
-                                flex: 1,
-                                padding: '6px',
-                                background: C.red,
-                                border: 'none',
-                                borderRadius: 4,
-                                color: '#fff',
-                                fontWeight: 600,
-                                fontSize: 11,
-                                cursor: 'pointer',
-                                fontFamily: 'inherit'
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => {
-                            if (confirm('Release this table from booking?')) {
-                            }}
-                          }
-                          style={{
-                            padding: '6px',
-                            background: 'transparent',
-                            border: `1px solid ${C.border}`,
-                            borderRadius: 4,
-                            color: C.t2,
-                            fontWeight: 600,
-                            fontSize: 11,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit'
-                          }}
-                        >
-                          Release
-                        </button>
-                      </div>
+                  {currentWalkinBooking && (
+                    <div style={{ fontSize: 12, color: C.t0 }}>
+                      <strong>{currentWalkinBooking.customerName}</strong> <span style={{ color: C.t3 }}>(Walk-in)</span>
                     </div>
                   )}
-                  {upcomingBookings.filter(b => b.id !== tableBooking?.id).map(booking => (
+                  {upcomingOccupyingBooking && (
+                    <div style={{ fontSize: 12, color: C.t0 }}>
+                      <strong>{upcomingOccupyingBooking.customerName}</strong> <span style={{ color: C.t3 }}>(Reservation at {upcomingOccupyingBooking.bookingTime})</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Upcoming Bookings for this table */}
+              {upcomingBookings.length > 0 && (
+                <div style={{ background: C.card, borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, marginBottom: 8 }}>
+                    UPCOMING BOOKINGS ({upcomingBookings.length})
+                  </div>
+                  {upcomingBookings.map(booking => (
                     <div key={booking.id} style={{
-                      padding: '8px',
+                      padding: '10px',
                       background: C.page,
                       borderRadius: 6,
-                      marginBottom: 4
+                      marginBottom: 6,
+                      border: `1px solid ${booking.status === 'confirmed' ? `${C.green}40` : `${C.amber}40`}`
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.t0, marginBottom: 2 }}>
-                        {booking.customerName}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.t0 }}>{booking.customerName}</div>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+                          background: booking.status === 'confirmed' ? `${C.green}20` : `${C.amber}20`,
+                          color: booking.status === 'confirmed' ? C.green : C.amber,
+                          textTransform: 'uppercase'
+                        }}>
+                          {booking.status}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 11, color: C.t2 }}>
-                        {formatDate(booking.bookingDate)} at {booking.bookingTime} • Party of {booking.partySize}
+                      <div style={{ fontSize: 11, color: C.t2, marginBottom: 2 }}>
+                        📅 {formatDate(booking.bookingDate)} at {booking.bookingTime}
                       </div>
+                      <div style={{ fontSize: 11, color: C.t2, marginBottom: booking.customerEmail ? 2 : 6 }}>
+                        👥 Party of {booking.partySize}
+                      </div>
+                      {booking.customerEmail && (
+                        <div style={{ fontSize: 11, color: C.t2, marginBottom: booking.customerPhone ? 2 : 6 }}>
+                          📧 {booking.customerEmail}
+                        </div>
+                      )}
+                      {booking.customerPhone && (
+                        <div style={{ fontSize: 11, color: C.t2, marginBottom: 6 }}>
+                          📞 {booking.customerPhone}
+                        </div>
+                      )}
+                      {booking.notes && (
+                        <div style={{ fontSize: 11, color: C.t3, marginBottom: 6, fontStyle: 'italic' }}>
+                          "{booking.notes}"
+                        </div>
+                      )}
+                      {booking.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => updateBookingMutation.mutate({ bookingId: booking.id, status: 'confirmed' })}
+                            style={{
+                              flex: 1, padding: '5px', background: C.green, border: 'none',
+                              borderRadius: 4, color: '#fff', fontWeight: 600, fontSize: 11,
+                              cursor: 'pointer', fontFamily: 'inherit'
+                            }}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => updateBookingMutation.mutate({ bookingId: booking.id, status: 'cancelled' })}
+                            style={{
+                              flex: 1, padding: '5px', background: C.red, border: 'none',
+                              borderRadius: 4, color: '#fff', fontWeight: 600, fontSize: 11,
+                              cursor: 'pointer', fontFamily: 'inherit'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -2121,7 +2277,7 @@ function TablesTab({ clientId, selectedLocation, bookings, queryClient }) {
                 style={{
                   width: '100%',
                   padding: '10px',
-                  background: isBooked ? C.red : C.green,
+                  background: isCurrentlyOccupied ? C.red : C.green,
                   border: 'none',
                   borderRadius: 8,
                   color: '#fff',
@@ -2132,7 +2288,7 @@ function TablesTab({ clientId, selectedLocation, bookings, queryClient }) {
                   opacity: updateTableBookingMutation.isPending ? 0.5 : 1
                 }}
               >
-                {isBooked ? 'Mark as Available' : 'Mark as Booked (Walk-in)'}
+                {isCurrentlyOccupied ? 'Mark as Available' : 'Mark as Booked (Walk-in)'}
               </button>
             </div>
           )

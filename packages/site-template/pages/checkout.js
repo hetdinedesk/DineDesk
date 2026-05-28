@@ -29,7 +29,8 @@ const THEME_COMPONENTS = {
 import { useCart } from '../contexts/CartContext'
 import { ShoppingCart, CreditCard, DollarSign, Clock, User, Phone, Mail, Calendar, Check, X, Loader2, Gift, Star, ArrowLeft, ArrowRight, MapPin, UtensilsCrossed, Sparkles } from 'lucide-react'
 import { loadStripe } from '@stripe/stripe-js'
-import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js'
+import { PaymentElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js'
+import { isRestaurantOpen } from '../lib/operatingHours'
 
 export async function getServerSideProps({ query }) {
   const rawSite = query.site
@@ -55,10 +56,13 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
     setLoading(true)
     setError(null)
 
-    const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: {
-        card: elements.getElement(CardElement),
-      }
+    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      clientSecret,
+      confirmParams: {
+        return_url: window.location.href,
+      },
+      redirect: 'if_required'
     })
 
     if (stripeError) {
@@ -74,17 +78,13 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
   return (
     <form onSubmit={handleSubmit}>
       <div className="p-6 border border-[var(--color-secondary)]/20 rounded-full mt-6 bg-[var(--color-accent)]">
-        <CardElement
+        <PaymentElement
           options={{
-            style: {
-              base: {
-                fontSize: '16px',
-                color: 'var(--color-secondary)',
-                '::placeholder': {
-                  color: 'var(--color-secondary)',
-                },
-              },
-            },
+            layout: 'tabs',
+            wallets: {
+              applePay: 'auto',
+              googlePay: 'auto'
+            }
           }}
         />
       </div>
@@ -276,6 +276,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine-in
   const [selectedLocation, setSelectedLocation] = useState('')
 
+  // Check if restaurant is currently open
+  const primaryLocation = data?.locations?.find(loc => loc.isPrimary) || data?.locations?.[0]
+  const isRestaurantCurrentlyOpen = isRestaurantOpen(primaryLocation?.hours)
+
   // Auto-select first location if only one active location exists
   useEffect(() => {
     const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
@@ -283,6 +287,106 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       setSelectedLocation(activeLocations[0].id)
     }
   }, [data?.locations])
+
+  // If restaurant is closed, default to scheduled pickup
+  useEffect(() => {
+    if (!isRestaurantCurrentlyOpen) {
+      setPickupType('scheduled')
+    }
+  }, [isRestaurantCurrentlyOpen])
+
+  // Validate scheduled time when it changes
+  useEffect(() => {
+    if (pickupType === 'scheduled' && scheduledTime) {
+      if (!isScheduledTimeValid(scheduledTime)) {
+        setScheduledTimeError('Restaurant is closed at the selected time. Please choose a time when we are open.')
+      } else {
+        setScheduledTimeError('')
+      }
+    } else {
+      setScheduledTimeError('')
+    }
+  }, [scheduledTime, pickupType])
+
+  // Calculate minimum scheduled time (opening time + 15 minutes)
+  const getMinScheduledTime = () => {
+    const now = new Date()
+    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' })
+    const todayHours = primaryLocation?.hours?.[currentDay]
+    
+    if (!todayHours || todayHours.closed || !todayHours.open) {
+      // If closed today, return tomorrow's opening time + 15 min
+      const tomorrow = new Date(now)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0)
+      return tomorrow.toISOString().slice(0, 16)
+    }
+
+    // Parse opening time
+    const parseTime = (timeStr) => {
+      const match = timeStr.toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
+      if (!match) return null
+      let hours = parseInt(match[1])
+      const minutes = match[2] ? parseInt(match[2]) : 0
+      const meridiem = match[3]
+      if (meridiem === 'pm' && hours !== 12) hours += 12
+      if (meridiem === 'am' && hours === 12) hours = 0
+      return hours * 60 + minutes
+    }
+
+    const openMinutes = parseTime(todayHours.open)
+    if (openMinutes === null) return now.toISOString().slice(0, 16)
+
+    // Create date with opening time + 15 minutes
+    const openingDate = new Date(now)
+    openingDate.setHours(Math.floor(openMinutes / 60), openMinutes % 60, 0, 0)
+    openingDate.setMinutes(openingDate.getMinutes() + 15)
+
+    // If opening time + 15 min is in the past, use it tomorrow
+    if (openingDate < now) {
+      openingDate.setDate(openingDate.getDate() + 1)
+    }
+
+    return openingDate.toISOString().slice(0, 16)
+  }
+
+  // Check if scheduled time is within operating hours
+  const isScheduledTimeValid = (scheduledTimeStr) => {
+    if (!scheduledTimeStr) return false
+    
+    const scheduledDate = new Date(scheduledTimeStr)
+    const scheduledDay = scheduledDate.toLocaleDateString('en-US', { weekday: 'long' })
+    const scheduledMinutes = scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
+    
+    const dayHours = primaryLocation?.hours?.[scheduledDay]
+    if (!dayHours || dayHours.closed || !dayHours.open || !dayHours.close) {
+      return false
+    }
+
+    // Parse time strings
+    const parseTime = (timeStr) => {
+      const match = timeStr.toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
+      if (!match) return null
+      let hours = parseInt(match[1])
+      const minutes = match[2] ? parseInt(match[2]) : 0
+      const meridiem = match[3]
+      if (meridiem === 'pm' && hours !== 12) hours += 12
+      if (meridiem === 'am' && hours === 12) hours = 0
+      return hours * 60 + minutes
+    }
+
+    const openMinutes = parseTime(dayHours.open)
+    const closeMinutes = parseTime(dayHours.close)
+
+    if (openMinutes === null || closeMinutes === null) return false
+
+    // Handle overnight hours
+    if (closeMinutes < openMinutes) {
+      return scheduledMinutes >= openMinutes || scheduledMinutes < closeMinutes
+    }
+
+    return scheduledMinutes >= openMinutes && scheduledMinutes < closeMinutes
+  }
 
   // Payment
   const [paymentMethod, setPaymentMethod] = useState('cash') // stripe | cash
@@ -292,10 +396,18 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false)
   const [redeemedReward, setRedeemedReward] = useState(null)
   const [discountAmount, setDiscountAmount] = useState(0)
+  const [scheduledTimeError, setScheduledTimeError] = useState('')
 
   const handlePlaceOrder = async () => {
     setLoading(true)
     setError(null)
+
+    // Validate scheduled time if pickup type is scheduled
+    if (pickupType === 'scheduled' && !isScheduledTimeValid(scheduledTime)) {
+      setError('Please select a pickup time when the restaurant is open.')
+      setLoading(false)
+      return
+    }
 
     try {
       const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
@@ -838,7 +950,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                               : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
                           }`}
                         >
-                          {type}
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
                         </button>
                       ))}
                     </div>
@@ -846,18 +958,31 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
                   <div>
                     <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Pickup Time</label>
+                    
+                    {!isRestaurantCurrentlyOpen && (
+                      <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-full">
+                        <div className="flex items-center gap-3">
+                          <Clock width={18} height={18} strokeWidth={2} className="text-red-600" />
+                          <span className="text-sm font-bold text-red-800">Restaurant is currently closed</span>
+                        </div>
+                        <p className="text-xs text-red-600 mt-1">Please schedule your order for when we open</p>
+                      </div>
+                    )}
+                    
                     <div className="flex gap-4">
-                      <button
-                        onClick={() => setPickupType('asap')}
-                        className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all flex items-center justify-center gap-3 ${
-                          pickupType === 'asap' 
-                            ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
-                            : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
-                        }`}
-                      >
-                        <Clock width={18} height={18} strokeWidth={2} />
-                        ASAP
-                      </button>
+                      {isRestaurantCurrentlyOpen && (
+                        <button
+                          onClick={() => setPickupType('asap')}
+                          className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all flex items-center justify-center gap-3 ${
+                            pickupType === 'asap' 
+                              ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
+                              : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
+                          }`}
+                        >
+                          <Clock width={18} height={18} strokeWidth={2} />
+                          ASAP
+                        </button>
+                      )}
                       <button
                         onClick={() => setPickupType('scheduled')}
                         className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all flex items-center justify-center gap-3 ${
@@ -880,8 +1005,14 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
                         className="w-full px-6 py-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/20 rounded-full focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-secondary)] font-sans"
-                        min={new Date().toISOString().slice(0, 16)}
+                        min={getMinScheduledTime()}
                       />
+                      {scheduledTimeError && (
+                        <p className="text-xs text-red-600 mt-2 font-medium">{scheduledTimeError}</p>
+                      )}
+                      <p className="text-xs text-[var(--color-secondary)]/40 mt-2">
+                        {isRestaurantCurrentlyOpen ? 'Pickup available now or schedule for later' : 'Scheduled orders available 15 minutes after opening'}
+                      </p>
                     </div>
                   )}
 

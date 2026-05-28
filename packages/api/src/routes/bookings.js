@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit')
 const { authenticateToken } = require('../middleware/auth')
 const { prisma } = require('../lib/prisma')
 const { log } = require('../lib/activityLog')
+const { sendBookingConfirmation } = require('../lib/email')
 const router = express.Router()
 
 // Rate limiting for public booking endpoints
@@ -25,7 +26,8 @@ const availabilityLimiter = rateLimit({
 // Create a new booking - with rate limiting
 router.post('/', bookingLimiter, async (req, res) => {
   try {
-    const { clientId, locationId, customerName, customerEmail, customerPhone, partySize, bookingDate, bookingTime, notes, confirmationMethod, tableId, autoAssignTable = false } = req.body
+    const { clientId, customerName, customerEmail, customerPhone, partySize, bookingDate, bookingTime, notes, confirmationMethod, tableId, autoAssignTable = false } = req.body
+    let locationId = req.body.locationId
 
     // Validate required fields
     if (!clientId || !customerName || !partySize || !bookingDate || !bookingTime || !confirmationMethod) {
@@ -153,16 +155,42 @@ router.post('/', bookingLimiter, async (req, res) => {
       },
       include: {
         location: true,
-        table: true
+        tables: true
       }
     })
 
-    // If a table was assigned, update the table with the booking reference
-    if (assignedTableId) {
-      await prisma.restaurantTable.update({
-        where: { id: assignedTableId },
-        data: { bookingId: booking.id }
+    // Don't set RestaurantTable.bookingId for future reservations
+    // The Booking.tableId field links the reservation to the table
+    // RestaurantTable.bookingId is only for current walk-in bookings
+
+    // Send booking confirmation email
+    try {
+      const client = await prisma.client.findUnique({
+        where: { id: clientId },
+        select: {
+          name: true,
+          logo: true,
+          colours: true
+        }
       })
+      
+      const siteConfig = await prisma.siteConfig.findUnique({
+        where: { id: clientId },
+        select: { notifications: true }
+      })
+      
+      if (client && customerEmail) {
+        await sendBookingConfirmation(
+          booking,
+          client.name,
+          siteConfig?.notifications || {},
+          client,
+          booking.location
+        )
+      }
+    } catch (emailError) {
+      console.error('Failed to send booking confirmation email:', emailError)
+      // Don't fail the booking if email fails
     }
 
     res.json(booking)

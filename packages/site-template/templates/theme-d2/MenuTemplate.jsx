@@ -2,47 +2,23 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Search, Plus, Check, Gift, Phone } from 'lucide-react';
+import { Search, Plus, Check, Gift, Phone, Clock } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 import ItemCustomizationModal from '../../components/ItemCustomizationModal';
+import { isRestaurantOpen, formatOperatingHours } from '../../lib/operatingHours';
 
 export default function MenuPage({ data, page, banner }) {
-  const { menuCategories, menuItems, shortcodes, contentPages, ordering } = useCMS();
+  const { menuCategories, menuItems, shortcodes, contentPages, ordering, locations } = useCMS();
   const { addItem, isEnabled: orderingEnabled } = useCart();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [addedItems, setAddedItems] = useState({});
   const [customizingItem, setCustomizingItem] = useState(null);
 
-  // Drag-to-scroll state for categories
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const categoryContainerRef = React.useRef(null);
-
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setStartX(e.pageX - (categoryContainerRef.current?.offsetLeft || 0));
-    setScrollLeft(categoryContainerRef.current?.scrollLeft || 0);
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    const x = e.pageX - (categoryContainerRef.current?.offsetLeft || 0);
-    const walk = (x - startX) * 2;
-    if (categoryContainerRef.current) {
-      categoryContainerRef.current.scrollLeft = scrollLeft - walk;
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
+  // Check if restaurant is currently open based on operating hours
+  const primaryLocation = locations?.find(loc => loc.isPrimary) || locations?.[0];
+  const isRestaurantCurrentlyOpen = isRestaurantOpen(primaryLocation?.hours);
+  const currentOperatingHours = formatOperatingHours(primaryLocation?.hours);
 
   // Get loyalty config from data instead of hook
   const loyaltyConfig = data?.loyaltyConfig;
@@ -141,15 +117,17 @@ export default function MenuPage({ data, page, banner }) {
     <div className="min-h-screen bg-[var(--color-accent)]">
       {/* Hero Banner */}
       <div className="bg-[var(--color-secondary)] py-32 px-6 text-center text-[var(--color-accent)] relative overflow-hidden">
-        {/* Background Image */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src={pageBanner?.imageUrl || 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?q=80&w=2070&auto=format&fit=crop'} 
-            alt="" 
-            className="w-full h-full object-cover opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--color-secondary)]/50 to-[var(--color-secondary)]"></div>
-        </div>
+        {/* Background Image from CMS Banner */}
+        {pageBanner?.imageUrl && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={pageBanner.imageUrl} 
+              alt="" 
+              className="w-full h-full object-cover opacity-30"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[var(--color-secondary)]/50 to-[var(--color-secondary)]"></div>
+          </div>
+        )}
         
         {/* Content */}
         <div className="relative z-10 space-y-6">
@@ -206,86 +184,53 @@ export default function MenuPage({ data, page, banner }) {
         </div>
       )}
 
-      {/* Enhanced Sticky Filter Bar */}
-      <div className="sticky top-20 z-40 bg-gradient-to-r from-[var(--color-accent)] via-[var(--color-accent)]/95 to-[var(--color-accent)]/90 backdrop-blur-xl border-b border-[var(--color-secondary)]/10 py-6 px-6 shadow-lg">
-        <div className="max-w-7xl mx-auto space-y-4">
-          {/* Category Tabs - Full Width Scrollable */}
-          <div className="relative w-full overflow-hidden">
-            {/* Scroll indicators */}
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
-              <div className="w-12 h-16 bg-gradient-to-r from-[var(--color-accent)] to-transparent"></div>
-            </div>
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
-              <div className="w-12 h-16 bg-gradient-to-l from-[var(--color-accent)] to-transparent"></div>
-            </div>
-            
-            <div 
-              ref={categoryContainerRef}
-              className={`flex gap-3 p-2 bg-white/80 backdrop-blur-sm rounded-2xl shadow-inner border border-[var(--color-secondary)]/15 overflow-x-auto scrollbar-hide select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-              style={{ 
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
+
+      {/* Filter Bar */}
+      <div className="bg-[var(--color-accent)]/90 backdrop-blur-xl border-b border-[var(--color-secondary)]/5 py-8 px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
+          {/* Category Pills */}
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`px-8 py-3 rounded-full font-sans font-bold text-[10px] tracking-[0.2em] transition-all duration-700 uppercase ${
+                !selectedCategory
+                  ? 'bg-[var(--color-primary)] text-white shadow-lg'
+                  : 'text-[var(--color-secondary)]/40 hover:text-[var(--color-secondary)] hover:bg-[var(--color-primary)]/5'
+              }`}
             >
+              All Items
+            </button>
+            {activeCategories.map((category) => (
               <button
-                onClick={() => setSelectedCategory(null)}
-                className={`flex-shrink-0 group relative px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${
-                  !selectedCategory
-                    ? 'bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-primary)] text-white shadow-lg shadow-[var(--color-secondary)]/25'
-                    : 'text-[var(--color-secondary)]/70 hover:text-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/10'
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`px-8 py-3 rounded-full font-sans font-bold text-[10px] tracking-[0.2em] transition-all duration-700 uppercase ${
+                  selectedCategory === category.id
+                    ? 'bg-[var(--color-primary)] text-white shadow-lg'
+                    : 'text-[var(--color-secondary)]/40 hover:text-[var(--color-secondary)] hover:bg-[var(--color-primary)]/5'
                 }`}
               >
-                <span className="relative z-10">All Items</span>
-                {!selectedCategory && (
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-primary)] opacity-100"></div>
-                )}
+                {category.name}
               </button>
-              {activeCategories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`flex-shrink-0 group relative px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${
-                    selectedCategory === category.id
-                      ? 'bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-primary)] text-white shadow-lg shadow-[var(--color-secondary)]/25'
-                      : 'text-[var(--color-secondary)]/70 hover:text-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/10'
-                  }`}
-                >
-                  <span className="relative z-10 flex items-center gap-2">
-                    {category.name}
-                    {selectedCategory === category.id && (
-                      <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                    )}
-                  </span>
-                  {selectedCategory === category.id && (
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-primary)] opacity-100"></div>
-                  )}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-          
-          {/* Enhanced Search - Centered Below */}
-          <div className="relative w-full max-w-md mx-auto group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-[var(--color-primary)]/20 to-[var(--color-secondary)]/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--color-secondary)]/40 group-hover:text-[var(--color-primary)] transition-colors duration-300" size={20} />
+
+          {/* Search Bar */}
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--color-secondary)]/20" size={16} />
             <input
               type="text"
-              placeholder="Search menu items..."
+              placeholder="FIND IN THE GARDEN..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="relative w-full bg-white/90 backdrop-blur-sm border border-[var(--color-secondary)]/20 rounded-full pl-14 pr-6 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all duration-300 placeholder:text-[var(--color-secondary)]/40"
+              className="w-full bg-[var(--color-secondary)]/5 border border-transparent rounded-full px-14 py-4 text-[10px] font-sans font-bold tracking-widest text-[var(--color-secondary)] focus:outline-none focus:bg-white focus:border-[var(--color-primary)]/20 transition-all duration-500 placeholder:text-[var(--color-secondary)]/40"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full bg-[var(--color-secondary)]/10 hover:bg-[var(--color-secondary)]/20 transition-colors duration-200"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[var(--color-secondary)]/10 transition-colors duration-200"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-secondary)]/60">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-secondary)]/60">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
@@ -296,59 +241,57 @@ export default function MenuPage({ data, page, banner }) {
       </div>
 
       {/* Menu Items Grid */}
-      <div className="max-w-7xl mx-auto py-16 px-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+      <div className="max-w-7xl mx-auto py-16 px-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
           {filteredItems.map((item) => {
             const name = replaceShortcodes(item.name || '', shortcodes);
             const description = replaceShortcodes(item.description || '', shortcodes);
-            
+
             return (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="group flex flex-col gap-6 p-4 rounded-3xl hover:bg-white hover:shadow-xl transition-all duration-500"
+                className="group flex flex-col gap-3 p-3 md:p-4 rounded-2xl md:rounded-3xl hover:bg-white hover:shadow-xl transition-all duration-500"
               >
                 {/* Image */}
-                <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-md">
+                <div className="aspect-square rounded-xl md:rounded-2xl overflow-hidden shadow-md">
                   <img
                     src={getItemImage(item) || 'https://images.unsplash.com/photo-1541167760496-162955ed8a9f?q=80&w=1936&auto=format&fit=crop'}
                     alt={name}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                 </div>
-                
+
                 {/* Content */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-start gap-4">
-                    <h3 className="font-serif text-2xl font-bold text-[var(--color-secondary)] group-hover:text-[var(--color-primary)] transition-colors">
-                      {name}
-                    </h3>
-                    <span className="text-[var(--color-primary)] font-bold text-xl">
-                      ${item.price?.toFixed(2)}
-                    </span>
-                  </div>
-                  <p className="text-[var(--color-secondary)]/60 text-sm leading-relaxed">
+                <div className="space-y-2 md:space-y-3">
+                  <h3 className="font-serif text-sm md:text-lg lg:text-2xl font-bold text-[var(--color-secondary)] group-hover:text-[var(--color-primary)] transition-colors line-clamp-2">
+                    {name}
+                  </h3>
+                  <span className="text-[var(--color-primary)] font-bold text-sm md:text-base lg:text-xl">
+                    ${item.price?.toFixed(2)}
+                  </span>
+                  <p className="text-[var(--color-secondary)]/60 text-xs md:text-sm leading-relaxed line-clamp-2">
                     {description}
                   </p>
-                  
+
                   {/* Add Button */}
                   {orderingEnabled && (
                     <button
                       onClick={() => handleAddItem(item)}
                       disabled={addedItems[item.id]}
-                      className="pt-2 text-[var(--color-secondary)] font-bold text-xs uppercase tracking-widest flex items-center gap-2 group/btn hover:text-[var(--color-primary)] transition-colors"
+                      className="pt-1 md:pt-2 text-[var(--color-secondary)] font-bold text-[10px] md:text-xs uppercase tracking-widest flex items-center gap-2 group/btn hover:text-[var(--color-primary)] transition-colors"
                     >
                       {addedItems[item.id] ? (
                         <>
-                          <Check size={16} />
+                          <Check size={14} />
                           Added
-                          <div className="w-10 h-px bg-green-500"></div>
+                          <div className="w-8 h-px bg-green-500"></div>
                         </>
                       ) : (
                         <>
                           Customize & Add
-                          <div className="w-6 h-px bg-[var(--color-primary)] transition-all duration-300 group-hover/btn:w-10"></div>
+                          <div className="w-4 h-px bg-[var(--color-primary)] transition-all duration-300 group-hover/btn:w-8"></div>
                         </>
                       )}
                     </button>

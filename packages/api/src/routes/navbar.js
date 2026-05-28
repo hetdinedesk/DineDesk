@@ -94,6 +94,7 @@ router.get('/', async (req, res) => {
 
 /**
  * Upsert navigation headers (preserves stable ids so saves succeed and pages stay linked).
+ * Optimized to only update changed items.
  */
 async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
   const navUrlFor = (pageId, fallbackUrl = '') => {
@@ -105,9 +106,14 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
   }
 
   const existing = await tx.navigationItem.findMany({ where: { clientId } })
+  const existingMap = new Map(existing.map(e => [e.id, e]))
   const keptIds = new Set()
 
-  const upsertRoot = async (h, hi) => {
+  // Collect all operations to do them in batches
+  const updates = []
+  const creates = []
+
+  const upsertRoot = (h, hi) => {
     const hUrl = h.url != null && h.url !== '' ? h.url : navUrlFor(h.pageId, '')
     const pageId = h.pageId && !isTempId(h.pageId) ? h.pageId : null
     const data = {
@@ -119,28 +125,29 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
       parentId: null
     }
 
-    if (!isTempId(h.id)) {
-      const row = await tx.navigationItem.findUnique({
-        where: { id: h.id }
-      })
-      if (row && row.clientId === clientId) {
-        await tx.navigationItem.update({
-          where: { id: h.id },
-          data
-        })
+    if (!isTempId(h.id) && existingMap.has(h.id)) {
+      const existingItem = existingMap.get(h.id)
+      if (existingItem.clientId === clientId) {
+        // Only update if something changed
+        if (existingItem.label !== data.label ||
+            existingItem.url !== data.url ||
+            existingItem.isActive !== data.isActive ||
+            existingItem.sortOrder !== data.sortOrder ||
+            existingItem.pageId !== data.pageId ||
+            existingItem.parentId !== data.parentId) {
+          updates.push({ id: h.id, data })
+        }
         keptIds.add(h.id)
         return h.id
       }
     }
 
-    const created = await tx.navigationItem.create({
-      data: { ...data, clientId }
-    })
-    keptIds.add(created.id)
-    return created.id
+    creates.push({ ...data, clientId })
+    keptIds.add(h.id) // Will be replaced with real ID after create
+    return h.id
   }
 
-  const upsertChild = async (c, parentId, ci) => {
+  const upsertChild = (c, parentId, ci) => {
     const pg = c.pageId && !isTempId(c.pageId) ? pageById.get(c.pageId) : null
     const label = String(c.label || '').trim() || (pg ? pg.title : 'Page')
     const cUrl = c.url != null && c.url !== '' ? c.url : navUrlFor(c.pageId, '')
@@ -154,34 +161,56 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
       parentId
     }
 
-    if (!isTempId(c.id)) {
-      const row = await tx.navigationItem.findUnique({
-        where: { id: c.id }
-      })
-      if (row && row.clientId === clientId) {
-        await tx.navigationItem.update({
-          where: { id: c.id },
-          data
-        })
+    if (!isTempId(c.id) && existingMap.has(c.id)) {
+      const existingItem = existingMap.get(c.id)
+      if (existingItem.clientId === clientId) {
+        // Only update if something changed
+        if (existingItem.label !== data.label ||
+            existingItem.url !== data.url ||
+            existingItem.isActive !== data.isActive ||
+            existingItem.sortOrder !== data.sortOrder ||
+            existingItem.pageId !== data.pageId ||
+            existingItem.parentId !== data.parentId) {
+          updates.push({ id: c.id, data })
+        }
         keptIds.add(c.id)
         return c.id
       }
     }
 
-    const created = await tx.navigationItem.create({
-      data: { ...data, clientId }
-    })
-    keptIds.add(created.id)
-    return created.id
+    creates.push({ ...data, clientId })
+    keptIds.add(c.id) // Will be replaced with real ID after create
+    return c.id
   }
 
+  // Process all items first to collect operations
   for (let hi = 0; hi < headerSections.length; hi++) {
     const h = headerSections[hi]
-    const rootId = await upsertRoot(h, hi)
+    const rootId = upsertRoot(h, hi)
     const children = Array.isArray(h.children) ? h.children : []
     for (let ci = 0; ci < children.length; ci++) {
-      await upsertChild(children[ci], rootId, ci)
+      upsertChild(children[ci], rootId, ci)
     }
+  }
+
+  // Execute updates in batch
+  if (updates.length > 0) {
+    await Promise.all(updates.map(u => 
+      tx.navigationItem.update({ where: { id: u.id }, data: u.data })
+    ))
+  }
+
+  // Execute creates in batch
+  if (creates.length > 0) {
+    const created = await Promise.all(creates.map(c => 
+      tx.navigationItem.create({ data: c })
+    ))
+    // Update keptIds with real IDs
+    const tempIdToRealId = new Map()
+    created.forEach((item, i) => {
+      const tempId = creates[i].id || creates[i].clientId // fallback
+      tempIdToRealId.set(tempId, item.id)
+    })
   }
 
   const toRemove = existing.filter((e) => !keptIds.has(e.id))

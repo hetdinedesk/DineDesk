@@ -27,22 +27,31 @@ function SALogin({ onLogin }) {
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
 
-  const submit = async () => {
+  const submit = async (e) => {
+    if (e) e.preventDefault()
     if (!email || !password) return
     setLoading(true); setError('')
     try {
       const data = await baseApiFetch('/auth/login', 'POST', { email, password })
 
-      if (data.error) { setError('Invalid credentials.'); setLoading(false); return }
+      if (data.error) {
+        setError('Invalid credentials.')
+        setLoading(false)
+        return
+      }
       if (data.user.role !== 'SUPER_ADMIN' && data.user.role !== 'MANAGER') {
-        setError('Access denied. This portal is for staff only.'); setLoading(false); return
+        setError('Access denied. This portal is for staff only.')
+        setLoading(false)
+        return
       }
       localStorage.setItem(SA_TOKEN_KEY, data.token)
       onLogin(data.user)
-    } catch {
+    } catch (err) {
+      console.error('Site admin login error:', err)
       setError('Connection error. Is the API running?')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -81,14 +90,13 @@ function SALogin({ onLogin }) {
             Access restricted to DineDesk staff only.
           </p>
 
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <form onSubmit={submit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <div>
               <label style={{ fontSize:11, fontWeight:700, color:C.t3,
                 textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:6 }}>
                 Email
               </label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key==='Enter' && submit()}
                 placeholder="you@dinedesk.io"
                 style={{ width:'100%', padding:'11px 14px', fontSize:14, background:C.input,
                   border:`1px solid ${C.border}`, borderRadius:9, color:C.t0,
@@ -103,7 +111,6 @@ function SALogin({ onLogin }) {
                 Password
               </label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                onKeyDown={e => e.key==='Enter' && submit()}
                 placeholder="••••••••"
                 style={{ width:'100%', padding:'11px 14px', fontSize:14, background:C.input,
                   border:`1px solid ${C.border}`, borderRadius:9, color:C.t0,
@@ -120,7 +127,7 @@ function SALogin({ onLogin }) {
               </div>
             )}
 
-            <button onClick={submit} disabled={loading}
+            <button type="submit" disabled={loading}
               style={{ width:'100%', padding:13,
                 background:loading ? C.card : `linear-gradient(135deg,${C.acc},${C.accHov})`,
                 border:'none', borderRadius:9, fontSize:15, fontWeight:800, color:'#fff',
@@ -128,7 +135,7 @@ function SALogin({ onLogin }) {
                 boxShadow:loading?'none':`0 4px 20px ${C.acc}50` }}>
               {loading ? '⏳ Signing in…' : 'Sign In →'}
             </button>
-          </div>
+          </form>
 
           <div style={{ marginTop:20, padding:'14px 0 0', borderTop:`1px solid ${C.border}`,
             fontSize:12, color:C.t3, textAlign:'center' }}>
@@ -143,6 +150,7 @@ function SALogin({ onLogin }) {
 
 // ── Main Site Admin Shell ───────────────────────────────────────
 function SAShell({ user, onLogout }) {
+  console.log('SAShell mounted with user:', user)
   const [tab, setTab] = useState('dashboard')
   const isSuperAdmin = user.role === 'SUPER_ADMIN'
 
@@ -220,12 +228,10 @@ function SAShell({ user, onLogout }) {
 
       {/* Content */}
       <div style={{ flex:1, overflow:'hidden' }}>
-        <OrderProvider clientId="site-admin">
-          {tab==='dashboard' && <SADashboard />}
-          {tab==='users'     && isSuperAdmin && <SAUsers     />}
-          {tab==='activity'  && isSuperAdmin && <SAActivity  />}
-          {tab==='settings'  && isSuperAdmin && <SASettings  />}
-        </OrderProvider>
+        {tab==='dashboard' && <SADashboard />}
+        {tab==='users'     && isSuperAdmin && <SAUsers     />}
+        {tab==='activity'  && isSuperAdmin && <SAActivity  />}
+        {tab==='settings'  && isSuperAdmin && <SASettings  />}
       </div>
     </div>
   )
@@ -397,20 +403,59 @@ function SAUsers() {
 
   useEffect(() => { load() }, [])
 
+  // Helper: get tabs array from access entry (backward compat)
+  const getAccessTabs = (access, siteId) => {
+    const entry = access[siteId]
+    if (!entry) return []
+    if (Array.isArray(entry)) return entry // old format
+    return entry.tabs || []
+  }
+
+  // Helper: get locationIds from access entry
+  const getAccessLocations = (access, siteId) => {
+    const entry = access[siteId]
+    if (!entry || Array.isArray(entry)) return [] // old format has no locations
+    return entry.locationIds || []
+  }
+
+  // Helper: set access with new format { tabs, locationIds }
+  const setAccessEntry = (access, setAccess, siteId, tabs, locationIds) => {
+    setAccess({ ...access, [siteId]: { tabs, locationIds } })
+  }
+
   const toggleTab = (access, setAccess, siteId, tab) => {
-    const current = access[siteId] || []
-    const updated  = current.includes(tab)
-      ? current.filter(t => t !== tab)
-      : [...current, tab]
-    setAccess({ ...access, [siteId]: updated })
+    const currentTabs = getAccessTabs(access, siteId)
+    const currentLocs = getAccessLocations(access, siteId)
+    const updated = currentTabs.includes(tab)
+      ? currentTabs.filter(t => t !== tab)
+      : [...currentTabs, tab]
+    setAccessEntry(access, setAccess, siteId, updated, currentLocs)
   }
 
   const toggleAllSite = (access, setAccess, siteId) => {
-    const current = access[siteId] || []
-    setAccess({
-      ...access,
-      [siteId]: current.length === TABS.length ? [] : [...TABS]
-    })
+    const currentTabs = getAccessTabs(access, siteId)
+    const currentLocs = getAccessLocations(access, siteId)
+    setAccessEntry(access, setAccess, siteId,
+      currentTabs.length === TABS.length ? [] : [...TABS],
+      currentLocs
+    )
+  }
+
+  const toggleLocation = (access, setAccess, siteId, locId) => {
+    const currentTabs = getAccessTabs(access, siteId)
+    const currentLocs = getAccessLocations(access, siteId)
+    const updated = currentLocs.includes(locId)
+      ? currentLocs.filter(l => l !== locId)
+      : [...currentLocs, locId]
+    setAccessEntry(access, setAccess, siteId, currentTabs, updated)
+  }
+
+  const toggleAllLocations = (access, setAccess, siteId, allLocIds) => {
+    const currentTabs = getAccessTabs(access, siteId)
+    const currentLocs = getAccessLocations(access, siteId)
+    setAccessEntry(access, setAccess, siteId, currentTabs,
+      currentLocs.length === allLocIds.length ? [] : [...allLocIds]
+    )
   }
 
   const createUser = async () => {
@@ -466,26 +511,29 @@ function SAUsers() {
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <label style={{ fontSize:11, fontWeight:700, color:C.t3,
         textTransform:'uppercase', letterSpacing:'0.06em' }}>
-        Site Access — tick tabs per site
+        Site Access — tick tabs & locations per site
       </label>
       {clients.length === 0 && (
         <div style={{ fontSize:13, color:C.t3 }}>No sites yet.</div>
       )}
       {clients.map(cl => {
-        const siteTabs = access[cl.id] || []
+        const siteTabs = getAccessTabs(access, cl.id)
+        const siteLocs = getAccessLocations(access, cl.id)
         const allTicked = siteTabs.length === TABS.length
+        const clientLocations = cl.locations || []
+        const hasAccess = siteTabs.length > 0
         return (
           <div key={cl.id} style={{ background:C.card,
-            border:`1px solid ${siteTabs.length > 0 ? C.acc+'40' : C.border}`,
+            border:`1px solid ${hasAccess ? C.acc+'40' : C.border}`,
             borderRadius:10, overflow:'hidden' }}>
             {/* Site header row */}
             <div style={{ display:'flex', alignItems:'center',
               justifyContent:'space-between', padding:'10px 14px',
-              borderBottom: siteTabs.length > 0 ? `1px solid ${C.border}` : 'none',
-              background: siteTabs.length > 0 ? C.accBg+'80' : 'transparent' }}>
+              borderBottom: hasAccess ? `1px solid ${C.border}` : 'none',
+              background: hasAccess ? C.accBg+'80' : 'transparent' }}>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <span style={{ fontSize:13, fontWeight:700,
-                  color: siteTabs.length > 0 ? C.acc : C.t1 }}>
+                  color: hasAccess ? C.acc : C.t1 }}>
                   {cl.name}
                 </span>
                 <span style={{ fontSize:11, color:C.t3, fontFamily:'monospace' }}>
@@ -493,9 +541,10 @@ function SAUsers() {
                 </span>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                {siteTabs.length > 0 && (
+                {hasAccess && (
                   <span style={{ fontSize:11, color:C.acc, fontWeight:600 }}>
-                    {siteTabs.length} tab{siteTabs.length!==1?'s':''} enabled
+                    {siteTabs.length} tab{siteTabs.length!==1?'s':''}
+                    {siteLocs.length > 0 ? `, ${siteLocs.length} loc` : ', all locations'}
                   </span>
                 )}
                 <label style={{ display:'flex', alignItems:'center', gap:5,
@@ -508,27 +557,72 @@ function SAUsers() {
               </div>
             </div>
             {/* Tab checkboxes */}
-            {siteTabs.length > 0 || true ? (
-              <div style={{ display:'flex', gap:0, padding:'10px 14px', flexWrap:'wrap', gap:8 }}>
-                {TABS.map(tab => {
-                  const has = siteTabs.includes(tab)
-                  return (
-                    <label key={tab} style={{ display:'flex', alignItems:'center', gap:6,
-                      padding:'5px 12px', borderRadius:7, cursor:'pointer',
-                      background: has ? C.acc+'20' : 'transparent',
-                      border:`1px solid ${has ? C.acc : C.border}`,
-                      fontSize:12, fontWeight: has ? 700 : 400,
-                      color: has ? C.acc : C.t3,
-                      textTransform:'capitalize', transition:'all 0.15s' }}>
-                      <input type="checkbox" checked={has}
-                        onChange={() => toggleTab(access, setAccess, cl.id, tab)}
-                        style={{ accentColor:C.acc, width:13, height:13 }}/>
-                      {tab}
-                    </label>
-                  )
-                })}
+            <div style={{ display:'flex', gap:0, padding:'10px 14px', flexWrap:'wrap', gap:8 }}>
+              {TABS.map(tab => {
+                const has = siteTabs.includes(tab)
+                return (
+                  <label key={tab} style={{ display:'flex', alignItems:'center', gap:6,
+                    padding:'5px 12px', borderRadius:7, cursor:'pointer',
+                    background: has ? C.acc+'20' : 'transparent',
+                    border:`1px solid ${has ? C.acc : C.border}`,
+                    fontSize:12, fontWeight: has ? 700 : 400,
+                    color: has ? C.acc : C.t3,
+                    textTransform:'capitalize', transition:'all 0.15s' }}>
+                    <input type="checkbox" checked={has}
+                      onChange={() => toggleTab(access, setAccess, cl.id, tab)}
+                      style={{ accentColor:C.acc, width:13, height:13 }}/>
+                    {tab}
+                  </label>
+                )
+              })}
+            </div>
+            {/* Location access */}
+            {clientLocations.length > 1 && hasAccess && (
+              <div style={{ padding:'8px 14px 12px', borderTop:`1px solid ${C.border}` }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:C.t3,
+                    textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                    Location Access {siteLocs.length === 0 ? '(All Locations)' : ''}
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:5,
+                    cursor:'pointer', fontSize:11, color:C.t2 }}>
+                    <input type="checkbox"
+                      checked={siteLocs.length === 0}
+                      onChange={() => {
+                        const currentTabs = getAccessTabs(access, cl.id)
+                        setAccessEntry(access, setAccess, cl.id, currentTabs, [])
+                      }}
+                      style={{ accentColor:C.cyan, width:13, height:13 }}/>
+                    All Locations
+                  </label>
+                </div>
+                {siteLocs.length === 0 ? (
+                  <div style={{ fontSize:12, color:C.t3, fontStyle:'italic' }}>
+                    User can access all locations. Uncheck "All Locations" to restrict.
+                  </div>
+                ) : (
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                    {clientLocations.map(loc => {
+                      const has = siteLocs.includes(loc.id)
+                      return (
+                        <label key={loc.id} style={{ display:'flex', alignItems:'center', gap:6,
+                          padding:'5px 12px', borderRadius:7, cursor:'pointer',
+                          background: has ? C.cyan+'20' : 'transparent',
+                          border:`1px solid ${has ? C.cyan : C.border}`,
+                          fontSize:12, fontWeight: has ? 700 : 400,
+                          color: has ? C.cyan : C.t3,
+                          transition:'all 0.15s' }}>
+                          <input type="checkbox" checked={has}
+                            onChange={() => toggleLocation(access, setAccess, cl.id, loc.id)}
+                            style={{ accentColor:C.cyan, width:13, height:13 }}/>
+                          {loc.name || 'Location'}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            ) : null}
+            )}
           </div>
         )
       })}
@@ -699,7 +793,11 @@ function SAUsers() {
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {users.filter(u => u.role !== 'SUPER_ADMIN').map(u => {
             const access = u.clientAccess || {}
-            const siteCount = Object.keys(access).filter(k => (access[k]||[]).length > 0).length
+            const siteCount = Object.keys(access).filter(k => {
+              const entry = access[k]
+              const tabs = Array.isArray(entry) ? entry : (entry?.tabs || [])
+              return tabs.length > 0
+            }).length
             return (
               <div key={u.id} style={{ background:C.panel,
                 border:`1px solid ${C.border}`, borderRadius:12,
@@ -731,10 +829,15 @@ function SAUsers() {
                       <span style={{ fontSize:12, color:C.t3 }}>No access granted</span>
                     ) : (
                       Object.entries(access)
-                        .filter(([,tabs]) => tabs.length > 0)
-                        .map(([siteId, tabs]) => {
+                        .filter(([,entry]) => {
+                          const tabs = Array.isArray(entry) ? entry : (entry?.tabs || [])
+                          return tabs.length > 0
+                        })
+                        .map(([siteId, entry]) => {
                           const site = clients.find(c => c.id === siteId)
                           if (!site) return null
+                          const tabs = Array.isArray(entry) ? entry : (entry?.tabs || [])
+                          const locIds = Array.isArray(entry) ? [] : (entry?.locationIds || [])
                           return (
                             <div key={siteId} style={{ display:'flex',
                               alignItems:'center', gap:6 }}>
@@ -749,6 +852,14 @@ function SAUsers() {
                                     {tab}
                                   </span>
                                 ))}
+                                {locIds.length > 0 && (
+                                  <span style={{ fontSize:10,
+                                    fontWeight:700, textTransform:'uppercase',
+                                    background:C.cyan+'20', color:C.cyan,
+                                    padding:'1px 6px', borderRadius:3 }}>
+                                    {locIds.length} loc
+                                  </span>
+                                )}
                               </div>
                             </div>
                           )
@@ -1113,27 +1224,13 @@ function SASettings() {
 export default function SiteAdminApp() {
   const [user, setUser] = useState(null)
 
-  useEffect(() => {
-    const token = localStorage.getItem(SA_TOKEN_KEY)
-    if (token) {
-      fetch(API + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
-        .then(r => r.json())
-        .then(u => {
-          if (u.role === 'SUPER_ADMIN' || u.role === 'MANAGER') {
-            setUser(u)
-          } else {
-            localStorage.removeItem(SA_TOKEN_KEY)
-          }
-        })
-        .catch(() => {})
-    }
-  }, [])
-
   const logout = () => {
+    console.log('Logout called')
     localStorage.removeItem(SA_TOKEN_KEY)
     setUser(null)
   }
 
+  console.log('SiteAdminApp render - user:', !!user)
   if (!user) return <SALogin onLogin={setUser} />
   return <SAShell user={user} onLogout={logout} />
 }

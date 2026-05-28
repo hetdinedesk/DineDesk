@@ -7,7 +7,31 @@ import { withSiteParam, getSiteId } from '../../../lib/links';
 export default function PromoTilesSection({ promos = [], title, subtitle, shortcodes = {} }) {
   const router = useRouter();
   const siteId = getSiteId(router);
-  if (!promos || promos.length === 0) return null;
+  if (!promos || promos.length === 0) {
+    return (
+      <section className="py-24 px-6 bg-[var(--color-accent)]">
+        <div className="max-w-7xl mx-auto">
+          {(title || subtitle) && (
+            <div className="text-center mb-16">
+              {title && (
+                <h2 className="text-4xl md:text-5xl font-bold text-[var(--color-primary)] mb-4" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                  {title}
+                </h2>
+              )}
+              {subtitle && (
+                <p className="text-xl text-gray-600">
+                  {subtitle}
+                </p>
+              )}
+            </div>
+          )}
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">Promotions coming soon...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const replaceShortcodes = (text) => {
     if (!text || typeof text !== 'string') return text || '';

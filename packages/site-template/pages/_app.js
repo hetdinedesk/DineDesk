@@ -1,6 +1,7 @@
 import Head from 'next/head'
 import { buildThemeCSS } from '../lib/theme'
 import { CartProvider } from '../contexts/CartContext'
+import { WishlistProvider } from '../contexts/WishlistContext'
 import { useState, useEffect } from 'react'
 import '../styles/theme-d1/index.css'
 import '../styles/theme-d2/index.css'
@@ -130,15 +131,17 @@ export default function App({ Component, pageProps }) {
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
       <ErrorBoundary>
-        <CartProvider ordering={data.ordering}>
-          <ThemeLoader themeKey={themeKey}>
-            {(CartDrawer) => (
-              <>
-                <Component {...pageProps}/>
-                {CartDrawer && <CartDrawer />}
-              </>
-            )}
-          </ThemeLoader>
+        <CartProvider ordering={data.ordering} siteId={data.id}>
+          <WishlistProvider>
+            <ThemeLoader themeKey={themeKey}>
+              {(CartDrawer) => (
+                <>
+                  <Component {...pageProps}/>
+                  {CartDrawer && <CartDrawer />}
+                </>
+              )}
+            </ThemeLoader>
+          </WishlistProvider>
         </CartProvider>
       </ErrorBoundary>
     </>

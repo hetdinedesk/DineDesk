@@ -474,6 +474,16 @@ function HomeSpecialsSection({ specials, title, subtitle }) {
             </motion.div>
           ))}
         </div>
+
+        <div className="text-center mt-16">
+          <Link
+            href={withSiteParam('/specials', siteId)}
+            className="btn-bloom btn-sage inline-flex items-center gap-3 px-14 py-5 text-xs shadow-xl shadow-bloom-sage/10 group"
+          >
+            View All Specials
+            <ArrowRight className="w-[20px] h-[20px] group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
       </div>
     </section>
   );
@@ -490,7 +500,7 @@ function LoyaltyBannerSection() {
   }
 
   const hasRewards = loyaltyConfig?.rewards?.length > 0;
-  const firstReward = hasRewards ? loyaltyConfig.rewards[0] : null;
+  const rewards = loyaltyConfig?.rewards || [];
 
   return (
     <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-amber-50 to-emerald-50">
@@ -516,12 +526,14 @@ function LoyaltyBannerSection() {
                 Join our loyalty program and earn {loyaltyConfig.pointsPerDollar} point{loyaltyConfig.pointsPerDollar !== 1 ? 's' : ''} for every dollar spent. Redeem points for exclusive rewards!
               </p>
               {hasRewards && (
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2 bg-amber-100 px-4 py-2 rounded-full">
-                    <Star className="w-5 h-5 text-amber-600" />
-                    <span className="font-semibold text-amber-900">{firstReward.pointsRequired} pts</span>
-                    <span className="text-amber-700">= {firstReward.discountType === 'percentage' ? `${firstReward.discountValue}% OFF` : `$${firstReward.discountValue.toFixed(2)} OFF`}</span>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {rewards.map((reward, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-amber-100 px-4 py-2 rounded-full">
+                      <Star className="w-5 h-5 text-amber-600" />
+                      <span className="font-semibold text-amber-900">{reward.pointsRequired} pts</span>
+                      <span className="text-amber-700">= {reward.discountType === 'percentage' ? `${reward.discountValue}% OFF` : `$${reward.discountValue.toFixed(2)} OFF`}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

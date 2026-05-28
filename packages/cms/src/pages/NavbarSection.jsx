@@ -1408,6 +1408,90 @@ const pageInpStyle = {
   boxSizing: 'border-box', fontFamily: 'inherit'
 }
 
+// Memoized draggable page item to prevent re-renders during drag
+const DraggablePage = memo(function DraggablePage ({ page, index, onToggle, onEdit, onDelete, isTogglePending }) {
+  const info = getTypeInfo(page.pageType || 'custom')
+  const isPublished = page.status === 'published'
+
+  const handleToggle = useCallback(() => {
+    if (!isTogglePending) {
+      onToggle(page.id, isPublished ? 'draft' : 'published')
+    }
+  }, [page.id, isPublished, isTogglePending, onToggle])
+
+  const handleEdit = useCallback(() => {
+    onEdit(page)
+  }, [page, onEdit])
+
+  const handleDelete = useCallback(() => {
+    onDelete(page)
+  }, [page, onDelete])
+
+  return (
+    <Draggable draggableId={page.id} index={index}>
+      {(prov, snap) => (
+        <div
+          ref={prov.innerRef}
+          {...prov.draggableProps}
+          style={{
+            ...prov.draggableProps.style,
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 14px', marginBottom: 8,
+            background: snap.isDragging
+              ? `linear-gradient(135deg, ${C.card}, ${C.panel})`
+              : C.panel,
+            border: `1px solid ${snap.isDragging ? C.acc : (isPublished ? C.green + '50' : C.border)}`,
+            borderRadius: 12,
+            opacity: snap.isDragging ? 0.9 : 1,
+            transform: snap.isDragging ? 'scale(1.02)' : 'scale(1)',
+            boxShadow: snap.isDragging
+              ? `0 8px 32px ${C.acc}40, 0 2px 8px rgba(0,0,0,0.15)`
+              : '0 1px 3px rgba(0,0,0,0.08)',
+            transition: snap.isDragging
+              ? 'none'
+              : 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            cursor: snap.isDragging ? 'grabbing' : 'default'
+          }}
+        >
+          <div {...prov.dragHandleProps} style={{
+            color: snap.isDragging ? C.acc : C.t3,
+            cursor: 'grab',
+            fontSize: 18,
+            flexShrink: 0,
+            userSelect: 'none',
+            transition: 'color 0.2s'
+          }}>⠿</div>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: info.color + '20',
+            border: `1px solid ${info.color}40`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, flexShrink: 0
+          }}>{info.icon}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: C.t0, fontSize: 14 }}>{page.title}</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: info.color, background: info.color + '18', padding: '2px 8px', borderRadius: 20 }}>{info.label}</span>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: C.t3, background: C.card, padding: '2px 6px', borderRadius: 4 }}>/{page.slug}</span>
+            </div>
+          </div>
+          <div
+            title={isPublished ? 'Click to unpublish' : 'Click to publish'}
+            onClick={handleToggle}
+            style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: isPublished ? C.green : C.border2, position: 'relative', transition: 'all 0.25s', flexShrink: 0, opacity: isTogglePending ? 0.5 : 1 }}
+          >
+            <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: isPublished ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+          </div>
+          <button type="button" onClick={handleEdit} style={{...btnCyan, padding: '8px 14px'}}>Edit</button>
+          <button type="button" onClick={handleDelete} style={{...btnDanger, padding: '8px 12px'}} title="Delete"><Trash2 size={16} /></button>
+        </div>
+      )}
+    </Draggable>
+  )
+})
+
+const MemoizedDraggablePage = DraggablePage
+
 function PagesListPanel ({ clientId, data, qc }) {
   const { data: allPages = [], isLoading } = useQuery({
     queryKey: ['pages', clientId],
@@ -1427,7 +1511,8 @@ function PagesListPanel ({ clientId, data, qc }) {
   const [modal, setModal] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveErr, setSaveErr] = useState('')
-  const [dndMoving, setDndMoving] = useState(false)
+  const [movingSectionId, setMovingSectionId] = useState(null) // per-section loading state
+  const [optimisticSections, setOptimisticSections] = useState(null) // optimistic UI state
 
   const del = useMutation({
     mutationFn: (id) => deletePage(clientId, id),
@@ -1454,7 +1539,7 @@ function PagesListPanel ({ clientId, data, qc }) {
   }, [data?.headerSections])
 
   // Group pages by heading section, maintain nav order (respecting drag position)
-  const sections = useMemo(() => {
+  const baseSections = useMemo(() => {
     const headings = data?.headerSections || []
     const result = headings.map(h => {
       // Get pages in this heading, sorted by their order in the children array
@@ -1475,78 +1560,135 @@ function PagesListPanel ({ clientId, data, qc }) {
     return result
   }, [allPages, data?.headerSections])
 
+  // Use optimistic sections during drag operations for instant UI feedback
+  const sections = optimisticSections || baseSections
+
+  // Build optimistic sections for instant UI feedback during drag
+  const buildOptimisticSections = (sourceId, destId, pageId, destIndex) => {
+    const page = allPages.find(p => p.id === pageId)
+    if (!page) return null
+
+    return baseSections.map(section => {
+      if (section.id === sourceId && sourceId !== 'unassigned') {
+        // Remove from source
+        return { ...section, pages: section.pages.filter(p => p.id !== pageId) }
+      }
+      if (section.id === destId && destId !== 'unassigned') {
+        // Add to destination at index
+        const newPages = [...section.pages]
+        // Remove if already in this section (reordering)
+        const existingIdx = newPages.findIndex(p => p.id === pageId)
+        if (existingIdx >= 0) newPages.splice(existingIdx, 1)
+        // Insert at new position
+        newPages.splice(destIndex, 0, page)
+        return { ...section, pages: newPages }
+      }
+      if (section.id === 'unassigned' && sourceId === 'unassigned') {
+        // Moving out of unassigned
+        return { ...section, pages: section.pages.filter(p => p.id !== pageId) }
+      }
+      if (section.id === 'unassigned' && destId === 'unassigned') {
+        // Moving to unassigned
+        return { ...section, pages: [...section.pages, page] }
+      }
+      return section
+    })
+  }
+
   // Drag page from one section to another (or reorder within same section)
-  const handleDragEnd = async (result) => {
-    if (!result.destination) return
+  const handleDragEnd = useCallback(async (result) => {
+    if (!result.destination) {
+      setOptimisticSections(null)
+      return
+    }
     const { draggableId: pageId, source, destination } = result
     const fromId = source.droppableId
     const toId = destination.droppableId
-    const page = allPages.find(p => p.id === pageId)
-    if (!page) return
-    
-    // Same section reorder
-    if (fromId === toId) {
-      if (source.index === destination.index) return
-      if (toId === 'unassigned') return // Can't reorder unassigned
-      
-      setDndMoving(true)
-      try {
-        const heading = data?.headerSections?.find(h => h.id === toId)
-        if (!heading) return
-        
-        // Reorder children based on drag index
-        const children = [...(heading.children || [])]
-        const movedItem = children.find(c => c.pageId === pageId)
-        if (!movedItem) return
-        
-        // Remove from old position and insert at new
-        const filtered = children.filter(c => c.pageId !== pageId)
-        filtered.splice(destination.index, 0, movedItem)
-        
-        const newHeaderSections = (data?.headerSections || []).map(h => 
-          h.id === toId ? { ...h, children: filtered } : h
-        )
-        
-        await saveNavbarApi(clientId, { headerSections: serializeHeaderSections(newHeaderSections), footerSections: data?.footerSections || [] })
-        qc.invalidateQueries({ queryKey: ['navbar', clientId] })
-      } catch (e) {
-        console.error('DnD reorder failed:', e)
-      }
-      setDndMoving(false)
+
+    // No change
+    if (fromId === toId && source.index === destination.index) {
+      setOptimisticSections(null)
       return
     }
-    
-    // Moving between sections
-    setDndMoving(true)
-    try {
-      // Remove from source heading
-      const newHeaderSections = (data?.headerSections || []).map(h => ({
-        ...h,
-        children: (h.children || []).filter(c => !(c.pageId === pageId && h.id === fromId))
-      }))
-      
-      // Add to destination heading at specific index
-      if (toId !== 'unassigned') {
-        const ti = newHeaderSections.findIndex(h => h.id === toId)
-        if (ti >= 0) {
-          const destChildren = [...(newHeaderSections[ti].children || [])]
-          const newItem = {
-            id: `temp-${Date.now()}`, pageId,
-            label: page.title, url: page.slug ? `/${page.slug}` : '',
-            isActive: true, sortOrder: destination.index
-          }
-          destChildren.splice(destination.index, 0, newItem)
-          newHeaderSections[ti] = { ...newHeaderSections[ti], children: destChildren }
-        }
-      }
-      
-      await saveNavbarApi(clientId, { headerSections: serializeHeaderSections(newHeaderSections), footerSections: data?.footerSections || [] })
-      qc.invalidateQueries({ queryKey: ['navbar', clientId] })
-    } catch (e) {
-      console.error('DnD move failed:', e)
+    // Can't reorder unassigned
+    if (fromId === toId && toId === 'unassigned') {
+      setOptimisticSections(null)
+      return
     }
-    setDndMoving(false)
-  }
+
+    // Apply optimistic update immediately for smooth UI
+    const optimistic = buildOptimisticSections(fromId, toId, pageId, destination.index)
+    setOptimisticSections(optimistic)
+    setMovingSectionId(toId)
+
+    // Fire API in background - don't block UI
+    setTimeout(async () => {
+      try {
+        if (fromId === toId) {
+          const heading = data?.headerSections?.find(h => h.id === toId)
+          if (!heading) throw new Error('Heading not found')
+
+          const children = [...(heading.children || [])]
+          const movedItem = children.find(c => c.pageId === pageId)
+          if (!movedItem) throw new Error('Page not found in heading')
+
+          const filtered = children.filter(c => c.pageId !== pageId)
+          filtered.splice(destination.index, 0, movedItem)
+
+          const newHeaderSections = (data?.headerSections || []).map(h =>
+            h.id === toId ? { ...h, children: filtered } : h
+          )
+
+          await saveNavbarApi(clientId, { headerSections: serializeHeaderSections(newHeaderSections) })
+        } else {
+          const newHeaderSections = (data?.headerSections || []).map(h => ({
+            ...h,
+            children: (h.children || []).filter(c => !(c.pageId === pageId && h.id === fromId))
+          }))
+
+          if (toId !== 'unassigned') {
+            const ti = newHeaderSections.findIndex(h => h.id === toId)
+            if (ti >= 0) {
+              const destChildren = [...(newHeaderSections[ti].children || [])]
+              const page = allPages.find(p => p.id === pageId)
+              const newItem = {
+                id: `temp-${Date.now()}`, pageId,
+                label: page?.title || '', url: page?.slug ? `/${page.slug}` : '',
+                isActive: true, sortOrder: destination.index
+              }
+              destChildren.splice(destination.index, 0, newItem)
+              newHeaderSections[ti] = { ...newHeaderSections[ti], children: destChildren }
+            }
+          }
+
+          await saveNavbarApi(clientId, { headerSections: serializeHeaderSections(newHeaderSections) })
+        }
+        qc.invalidateQueries({ queryKey: ['navbar', clientId] })
+      } catch (e) {
+        console.error('DnD failed:', e)
+        setOptimisticSections(null)
+      } finally {
+        setMovingSectionId(null)
+        document.body.style.cursor = ''
+        setTimeout(() => setOptimisticSections(null), 200)
+      }
+    }, 0)
+  }, [allPages, data, clientId, qc, buildOptimisticSections])
+
+  const handleDragStart = useCallback(() => {
+    document.body.style.cursor = 'grabbing'
+  }, [])
+
+  const handleDragUpdate = useCallback(() => {}, [])
+
+  const onToggleStatus = useCallback((id, status) => {
+    toggleStatus.mutate({ id, status })
+  }, [toggleStatus])
+
+  const onDeletePage = useCallback((page) => {
+    if (!window.confirm(`Delete "${page.title}"? This also removes it from navigation.`)) return
+    del.mutate(page.id)
+  }, [del])
 
   const openCreate = () => setModal({ step: 1 })
   const selectType = (pageType) => setModal({ step: 2, isEdit: false, pageType, title: '', subtitle: '', slug: '', bannerId: null, content: '', metaTitle: '', metaDesc: '', showEnquiryForm: false, showLocationMap: false })
@@ -1602,14 +1744,27 @@ function PagesListPanel ({ clientId, data, qc }) {
           No pages yet — click <strong style={{ color: C.acc }}>Create Page</strong> to get started.
         </div>
       ) : (
-        <DragDropContext onDragEnd={handleDragEnd}>
+        <DragDropContext
+          onDragEnd={handleDragEnd}
+          onDragStart={handleDragStart}
+          onDragUpdate={handleDragUpdate}
+        >
           {sections.map(section => (
-            <div key={section.id} style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, padding: '6px 10px' }}>
-                <span style={{ fontSize: 14 }}>{section.id === 'unassigned' ? '📌' : '📂'}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{section.label}</span>
-                <span style={{ fontSize: 11, color: C.t3, marginLeft: 4 }}>({section.pages.length})</span>
-                {dndMoving && <span style={{ fontSize: 11, color: C.acc, marginLeft: 6 }}>Moving…</span>}
+            <div key={section.id} style={{ marginBottom: 20 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                padding: '8px 12px', background: section.id === 'unassigned' ? C.card : C.panel,
+                borderRadius: 10, border: `1px solid ${section.id === 'unassigned' ? C.border : C.border2}`
+              }}>
+                <span style={{ fontSize: 16 }}>{section.id === 'unassigned' ? '📌' : '📂'}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.t1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{section.label}</span>
+                <span style={{ fontSize: 11, color: C.t3, marginLeft: 4, background: C.border + '40', padding: '2px 8px', borderRadius: 10 }}>{section.pages.length}</span>
+                {movingSectionId === section.id && (
+                  <span style={{ fontSize: 11, color: C.acc, marginLeft: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 10, height: 10, border: `2px solid ${C.acc}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    Saving…
+                  </span>
+                )}
               </div>
               <Droppable droppableId={section.id}>
                 {(provided, snapshot) => (
@@ -1617,58 +1772,36 @@ function PagesListPanel ({ clientId, data, qc }) {
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     style={{
-                      minHeight: 44, borderRadius: 10, transition: 'background 0.15s',
-                      background: snapshot.isDraggingOver ? C.acc + '10' : 'transparent',
-                      border: `1px solid ${snapshot.isDraggingOver ? C.acc + '40' : 'transparent'}`,
-                      padding: snapshot.isDraggingOver ? 4 : 0
+                      minHeight: 60, borderRadius: 12,
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      background: snapshot.isDraggingOver
+                        ? `linear-gradient(135deg, ${C.acc}15, ${C.acc}08)`
+                        : 'transparent',
+                      border: `2px dashed ${snapshot.isDraggingOver ? C.acc : 'transparent'}`,
+                      boxShadow: snapshot.isDraggingOver ? `0 0 20px ${C.acc}20` : 'none',
+                      padding: snapshot.isDraggingOver ? 8 : 4
                     }}
                   >
                     {section.pages.length === 0 && (
-                      <div style={{ fontSize: 12, color: C.t3, padding: '10px 12px', textAlign: 'center', fontStyle: 'italic' }}>
-                        {snapshot.isDraggingOver ? 'Drop here' : 'No pages — drag one here'}
+                      <div style={{
+                        fontSize: 12, color: snapshot.isDraggingOver ? C.acc : C.t3,
+                        padding: '16px 12px', textAlign: 'center', fontWeight: snapshot.isDraggingOver ? 600 : 400,
+                        transition: 'all 0.2s'
+                      }}>
+                        {snapshot.isDraggingOver ? '⬇️ Drop here' : 'Drag pages here'}
                       </div>
                     )}
-                    {section.pages.map((page, index) => {
-                      const info = getTypeInfo(page.pageType || 'custom')
-                      const isPublished = page.status === 'published'
-                      return (
-                        <Draggable key={page.id} draggableId={page.id} index={index}>
-                          {(prov, snap) => (
-                            <div
-                              ref={prov.innerRef}
-                              {...prov.draggableProps}
-                              style={{
-                                ...prov.draggableProps.style,
-                                display: 'flex', alignItems: 'center', gap: 10,
-                                padding: '10px 12px', marginBottom: 6,
-                                background: snap.isDragging ? C.card : C.panel,
-                                border: `1px solid ${snap.isDragging ? C.acc : (isPublished ? C.green + '40' : C.border)}`,
-                                borderRadius: 10, opacity: snap.isDragging ? 0.95 : 1
-                              }}
-                            >
-                              <div {...prov.dragHandleProps} style={{ color: C.t3, cursor: 'grab', fontSize: 16, flexShrink: 0, userSelect: 'none' }}>⠿</div>
-                              <div style={{ width: 28, height: 28, borderRadius: 7, background: info.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{info.icon}</div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 700, color: C.t0, fontSize: 13 }}>{page.title}</div>
-                                <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: 10, fontWeight: 700, color: info.color, background: info.color + '15', padding: '1px 7px', borderRadius: 20 }}>{info.label}</span>
-                                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: C.t3 }}>/{page.slug}</span>
-                                </div>
-                              </div>
-                              <div
-                                title={isPublished ? 'Click to unpublish' : 'Click to publish'}
-                                onClick={() => !toggleStatus.isPending && toggleStatus.mutate({ id: page.id, status: isPublished ? 'draft' : 'published' })}
-                                style={{ width: 40, height: 21, borderRadius: 11, cursor: 'pointer', background: isPublished ? C.green : C.border2, position: 'relative', transition: 'background 0.2s', flexShrink: 0, opacity: toggleStatus.isPending ? 0.5 : 1 }}
-                              >
-                                <div style={{ width: 15, height: 15, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: isPublished ? 22 : 2, transition: 'left 0.2s' }} />
-                              </div>
-                              <button type="button" onClick={() => openEdit(page)} style={btnCyan}>Edit</button>
-                              <button type="button" onClick={() => handleDelete(page)} style={btnDanger} title="Delete"><Trash2 size={16} /></button>
-                            </div>
-                          )}
-                        </Draggable>
-                      )
-                    })}
+                    {section.pages.map((page, index) => (
+                      <MemoizedDraggablePage
+                        key={page.id}
+                        page={page}
+                        index={index}
+                        onToggle={onToggleStatus}
+                        onEdit={openEdit}
+                        onDelete={onDeletePage}
+                        isTogglePending={toggleStatus.isPending}
+                      />
+                    ))}
                     {provided.placeholder}
                   </div>
                 )}

@@ -18,8 +18,15 @@ async function main() {
       role: 'SUPER_ADMIN'
     }
   })
+
+  // Generate short ID for client
+  const generateShortId = () => {
+    return Math.random().toString(36).substring(2, 10)
+  }
+
   const client = await prisma.client.create({
     data: {
+      id: generateShortId(),
       name: 'Demo Restaurant',
       domain: 'demo.dinedesk.com.au',
       status: 'live'

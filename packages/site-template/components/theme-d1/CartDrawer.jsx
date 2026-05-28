@@ -55,9 +55,9 @@ export default function CartDrawer() {
 
   const getOrderTypeDisplay = () => {
     if (isTableOrdering) {
-      return 'Dine In'
+      return 'Dine-in'
     }
-    return 'Pickup'
+    return 'Pick-up'
   }
 
   const getPaymentPreferenceDisplay = () => {

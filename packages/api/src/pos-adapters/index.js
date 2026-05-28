@@ -1,65 +1,54 @@
 // POS Adapter Layer
-// This module handles routing orders to different POS systems based on configuration
+// Routes to the correct adapter based on posType from POSConfig
 
-const APIAdapter = require('./api-adapter')
-const OnlineOrdersAdapter = require('./online-orders-adapter')
+const SquareAdapter = require('./square-adapter')
+const ToastAdapter = require('./toast-adapter')
+const CloverAdapter = require('./clover-adapter')
+const APIKeyAdapter = require('./apikey-adapter')
 const FallbackAdapter = require('./fallback-adapter')
 
+const OAUTH_TYPES = ['square', 'toast', 'clover']
+const APIKEY_TYPES = ['abacus', 'lightspeed', 'revel']
+
+function getAdapter(config = {}) {
+  const posType = config.posType || 'none'
+
+  if (posType === 'square') return new SquareAdapter(config)
+  if (posType === 'toast') return new ToastAdapter(config)
+  if (posType === 'clover') return new CloverAdapter(config)
+  if (APIKEY_TYPES.includes(posType)) return new APIKeyAdapter(config)
+
+  return new FallbackAdapter(config)
+}
+
 /**
- * Order Router - determines which adapter to use based on POS configuration
+ * Thin wrapper used by order processing — keeps the existing sendOrder / checkStatus API.
  */
 class OrderRouter {
   constructor(posConfig) {
     this.posConfig = posConfig || {}
-    this.adapter = this.getAdapter()
+    this.adapter = getAdapter(this.posConfig)
   }
 
-  /**
-   * Get the appropriate adapter based on POS type
-   */
-  getAdapter() {
-    const posType = this.posConfig.posType || 'none'
-
-    switch (posType) {
-      case 'api':
-        return new APIAdapter(this.posConfig)
-      case 'online-orders':
-        return new OnlineOrdersAdapter(this.posConfig)
-      case 'email-import':
-      case 'unknown':
-      case 'none':
-      default:
-        return new FallbackAdapter(this.posConfig)
-    }
-  }
-
-  /**
-   * Send order to POS
-   */
   async sendOrder(order) {
     try {
-      const result = await this.adapter.sendOrder(order)
+      const result = await this.adapter.pushOrder(order)
       return {
         success: true,
-        orderId: result.orderId,
+        orderId: order.id,
         posOrderId: result.posOrderId,
-        message: result.message || 'Order sent successfully'
+        message: 'Order sent to POS'
       }
     } catch (error) {
       console.error('POS sendOrder error:', error)
-      return {
-        success: false,
-        error: error.message || 'Failed to send order to POS'
-      }
+      return { success: false, error: error.message || 'Failed to send order to POS' }
     }
   }
 
-  /**
-   * Check if POS is available
-   */
   async checkStatus() {
     try {
-      return await this.adapter.checkStatus()
+      const health = await this.adapter.healthCheck()
+      return { available: health.connected, latencyMs: health.latencyMs, error: health.lastError }
     } catch (error) {
       console.error('POS checkStatus error:', error)
       return { available: false, error: error.message }
@@ -68,3 +57,6 @@ class OrderRouter {
 }
 
 module.exports = OrderRouter
+module.exports.getAdapter = getAdapter
+module.exports.OAUTH_TYPES = OAUTH_TYPES
+module.exports.APIKEY_TYPES = APIKEY_TYPES

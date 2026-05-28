@@ -5,6 +5,34 @@ import { MapPin, Phone, Mail, Clock, Navigation, Send, Heart } from 'lucide-reac
 import { replaceShortcodes } from '../../lib/shortcodes';
 import DOMPurify from 'dompurify';
 
+// Clean HTML content - preserve basic formatting while removing complex structures
+const cleanPageContent = (html) => {
+  if (!html) return ''
+
+  let cleanHtml = html
+
+  // Remove only complex layout containers, keep basic structural tags
+  cleanHtml = cleanHtml.replace(/<(section|article|aside|header|footer|nav|main|figure|figcaption)([^>]*)>([\s\S]*?)<\/\1>/gi, '$3')
+
+  // Remove only grid/flex layout classes, preserve spacing and text classes
+  cleanHtml = cleanHtml.replace(/\sclass="[^"]*?(grid|flex|col-|row-|gap-|min-w-|max-w-|transform|translate|rotate|scale)[^"]*"/gi, '')
+
+  // Remove only layout-related inline styles, preserve spacing
+  cleanHtml = cleanHtml.replace(/\sstyle="[^"]*?(display|position|float|overflow|z-index|transform|transition|animation)[^"]*"/gi, '')
+
+  // Remove SVG icons and other non-text elements
+  cleanHtml = cleanHtml.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '')
+
+  // Remove empty paragraphs
+  cleanHtml = cleanHtml.replace(/<p>\s*<\/p>/gi, '')
+  cleanHtml = cleanHtml.replace(/<p><\/p>/gi, '')
+
+  // Clean up excessive whitespace but preserve line breaks
+  cleanHtml = cleanHtml.replace(/[ \t]+/g, ' ')
+
+  return cleanHtml
+}
+
 // Format time from various formats to readable format
 const formatTime = (timeStr) => {
   if (!timeStr) return '';
@@ -334,13 +362,14 @@ export default function CustomTemplate({ data, page, banner }) {
             animate={{ opacity: 1, x: 0 }}
             className={`flex flex-col ${showEnquiryForm ? 'h-full' : ''}`}
           >
-            <div className={`bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border border-gray-100 ${showEnquiryForm ? 'p-6 sm:p-10 lg:p-14 h-full flex flex-col' : 'p-6 sm:p-8 lg:p-12'}`}>
+            <div className={`bg-white rounded-3xl shadow-2xl border border-gray-200 ${showEnquiryForm ? 'p-8 sm:p-12 lg:p-16 h-full flex flex-col' : 'p-8 sm:p-12 lg:p-16'}`}>
               <div
-                className={`prose prose-lg sm:prose-xl max-w-none text-gray-800 leading-relaxed ${showEnquiryForm ? 'flex-1' : ''}`}
+                className={`prose prose-lg sm:prose-xl max-w-none text-gray-700 leading-8 ${showEnquiryForm ? 'flex-1' : ''}`}
                 style={{
                   '--tw-prose-headings': 'var(--color-primary)',
                   '--tw-prose-links': 'var(--color-secondary)',
                   '--tw-prose-bold': 'var(--color-primary)',
+                  '--tw-prose-lead': 'var(--color-secondary)',
                 }}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cleanPageContent(content)) }}
               />

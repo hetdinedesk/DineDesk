@@ -70,8 +70,8 @@ function HomePageContent() {
 
   // Map component type to render function
   const componentMap = {
-    welcome: () => welcomeContent?.isActive !== false && (welcomeContent?.heading || welcomeContent?.text || welcomeContent?.imageUrl) && (
-      <WelcomeSection 
+    welcome: () => welcomeContent?.isActive !== false && (
+      <WelcomeSection
         subtitle={replaceShortcodes(welcomeContent?.subtitle || '', shortcodes)}
         title={replaceShortcodes(welcomeContent?.heading || '', shortcodes)}
         content={replaceShortcodes(welcomeContent?.text || '', shortcodes)}
@@ -82,27 +82,28 @@ function HomePageContent() {
         shortcodes={shortcodes}
       />
     ),
-    promos: () => promoConfig?.isActive !== false && (promoConfig?.heading || activePromos.length > 0) && (
-      <PromoTilesSection 
-        promos={activePromos} 
+    promos: () => promoConfig?.isActive !== false && (
+      <PromoTilesSection
+        promos={activePromos}
         shortcodes={shortcodes}
         title={replaceShortcodes(promoConfig.heading || '', shortcodes)}
         subtitle={replaceShortcodes(promoConfig.subheading || '', shortcodes)}
       />
     ),
-    specials: () => specialsConfig?.showOnHomepage && activeSpecials.length > 0 && (
+    specials: () => specialsConfig?.showOnHomepage && (
       <HomeSpecialsSection
         specials={activeSpecials.slice(0, specialsConfig.maxItems || 2)}
         title={replaceShortcodes(specialsConfig?.heading || 'Current Specials', shortcodes)}
         subtitle={replaceShortcodes(specialsConfig?.subheading || 'Limited time offerings', shortcodes)}
       />
     ),
+    featured: () => <FeaturedItemsSection title="Featured Items" subtitle="Our most popular dishes" items={featuredItems} />,
     loyalty: () => <LoyaltyBannerSection />,
     reviews: () => <ReviewsSection />,
     custom: (blockId) => {
       const block = customTextBlocks?.find(b => b.id === blockId);
       if (!block || block.isActive === false) return null;
-      
+
       return (
         <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
           <div className="max-w-7xl mx-auto">
@@ -111,7 +112,7 @@ function HomePageContent() {
                 {replaceShortcodes(block.title, shortcodes)}
               </h2>
             )}
-            <div 
+            <div
               className="prose prose-lg max-w-none"
               dangerouslySetInnerHTML={{ __html: replaceShortcodes(block.content || '', shortcodes) }}
             />
@@ -159,10 +160,21 @@ function BannerCarousel({ banners, shortcodes, siteConfig }) {
   const homeBanners = (banners || [])
     .filter(b => b.isActive && b.location === 'home')
     .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-  
-  // No banners - render nothing (no default)
+
+  // No banners - render fallback hero section
   if (homeBanners.length === 0) {
-    return null;
+    return (
+      <section className="relative h-[60vh] min-h-[400px] flex items-center justify-center bg-[var(--color-secondary)]">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <h1 className="font-serif text-5xl md:text-7xl font-bold text-[var(--color-accent)]">
+            {siteConfig?.name || 'Welcome'}
+          </h1>
+          <p className="mt-4 text-xl text-[var(--color-accent)]/80">
+            Delicious food, great atmosphere
+          </p>
+        </div>
+      </section>
+    );
   }
 
   const next = () => setCurrent((c) => (c + 1) % homeBanners.length);
@@ -190,36 +202,31 @@ function BannerCarousel({ banners, shortcodes, siteConfig }) {
   return (
     <section className="relative h-[90vh] min-h-[600px] flex items-center justify-center overflow-hidden">
       {/* Background Image with Animation */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={current}
-          className="absolute inset-0 z-0"
-          initial={{ opacity: 0, scale: 1.05 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <img
-            src={banner.imageUrl}
-            alt={banner.title || 'Banner'}
-            className="w-full h-full object-cover"
-          />
-          {/* Dark Overlay with backdrop blur */}
-          <div className="absolute inset-0 bg-[var(--color-secondary)]/50 backdrop-blur-[2px]" />
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        key={current}
+        className="absolute inset-0 z-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+      >
+        <img
+          src={banner.imageUrl}
+          alt={banner.title || 'Banner'}
+          className="w-full h-full object-cover"
+        />
+        {/* Dark Overlay with backdrop blur */}
+        <div className="absolute inset-0 bg-[var(--color-secondary)]/50 backdrop-blur-[2px]" />
+      </motion.div>
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 text-center text-[var(--color-accent)]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={current}
-            className="space-y-8"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
+        <motion.div
+          key={current}
+          className="space-y-8"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
             {/* Badge */}
             {banner.subtitle && (
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--color-primary)]/20 border border-[var(--color-primary)]/30 text-[var(--color-primary)] text-xs font-bold tracking-[0.2em] uppercase">
@@ -283,7 +290,6 @@ function BannerCarousel({ banners, shortcodes, siteConfig }) {
               </div>
             )}
           </motion.div>
-        </AnimatePresence>
       </div>
 
       {/* Scroll Down Indicator */}
@@ -519,6 +525,16 @@ function HomeSpecialsSection({ specials, title, subtitle }) {
               </div>
             </motion.div>
           ))}
+        </div>
+
+        <div className="text-center mt-16">
+          <Link
+            href={withSiteParam('/specials', siteId)}
+            className="inline-flex items-center gap-3 bg-[var(--color-primary)] text-[var(--color-secondary)] px-10 py-4 rounded-full font-bold text-lg hover:bg-[var(--color-accent)] transition-all duration-300 shadow-xl hover:shadow-[var(--color-primary)]/20 transform hover:-translate-y-1 group"
+          >
+            View All Specials
+            <ArrowRight className="group-hover:translate-x-1 transition-transform" width={20} height={20} />
+          </Link>
         </div>
       </div>
     </section>

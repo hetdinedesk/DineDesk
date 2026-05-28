@@ -66,15 +66,23 @@ setInterval(async () => {
   await updateOrderStatuses()
 }, 60000) // 60 seconds
 
+// POS ORDER PUSH WORKER
+// Process pending order push queue every 5 seconds
+const { processOrderPushQueue } = require('./jobs/orderPushWorker')
+setInterval(async () => {
+  await processOrderPushQueue()
+}, 5000)
+
 // CORE ROUTES - LOGIN & USERS WORK
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/users', require('./routes/users'))
+app.use('/api/clients/:clientId/connect', require('./routes/stripeConnect')) // Stripe Connect onboarding (must be before generic /api/clients)
 app.use('/api/clients', require('./routes/clients'))
 app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories
 app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
 app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
-app.use('/api/clients/:clientId/connect', require('./routes/stripeConnect')) // Stripe Connect onboarding
 app.use('/api/clients', require('./routes/tables')) // Handles /api/clients/:clientId/locations/:locationId/tables
+app.use('/api/clients/:clientId/pos', require('./routes/pos')) // POS Integration
 app.use('/api/loyalty', require('./routes/loyalty'))
 app.use('/api/enquiries', require('./routes/enquiries'))
 

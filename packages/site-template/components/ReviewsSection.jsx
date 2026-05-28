@@ -5,8 +5,8 @@ export default function ReviewsSection({ data={} }) {
   // Check if reviews should be shown - require valid place ID and enabled carousel
   const hasValidPlaceId = reviews.placeId && reviews.placeId.trim() !== '';
   // showReviewsCarousel is exported from API based on showGoogleReviews setting
-  const isCarouselEnabled = reviews.showReviewsCarousel === true || reviews.showGoogleReviews !== false;
-  
+  const isCarouselEnabled = reviews.showReviewsCarousel !== false || reviews.showGoogleReviews !== false;
+
   // Use live Google reviews if available, otherwise nothing
   const reviewCards = reviews.googleReviews || []
 

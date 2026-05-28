@@ -1,5 +1,6 @@
 import { Navigation } from '@/components/navigation'
 import { HowItWorks } from '@/components/how-it-works'
+import { HomeComparison } from '@/components/home-comparison'
 import { Footer } from '@/components/footer'
 import type { Metadata } from 'next'
 
@@ -14,6 +15,7 @@ export default function HowItWorksPage() {
       <Navigation />
       <div className="pt-20">
         <HowItWorks />
+        <HomeComparison />
       </div>
       <Footer />
     </main>

@@ -1193,10 +1193,10 @@ function CheckoutContent() {
 
 ### Stripe Integration
 
-The checkout supports Stripe payments:
+The checkout supports Stripe payments with Apple Pay and Google Pay:
 
 ```jsx
-import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
+import { PaymentElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
 
 function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
   const stripe = useStripe();
@@ -1204,10 +1204,13 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: {
-        card: elements.getElement(CardElement),
-      }
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      clientSecret,
+      confirmParams: {
+        return_url: window.location.href,
+      },
+      redirect: 'if_required'
     });
 
     if (error) {
@@ -1219,7 +1222,15 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <CardElement />
+      <PaymentElement
+        options={{
+          layout: 'tabs',
+          wallets: {
+            applePay: 'auto',
+            googlePay: 'auto'
+          }
+        }}
+      />
       <button type="submit">Pay Now</button>
     </form>
   );

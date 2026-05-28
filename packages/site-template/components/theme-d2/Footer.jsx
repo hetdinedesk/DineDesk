@@ -174,7 +174,9 @@ export const Footer = () => {
             &copy; {new Date().getFullYear()} {restaurant?.name}. All rights reserved.
           </p>
           <p className="text-[var(--color-accent)]/30">
-            Designed by DineDesk
+            <a href="https://dinedesk.com.au" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent)]/50 transition-colors">
+              Powered by DineDesk
+            </a>
           </p>
         </div>
       </div>

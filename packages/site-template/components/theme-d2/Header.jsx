@@ -421,29 +421,29 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
       <UtilityBelt isDark={isDark} />
       <header className={`transition-all duration-300 ${headerBg}`} style={{ color: headerTextColor }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center min-h-20 relative">
-            {/* Desktop Left Navigation - flex-1 to balance with right, justify-end to align close to center */}
-            <nav className="hidden md:flex flex-1 items-center justify-end space-x-8 pr-8">
+          <div className="flex items-center justify-between min-h-20 md:gap-8">
+            {/* Desktop Left Navigation */}
+            <nav className="hidden md:flex items-center space-x-8">
               {leftNav.map((item) => (
                 <NavItem key={item.id} item={item} children={buildChildrenMap(navigation)[item.id] || []} headerTextColor={headerTextColor} router={router} withSiteParam={withSiteParam} isDark={isDark} />
               ))}
             </nav>
 
-            {/* Logo and Name - Centered absolutely */}
-            <Link href={withSiteParam('/') || '/'} className="flex items-center space-x-3 group absolute left-1/2 -translate-x-1/2">
+            {/* Logo and Name - Centered */}
+            <Link href={withSiteParam('/') || '/'} className="flex items-center space-x-3 group flex-shrink-0">
               {displayLogo ? (
                 <img
                   src={displayLogo}
                   alt={restaurant?.name || 'Restaurant'}
-                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-32"
+                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-12 md:max-h-32"
                 />
               ) : (
-                <div className="w-12 h-12 bg-[var(--color-secondary)] rounded-xl flex items-center justify-center text-[var(--color-accent)] group-hover:bg-[var(--color-primary)] transition-colors">
-                  <Coffee width={24} height={24} />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-[var(--color-secondary)] rounded-xl flex items-center justify-center text-[var(--color-accent)] group-hover:bg-[var(--color-primary)] transition-colors">
+                  <Coffee width={20} height={20} className="md:w-6 md:h-6" />
                 </div>
               )}
               <span
-                className="text-xl font-bold tracking-tight transition-colors font-serif"
+                className="text-base md:text-xl font-bold tracking-tight transition-colors font-serif"
                 style={{
                   fontFamily: 'var(--font-heading, inherit)',
                   color: headerTextColor
@@ -459,8 +459,8 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
               </span>
             </Link>
 
-            {/* Desktop Right Navigation - flex-1 to balance with left, justify-start to align close to center */}
-            <nav className="hidden md:flex flex-1 items-center justify-start space-x-8 pl-8">
+            {/* Desktop Right Navigation */}
+            <nav className="hidden md:flex items-center space-x-6">
               {rightNav.map((item) => (
                 <NavItem key={item.id} item={item} children={buildChildrenMap(navigation)[item.id] || []} headerTextColor={headerTextColor} router={router} withSiteParam={withSiteParam} isDark={isDark} />
               ))}
@@ -498,62 +498,63 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
               )}
             </nav>
 
-            {/* Mobile Menu Button - Left */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg transition-colors"
-              style={{ color: headerTextColor }}
-            >
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-
-            {/* Cart - Right */}
-            {orderingEnabled && (
+            {/* Mobile Menu and Cart */}
+            <div className="flex md:hidden items-center gap-1">
+              {orderingEnabled && (
+                <button
+                  onClick={toggleCart}
+                  className="relative p-2 rounded-lg transition-colors"
+                  style={{ color: headerTextColor }}
+                  aria-label="Shopping cart"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--color-primary)] text-white text-xs font-bold flex items-center justify-center">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+              )}
               <button
-                onClick={toggleCart}
-                className="md:hidden relative p-2 rounded-lg transition-colors"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 rounded-lg transition-colors"
                 style={{ color: headerTextColor }}
-                aria-label="Shopping cart"
+                aria-label="Open menu"
               >
-                <ShoppingCart className="w-5 h-5" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--color-primary)] text-white text-xs font-bold flex items-center justify-center">
-                    {totalItems}
-                  </span>
-                )}
+                {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
-            )}
+            </div>
           </div>
         </div>
+      </header>
 
-        {/* Mobile Sidebar Navigation */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setMobileMenuOpen(false)}
-                className="fixed inset-0 bg-black/50 z-[60]"
-              />
-              {/* Sidebar */}
-              <motion.div
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'tween', duration: 0.3 }}
-                className="fixed top-0 right-0 h-full w-80 max-w-full z-[70] shadow-2xl"
-                style={{ backgroundColor: 'var(--color-accent)' }}
-              >
+      {/* Mobile Sidebar Navigation - Outside header to avoid backdrop-blur clipping */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/60 z-[9998]"
+            />
+            {/* Sidebar */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="fixed top-0 right-0 h-full w-80 max-w-full z-[9999] shadow-2xl"
+              style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}
+            >
                 {/* Close Button */}
-                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--color-secondary)/20' }}>
-                  <span className="text-lg font-semibold" style={{ color: 'var(--color-secondary)' }}>Menu</span>
+                <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                  <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Menu</span>
                   <button
                     onClick={() => setMobileMenuOpen(false)}
-                    className="p-2 rounded-lg transition-colors"
-                    style={{ color: 'var(--color-secondary)' }}
+                    className={`p-2 rounded-lg transition-colors ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'}`}
                   >
                     <X size={24} />
                   </button>
@@ -570,16 +571,14 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
                         <Link
                           href={href}
                           onClick={() => setMobileMenuOpen(false)}
-                          className="block px-3 py-3 text-base font-medium transition-colors rounded-md"
-                          style={{ color: 'var(--color-secondary)', backgroundColor: isActive ? 'var(--color-secondary)/20' : 'transparent' }}
+                          className={`block px-3 py-3 text-base font-medium transition-colors rounded-md ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} ${isActive ? (isDark ? 'bg-white/20 font-semibold' : 'bg-gray-100 font-semibold') : ''}`}
                         >
                           {item.label}
                         </Link>
                         {itemChildren.length > 0 && itemChildren.map(child => (
                           <Link key={child.id} href={withSiteParam(child.url) || '#'}
                             onClick={() => setMobileMenuOpen(false)}
-                            className="block px-6 py-2 text-sm font-medium transition-colors rounded-md"
-                            style={{ color: router.asPath === child.url ? 'var(--color-primary)' : 'var(--color-secondary)/80' }}
+                            className={`block px-6 py-2 text-sm font-medium transition-colors rounded-md ${router.asPath === child.url ? (isDark ? 'text-white bg-white/10' : 'text-gray-900 bg-gray-100') : (isDark ? 'text-white/70 hover:text-white hover:bg-white/5' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')}`}
                           >{child.label}</Link>
                         ))}
                       </React.Fragment>
@@ -588,7 +587,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
 
                   {/* Mobile CTAs */}
                   {(booking?.showOrderBtn || booking?.showInHeader) && (
-                    <div className="pt-4 border-t mt-4 space-y-2" style={{ borderColor: 'var(--color-secondary)/20' }}>
+                    <div className="pt-4 border-t mt-4 space-y-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
                       {booking?.showOrderBtn && booking?.orderUrl && (
                         <Link
                           href={withSiteParam(booking.orderUrl) || '#'}
@@ -612,10 +611,9 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
                   )}
                 </nav>
               </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-      </header>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -666,56 +664,60 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
               </span>
             </Link>
 
-            {/* Menu Button - Always visible */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg transition-colors hover:bg-white/10"
-              style={{ color: headerTextColor }}
-              aria-label="Open menu"
-            >
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
+            {/* Right side: Cart and Menu buttons grouped */}
+            <div className="flex items-center gap-2">
+              {/* Cart */}
+              {orderingEnabled && (
+                <button
+                  onClick={toggleCart}
+                  className="relative p-2 rounded-lg transition-colors hover:bg-white/10"
+                  style={{ color: headerTextColor }}
+                  aria-label="Shopping cart"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--color-secondary)] text-white text-xs font-bold flex items-center justify-center">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+              )}
 
-            {/* Cart - Right */}
-            {orderingEnabled && (
+              {/* Menu Button */}
               <button
-                onClick={toggleCart}
-                className="relative p-2 rounded-lg transition-colors hover:bg-white/10"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 rounded-lg transition-colors hover:bg-white/10"
                 style={{ color: headerTextColor }}
-                aria-label="Shopping cart"
+                aria-label="Open menu"
               >
-                <ShoppingCart className="w-5 h-5" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[var(--color-secondary)] text-white text-xs font-bold flex items-center justify-center">
-                    {totalItems}
-                  </span>
-                )}
+                {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
-            )}
+            </div>
           </div>
         </div>
+      </header>
 
-        {/* Sidebar Navigation */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <>
-              {/* Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setMobileMenuOpen(false)}
-                className="fixed inset-0 bg-black/50 z-[60]"
-              />
-              {/* Sidebar */}
-              <motion.div
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'tween', duration: 0.3 }}
-                className="fixed top-0 right-0 h-full w-80 max-w-full z-[70] shadow-2xl"
-                style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}
-              >
+      {/* Sidebar Navigation - Outside header to avoid backdrop-blur clipping */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/60 z-[9998]"
+            />
+            {/* Sidebar */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="fixed top-0 right-0 h-full w-80 max-w-full z-[9999] shadow-2xl"
+              style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}
+            >
                 {/* Close Button */}
                 <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
                   <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Menu</span>
@@ -779,10 +781,9 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
                   )}
                 </nav>
               </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-      </header>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

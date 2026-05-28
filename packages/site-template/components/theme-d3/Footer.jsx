@@ -11,6 +11,7 @@ export const Footer = () => {
   const siteId = getSiteId(router) || rawData?.client?.id || '';
 
   const primaryLocation = (locations || []).find((loc) => loc.isPrimary && loc.isActive) || (locations || [])[0];
+  const footerLocations = (locations || []).filter((loc) => loc.showInFooter && loc.isActive);
   const isDark = siteConfig?.theme?.footerStyle === 'dark';
 
   // Choose logo based on theme
@@ -73,97 +74,106 @@ export const Footer = () => {
             </div>
           </div>
 
-          {/* Column 2: Navigation */}
-          <div>
-            {allColumns[0]?.title && (
-              <h4 className="font-serif italic text-2xl mb-10 text-[var(--color-primary)] tracking-tight">
-                {allColumns[0].title}
-              </h4>
-            )}
-            <ul className="space-y-6 font-sans text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--color-accent)]/40">
-              {allColumns.length > 0 && allColumns[0]?.links?.map((link, index) => (
-                <li key={index}>
-                  <Link href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-primary)] transition-colors duration-500">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-              {unassignedFooterLinks?.map((link, index) => (
-                <li key={index}>
-                  <Link href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-primary)] transition-colors duration-500">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Column 3: Location / Contact */}
-          <div>
-            {primaryLocation && (
-              <h4 className="font-serif italic text-2xl mb-10 text-[var(--color-primary)] tracking-tight">Contact</h4>
-            )}
-            <ul className="space-y-8 font-sans text-[10px] font-bold tracking-[0.15em] uppercase text-[var(--color-accent)]/40">
-              {primaryLocation && (
-                <>
-                  <li className="flex gap-4">
-                    <MapPin className="text-[var(--color-primary)] shrink-0" width={16} height={16} strokeWidth={2} />
-                    <span>
-                      {primaryLocation.address?.street && `${primaryLocation.address.street}, `}
-                      {primaryLocation.address?.suburb && `${primaryLocation.address.suburb}, `}
-                      {primaryLocation.address?.city && `${primaryLocation.address.city}`}
-                    </span>
-                  </li>
-                  {primaryLocation.phone && (
-                    <li className="flex gap-4">
-                      <Phone className="text-[var(--color-primary)] shrink-0" width={16} height={16} strokeWidth={2} />
-                      <a href={`tel:${primaryLocation.phone}`} className="hover:text-[var(--color-primary)] transition-colors">
-                        {primaryLocation.phone}
-                      </a>
-                    </li>
-                  )}
-                  {primaryLocation.email && (
-                    <li className="flex gap-4">
-                      <Mail className="text-[var(--color-primary)] shrink-0" width={16} height={16} strokeWidth={2} />
-                      <a href={`mailto:${primaryLocation.email}`} className="hover:text-[var(--color-primary)] transition-colors">
-                        {primaryLocation.email}
-                      </a>
-                    </li>
-                  )}
-                </>
-              )}
-            </ul>
-          </div>
-
-          {/* Column 4: Additional CMS Column or Newsletter if configured */}
-          {allColumns[1] && (
-            <div>
-              <h4 className="font-serif italic text-2xl mb-10 text-[var(--color-primary)] tracking-tight">{allColumns[1].title}</h4>
-              <ul className="space-y-6 font-sans text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--color-accent)]/40">
-                {allColumns[1].links?.map((link, index) => (
-                  <li key={index}>
-                    <Link href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-primary)] transition-colors duration-500">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          {/* Dynamic CMS Columns */}
+          {allColumns.length === 0 && (!unassignedFooterLinks || unassignedFooterLinks.length === 0) ? (
+            <div className="col-span-3 text-[var(--color-accent)]/40 font-sans text-xs uppercase tracking-widest">
+              No footer links configured yet.
             </div>
+          ) : (
+            <>
+              {allColumns.map((column, index) => (
+                <div key={column.id}>
+                  {column.title && (
+                    <h4 className="font-serif italic text-2xl mb-10 text-[var(--color-primary)] tracking-tight">
+                      {column.title}
+                    </h4>
+                  )}
+                  <ul className="space-y-6 font-sans text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--color-accent)]/40">
+                    {(column.links || []).map((link, linkIndex) => (
+                      <li key={linkIndex}>
+                        <Link href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-primary)] transition-colors duration-500">
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              {unassignedFooterLinks && unassignedFooterLinks.length > 0 && (
+                <div>
+                  <h4 className="font-serif italic text-2xl mb-10 text-[var(--color-primary)] tracking-tight">Pages</h4>
+                  <ul className="space-y-6 font-sans text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--color-accent)]/40">
+                    {unassignedFooterLinks.map((link, index) => (
+                      <li key={index}>
+                        <Link href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-primary)] transition-colors duration-500">
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </div>
+
+        {/* Contact Locations Section */}
+        {footerLocations.length > 0 && (
+          <div className="mb-16 pt-16 border-t border-[var(--color-accent)]/5">
+            <h4 className="font-serif italic text-2xl mb-10 text-[var(--color-primary)] tracking-tight">Contact</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+              {footerLocations.map((loc) => (
+                <div key={loc.id} className="space-y-6">
+                  <h5 className="font-serif text-lg text-[var(--color-accent)]">{loc.name}</h5>
+                  <ul className="space-y-4 font-sans text-[10px] font-bold tracking-[0.15em] uppercase text-[var(--color-accent)]/40">
+                    <li className="flex gap-4">
+                      <MapPin className="text-[var(--color-primary)] shrink-0" width={16} height={16} strokeWidth={2} />
+                      <span>
+                        {loc.address?.street && `${loc.address.street}, `}
+                        {loc.address?.suburb && `${loc.address.suburb}, `}
+                        {loc.address?.city && `${loc.address.city}`}
+                      </span>
+                    </li>
+                    {loc.phone && (
+                      <li className="flex gap-4">
+                        <Phone className="text-[var(--color-primary)] shrink-0" width={16} height={16} strokeWidth={2} />
+                        <a href={`tel:${loc.phone}`} className="hover:text-[var(--color-primary)] transition-colors">
+                          {loc.phone}
+                        </a>
+                      </li>
+                    )}
+                    {loc.email && (
+                      <li className="flex gap-4">
+                        <Mail className="text-[var(--color-primary)] shrink-0" width={16} height={16} strokeWidth={2} />
+                        <a href={`mailto:${loc.email}`} className="hover:text-[var(--color-primary)] transition-colors">
+                          {loc.email}
+                        </a>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Bottom Bar */}
         <div className="pt-16 border-t border-[var(--color-accent)]/5 flex flex-col md:flex-row justify-between items-center gap-10 text-[9px] font-sans font-bold uppercase tracking-[0.3em] text-[var(--color-accent)]/10">
           <p>&copy; {new Date().getFullYear()} {restaurant?.name || ''}. ALL RIGHTS RESERVED.</p>
-          {allColumns[2] && (
-            <div className="flex gap-12">
-              {allColumns[2].links?.map((link, index) => (
-                <Link key={index} href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-accent)] transition-colors">
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          )}
+          <div className="flex gap-12 items-center">
+            {allColumns.length > 2 && (
+              <div className="flex gap-12">
+                {allColumns[2].links?.map((link, index) => (
+                  <Link key={index} href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-accent)] transition-colors">
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+            <a href="https://dinedesk.com.au" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent)] transition-colors">
+              Powered by DineDesk
+            </a>
+          </div>
         </div>
       </div>
     </footer>

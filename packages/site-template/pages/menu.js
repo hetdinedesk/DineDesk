@@ -4,13 +4,13 @@ import { replaceShortcodes } from '../lib/shortcodes'
 import { CMSProvider } from '../contexts/CMSContext'
 import { useState, useEffect } from 'react'
 import { Suspense } from 'react'
-import { FloatingCartIcon } from '../components/theme-d1/FloatingCartIcon'
 
 // Dynamic theme loading with loading state
 function DynamicMenuTemplate({ themeKey, data, page, banner }) {
   const [Header, setHeader] = useState(null)
   const [Footer, setFooter] = useState(null)
   const [MenuTemplate, setMenuTemplate] = useState(null)
+  const [FloatingCartIcon, setFloatingCartIcon] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,22 +20,26 @@ function DynamicMenuTemplate({ themeKey, data, page, banner }) {
     Promise.all([
       import(`../components/${theme}/Header`),
       import(`../components/${theme}/Footer`),
-      import(`../templates/${theme}/MenuTemplate`)
-    ]).then(([headerModule, footerModule, templateModule]) => {
+      import(`../templates/${theme}/MenuTemplate`),
+      import(`../components/${theme}/FloatingCartIcon`)
+    ]).then(([headerModule, footerModule, templateModule, cartModule]) => {
       setHeader(() => headerModule.Header)
       setFooter(() => footerModule.Footer)
       setMenuTemplate(() => templateModule.default)
+      setFloatingCartIcon(() => cartModule.default)
       setLoading(false)
     }).catch(() => {
       // Fallback to theme-d1
       Promise.all([
         import('../components/theme-d1/Header'),
         import('../components/theme-d1/Footer'),
-        import('../templates/theme-d1/MenuTemplate')
-      ]).then(([headerModule, footerModule, templateModule]) => {
+        import('../templates/theme-d1/MenuTemplate'),
+        import('../components/theme-d1/FloatingCartIcon')
+      ]).then(([headerModule, footerModule, templateModule, cartModule]) => {
         setHeader(() => headerModule.Header)
         setFooter(() => footerModule.Footer)
         setMenuTemplate(() => templateModule.default)
+        setFloatingCartIcon(() => cartModule.default)
         setLoading(false)
       })
     })
@@ -65,6 +69,7 @@ function DynamicMenuTemplate({ themeKey, data, page, banner }) {
       {Header && <Header />}
       {MenuTemplate && <MenuTemplate data={data} page={page} banner={banner} />}
       {Footer && <Footer />}
+      {FloatingCartIcon && <FloatingCartIcon />}
     </>
   )
 }
@@ -110,7 +115,6 @@ export default function Page({ data, template }) {
       <Suspense fallback={<div>Loading...</div>}>
         <DynamicMenuTemplate themeKey={template} data={data} page={page} banner={banner} />
       </Suspense>
-      <FloatingCartIcon />
     </CMSProvider>
   )
 }

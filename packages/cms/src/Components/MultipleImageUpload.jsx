@@ -44,14 +44,22 @@ export default function MultipleImageUpload({
         body: formData
       })
       
-      if (!res.ok) throw new Error('Upload failed')
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || `Upload failed: ${res.status}`)
+      }
       
       const data = await res.json()
+      if (!data.url) {
+        throw new Error('No URL returned from upload')
+      }
+      
       const newImages = [...value, data.url]
       onChange(newImages)
       setPreviews(prev => ({ ...prev, [data.url]: URL.createObjectURL(file) }))
     } catch (err) {
-      setError(err.message)
+      console.error('Upload error:', err)
+      setError(err.message || 'Upload failed')
     } finally {
       setUploading(false)
     }
@@ -151,12 +159,29 @@ export default function MultipleImageUpload({
                 <img 
                   src={previews[imageUrl] || imageUrl} 
                   alt={`Exterior photo ${index + 1}`}
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                    e.target.nextSibling.style.display = 'flex'
+                  }}
                   style={{ 
                     maxWidth: '100%', 
                     maxHeight: '100%', 
                     objectFit: 'cover' 
                   }}
                 />
+                <div style={{
+                  display: 'none',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: C.red,
+                  fontSize: 11,
+                  textAlign: 'center',
+                  padding: 8
+                }}>
+                  <span>Failed to load</span>
+                  <span style={{fontSize: 9, color: C.t3, marginTop: 4, wordBreak: 'break-all'}}>{imageUrl}</span>
+                </div>
               </div>
 
               {/* Image Controls */}
@@ -344,7 +369,12 @@ export default function MultipleImageUpload({
             maxWidth: '100%',
             aspectRatio: displayDimensions.width / displayDimensions.height
           }}>
-            <img src={previews[value[0]] || value[0]} alt="Primary exterior photo preview"
+            <img 
+              src={previews[value[0]] || value[0]} 
+              alt="Primary exterior photo preview"
+              onError={(e) => {
+                e.target.style.display = 'none'
+              }}
               style={{ 
                 width: '100%', 
                 height: '100%', 

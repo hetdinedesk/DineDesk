@@ -48,17 +48,18 @@ export default function BookingButton({ booking, locations = [], className = '',
       </button>
 
       {showForm && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+        <div
+          className="fixed inset-0 bg-black/60 flex items-start sm:items-center justify-center z-[10000] p-4 sm:p-6 overflow-y-auto"
           onClick={() => setShowForm(false)}
+          style={{ backdropFilter: 'blur(4px)' }}
         >
-          <div 
-            className="relative w-full max-w-md max-h-[90vh] bg-white rounded-lg shadow-2xl overflow-hidden"
+          <div
+            className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh] my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with close button */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-lg font-semibold text-gray-900">Book a Table</h3>
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Book a Table</h3>
               <button
                 onClick={() => setShowForm(false)}
                 className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
@@ -69,9 +70,9 @@ export default function BookingButton({ booking, locations = [], className = '',
                 </svg>
               </button>
             </div>
-            
+
             {/* Scrollable form content */}
-            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+            <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(85vh - 80px)' }}>
               <BookingForm
                 clientId={booking?.clientId}
                 config={{ booking }}

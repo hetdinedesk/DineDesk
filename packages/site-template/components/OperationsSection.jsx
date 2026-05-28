@@ -106,7 +106,7 @@ export default function OperationsSection({ data={}, clientId }) {
       const table = tables.find(t => t.id === order.tableId)
       return table ? `Table ${table.tableNumber}` : 'Unknown Table'
     }
-    return order.orderType === 'pickup' ? 'Pickup' : 'Delivery'
+    return order.orderType === 'pickup' ? 'Pick-up' : 'Delivery'
   }
 
   const filteredOrders = orders.filter(order => {

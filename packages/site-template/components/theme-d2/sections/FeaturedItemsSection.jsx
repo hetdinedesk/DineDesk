@@ -13,7 +13,32 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
   // Use passed items or fetch from CMS
   const featuredItems = items || menuItems?.filter((item) => item.isFeatured && item.isAvailable).slice(0, 6) || [];
 
-  if (featuredItems.length === 0) return null;
+  // If no featured items, show placeholder
+  if (featuredItems.length === 0) {
+    return (
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2
+              className="text-4xl md:text-5xl font-bold text-[var(--color-primary)] mb-4"
+              style={{ fontFamily: 'var(--font-heading, inherit)' }}
+            >
+              {title}
+            </h2>
+            {subtitle && <p className="text-xl text-gray-600">{subtitle}</p>}
+          </motion.div>
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">Featured items coming soon...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-20 bg-white">

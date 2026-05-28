@@ -30,7 +30,7 @@ export async function getServerSideProps({ query, req }) {
   // Reject literal string "undefined" as invalid site ID
   const rawSite = query.site
   const isValidSite = rawSite && rawSite !== 'undefined' && rawSite.trim() !== ''
-  const isPreview = isValidSite
+  const isPreview = Boolean(isValidSite)
   const siteId = isValidSite ? rawSite : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
 
   const data = await getSiteData(siteId)

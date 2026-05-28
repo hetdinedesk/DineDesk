@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { MapPin, Phone, Mail, Clock, Navigation, ExternalLink, UtensilsCrossed, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
@@ -7,29 +7,76 @@ import { replaceShortcodes } from '../../lib/shortcodes';
 // Format hours for display
 function formatHoursDisplay(hours) {
   if (!hours || hours.length === 0) return 'Contact for hours';
-  
-  // Find patterns in hours to simplify display
+
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const dayOrder = days.reduce((acc, day) => {
+
+  // Build a map of time strings to days
+  const timeToDays = days.reduce((acc, day) => {
     const hour = hours.find(h => h.day === day);
     if (hour && !hour.closed && hour.open && hour.close) {
       const timeStr = `${hour.open} - ${hour.close}`;
       acc[timeStr] = acc[timeStr] || [];
       acc[timeStr].push(day);
+    } else if (hour && hour.closed) {
+      acc['Closed'] = acc['Closed'] || [];
+      acc['Closed'].push(day);
     }
     return acc;
   }, {});
-  
-  // Return simplified hours if all weekdays are same
-  const weekdayKey = Object.keys(dayOrder).find(key => 
-    dayOrder[key].includes('Monday') && dayOrder[key].includes('Friday')
-  );
-  
-  if (weekdayKey) {
-    return `Monday - Friday: ${weekdayKey}`;
+
+  // Check if all days have the same hours
+  const timeKeys = Object.keys(timeToDays);
+  if (timeKeys.length === 1 && !timeKeys[0].includes('Closed')) {
+    return `All days: ${timeKeys[0]}`;
   }
-  
-  return 'Hours vary by day';
+
+  // Check if weekdays (Mon-Fri) have same hours and weekend (Sat-Sun) have same hours
+  const weekdayKey = timeKeys.find(key =>
+    timeToDays[key].includes('Monday') &&
+    timeToDays[key].includes('Tuesday') &&
+    timeToDays[key].includes('Wednesday') &&
+    timeToDays[key].includes('Thursday') &&
+    timeToDays[key].includes('Friday')
+  );
+
+  const weekendKey = timeKeys.find(key =>
+    timeToDays[key].includes('Saturday') &&
+    timeToDays[key].includes('Sunday')
+  );
+
+  if (weekdayKey && weekendKey) {
+    return `Mon-Fri: ${weekdayKey}, Sat-Sun: ${weekendKey}`;
+  }
+
+  if (weekdayKey) {
+    let result = `Mon-Fri: ${weekdayKey}`;
+    // Add weekend if different
+    const sat = hours.find(h => h.day === 'Saturday');
+    const sun = hours.find(h => h.day === 'Sunday');
+    if (sat && sun && !sat.closed && sat.open && sat.close) {
+      const satTime = `${sat.open} - ${sat.close}`;
+      const sunTime = `${sun.open} - ${sun.close}`;
+      if (satTime === sunTime) {
+        result += `, Sat-Sun: ${satTime}`;
+      } else {
+        result += `, Sat: ${satTime}, Sun: ${sunTime}`;
+      }
+    } else if (sat && sat.closed && sun && sun.closed) {
+      result += ', Sat-Sun: Closed';
+    }
+    return result;
+  }
+
+  // If no pattern found, return detailed breakdown
+  return timeKeys.map(time => {
+    const dayList = timeToDays[time];
+    if (dayList.length === 1) {
+      return `${dayList[0]}: ${time}`;
+    }
+    const firstDay = dayList[0];
+    const lastDay = dayList[dayList.length - 1];
+    return `${firstDay} - ${lastDay}: ${time}`;
+  }).join(', ');
 }
 
 export default function LocationsPage({ data, page, banner }) {
@@ -37,6 +84,31 @@ export default function LocationsPage({ data, page, banner }) {
   const [currentImageIndexes, setCurrentImageIndexes] = useState({});
 
   const activeLocations = locations?.filter((loc) => loc.isActive) || [];
+
+  // Auto-scroll gallery images every 4 seconds
+  useEffect(() => {
+    const intervals = {};
+
+    activeLocations.forEach((location) => {
+      const gallery = location.galleryImages || location.gallery || [];
+      if (gallery.length > 1) {
+        intervals[location.id] = setInterval(() => {
+          setCurrentImageIndexes(prev => {
+            const currentIdx = prev[location.id] || 0;
+            const maxIdx = gallery.length - 1;
+            return {
+              ...prev,
+              [location.id]: currentIdx >= maxIdx ? 0 : currentIdx + 1
+            };
+          });
+        }, 4000);
+      }
+    });
+
+    return () => {
+      Object.values(intervals).forEach(clearInterval);
+    };
+  }, [activeLocations]);
 
   const pageTitle = replaceShortcodes(page?.title || 'Find Us', shortcodes);
   const pageSubtitle = replaceShortcodes(page?.subtitle || page?.metaDesc || 'Visit one of our artisanal spaces and experience the perfect cup in person.', shortcodes);
@@ -52,23 +124,25 @@ export default function LocationsPage({ data, page, banner }) {
   // Navigate images
   const nextImage = (location) => {
     const currentIdx = getImageIndex(location.id);
-    const maxIdx = (location.gallery?.length || 1) - 1;
+    const maxIdx = (location.galleryImages?.length || location.gallery?.length || 1) - 1;
     setImageIndex(location.id, currentIdx >= maxIdx ? 0 : currentIdx + 1);
   };
 
   const prevImage = (location) => {
     const currentIdx = getImageIndex(location.id);
-    const maxIdx = (location.gallery?.length || 1) - 1;
+    const maxIdx = (location.galleryImages?.length || location.gallery?.length || 1) - 1;
     setImageIndex(location.id, currentIdx <= 0 ? maxIdx : currentIdx - 1);
   };
 
   // Get image for a location at current index
   const getLocationImage = (location) => {
-    const gallery = location.gallery || [];
+    const gallery = location.galleryImages || location.gallery || [];
     const idx = getImageIndex(location.id);
     
     if (gallery.length > 0) {
-      return gallery[idx] || gallery[0];
+      const image = gallery[idx] || gallery[0];
+      // Handle if image is an object with url property
+      return typeof image === 'object' ? image.url : image;
     }
     if (location.exteriorImage) {
       return location.exteriorImage;
@@ -138,14 +212,15 @@ export default function LocationsPage({ data, page, banner }) {
       {/* Hero Section with Optional Banner */}
       <div className="relative bg-[var(--color-secondary)] py-48 px-6 text-center text-[var(--color-accent)] overflow-hidden">
         {/* Background Image from CMS Banner */}
-        <div className="absolute inset-0 z-0 opacity-20 mix-blend-overlay">
-          <img 
-            src={pageBanner?.imageUrl || 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?q=80&w=2033&auto=format&fit=crop'} 
-            alt="" 
-            className="w-full h-full object-cover"
-          />
-        </div>
-        
+        {pageBanner?.imageUrl && (
+          <div className="absolute inset-0 z-0 opacity-20 mix-blend-overlay">
+            <img 
+              src={pageBanner.imageUrl} 
+              alt="" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
         <div className="relative z-10 space-y-8 max-w-4xl mx-auto">
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
@@ -194,7 +269,7 @@ export default function LocationsPage({ data, page, banner }) {
                   />
                   
                   {/* Gallery Navigation */}
-                  {(location.gallery?.length || 0) > 1 && (
+                  {(location.galleryImages?.length || location.gallery?.length || 0) > 1 && (
                     <>
                       {/* Prev/Next Buttons */}
                       <button

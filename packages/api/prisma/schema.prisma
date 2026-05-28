@@ -61,6 +61,7 @@ model Client {
   orders           Order[]
   pages            Page[]
   paymentGateway   PaymentGateway?
+  posConfig        POSConfig?
   promoConfig      PromoConfig?
   promoTiles       PromoTile[]
   rewards          Reward[]
@@ -146,7 +147,8 @@ model RestaurantTable {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  booking     Booking? @relation(fields: [bookingId], references: [id])
+  booking     Booking? @relation("TableBooking", fields: [bookingId], references: [id])
+  bookings    Booking[] @relation("BookingTable")
   orders      Order[]
 
   @@index([clientId])
@@ -572,12 +574,85 @@ model Order {
   table                 RestaurantTable? @relation(fields: [tableId], references: [id])
   paymentGateway        PaymentGateway? @relation(fields: [paymentGatewayId], references: [id])
 
+  posOrderId            String?
+  posPushAttempts       Int             @default(0)
+  posPushLastError      String?
+
   @@index([clientId])
   @@index([orderNumber])
   @@index([status])
   @@index([paymentGatewayId])
   @@index([customerId])
   @@index([locationId])
+}
+
+model POSConfig {
+  id                          String    @id @default(cuid())
+  clientId                    String    @unique
+  posType                     String    @default("none")
+  encryptedCredentials        String?
+  oauthAccessToken            String?
+  oauthRefreshToken           String?
+  oauthTokenExpiresAt         DateTime?
+  locationId                  String?
+  locationName                String?
+  connected                   Boolean   @default(false)
+  connectionVerifiedAt        DateTime?
+  lastMenuSyncAt              DateTime?
+  lastOrderPushAt             DateTime?
+  menuItemsCount              Int       @default(0)
+  webhookSecret               String?
+  autoSyncEnabled             Boolean   @default(true)
+  autoPublishEnabled          Boolean   @default(false)
+  settings                    Json      @default("{}")
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+  client                      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  menuSyncLogs                MenuSyncLog[]
+  orderPushQueue              OrderPushQueue[]
+
+  @@index([clientId])
+  @@index([posType])
+}
+
+model MenuSyncLog {
+  id            String    @id @default(cuid())
+  clientId      String
+  posConfigId   String
+  syncType      String    @default("manual")
+  status        String    @default("success")
+  itemsAdded    Int       @default(0)
+  itemsUpdated  Int       @default(0)
+  itemsRemoved  Int       @default(0)
+  totalItems    Int       @default(0)
+  errorMessage  String?
+  durationMs    Int?
+  createdAt     DateTime  @default(now())
+  posConfig     POSConfig @relation(fields: [posConfigId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([posConfigId])
+  @@index([createdAt])
+}
+
+model OrderPushQueue {
+  id            String    @id @default(cuid())
+  orderId       String
+  clientId      String
+  posConfigId   String
+  posType       String
+  attemptNumber Int       @default(1)
+  maxAttempts   Int       @default(4)
+  status        String    @default("pending")
+  nextRetryAt   DateTime  @default(now())
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+  posConfig     POSConfig @relation(fields: [posConfigId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@index([clientId])
+  @@index([orderId])
 }
 
 model LegalDoc {
@@ -645,9 +720,11 @@ model Booking {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   locationId         String?
-  client             Client    @relation(fields: [clientId], references: [id])
-  location           Location? @relation(fields: [locationId], references: [id])
-  tables             RestaurantTable[]
+  tableId            String?
+  client             Client           @relation(fields: [clientId], references: [id])
+  location           Location?        @relation(fields: [locationId], references: [id])
+  table              RestaurantTable? @relation("BookingTable", fields: [tableId], references: [id])
+  tables             RestaurantTable[] @relation("TableBooking")
 
   @@index([clientId])
   @@index([locationId])

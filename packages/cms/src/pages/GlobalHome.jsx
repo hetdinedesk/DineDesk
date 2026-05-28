@@ -52,7 +52,19 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
       if (!r.ok) throw new Error('Failed to load clients')
       return r.json()
     })
-      .then(d => { setClients(Array.isArray(d) ? d : []); setLoadingClients(false) })
+      .then(d => {
+        if (!Array.isArray(d)) { setClients([]); setLoadingClients(false); return }
+        // Normalize client objects to prevent null-access crashes during render
+        const safe = d.map(c => ({
+          ...c,
+          name: c.name || '',
+          domain: c.domain || '',
+          status: c.status || 'draft',
+          updatedAt: c.updatedAt || new Date().toISOString(),
+        }))
+        setClients(safe)
+        setLoadingClients(false)
+      })
       .catch((err) => {
         setLoadingClients(false)
       })
@@ -136,10 +148,12 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
     loadGroups(); loadClients()
   }
 
-  const filteredClients = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.domain.toLowerCase().includes(search.toLowerCase())
-  )
+  const searchLower = (search || '').toLowerCase()
+  const filteredClients = (Array.isArray(clients) ? clients : []).filter(c => {
+    if (!c) return false
+    return (c.name || '').toLowerCase().includes(searchLower) ||
+      (c.domain || '').toLowerCase().includes(searchLower)
+  })
 
   const metrics = [
     { label: 'Total Sites', value: clients.length, icon: '', color: C.acc },
@@ -273,7 +287,7 @@ export default function GlobalHome({ onOpenSite, isSuperAdmin }) {
               return (
                 <div key={cl.id} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 80px 100px', padding: '11px 14px', cursor: 'pointer', alignItems: 'center', borderBottom: i < filteredClients.length - 1 ? `1px solid ${C.border}20` : 'none' }} onClick={() => onOpenSite(cl)} onMouseEnter={e => e.currentTarget.style.background = C.hover} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <span style={{ fontWeight: 600, color: C.acc, fontSize: 14 }}>{cl.name}</span>
-                  <span onClick={e => { e.stopPropagation(); if (group) setOpenGroup(group) }}>{group ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, background: group.color + '20', color: group.color, padding: '2px 8px', borderRadius: 4, border: `1px solid ${group.color}40`, cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.opacity = '0.75'} onMouseLeave={e => e.currentTarget.style.opacity = '1'}><span style={{ width: 6, height: 6, borderRadius: '50%', background: group.color, flexShrink: 0 }} />{group.name}</span> : <span style={{ fontSize: 11, color: C.t3 }}>—</span>}</span>
+                  <span onClick={e => { e.stopPropagation(); if (group) setOpenGroup(group) }}>{group ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, background: group.color + '20', color: group.color, padding: '2px 8px', borderRadius: 4, border: `1px solid ${group.color}40`, cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.opacity = '0.75'} onMouseLeave={e => e.currentTarget.style.opacity = '1'}><span style={{ width: 6, height: 6, borderRadius: '50%', background: group.color, flexShrink: 0 }} />{group.name.length > 12 ? group.name.slice(0, 12) + '...' : group.name}</span> : <span style={{ fontSize: 11, color: C.t3 }}>—</span>}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: cl.status === 'live' ? C.green : C.amber }}>{cl.status}</span>
                   <span style={{ fontSize: 11, color: C.t3 }}>{new Date(cl.updatedAt).toLocaleDateString()}</span>
                 </div>

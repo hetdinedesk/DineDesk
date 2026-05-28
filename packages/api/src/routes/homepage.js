@@ -39,50 +39,55 @@ router.put('/', async (req, res) => {
   try {
     const clientId = getClientId(req)
     const sections = req.body
-    await prisma.$transaction(async (tx) => {
-      // Delete all member department relationships first
-      await tx.memberDepartment.deleteMany({
-        where: {
-          homeSection: {
-            clientId
-          }
-        }
-      })
-      
-      // Delete all existing sections
-      await tx.homeSection.deleteMany({ where: { clientId } })
-      
-      // Create new sections and department relationships
-      for (let section of sections) {
-        const { departmentIds, ...sectionData } = section
-        
-        const createdSection = await tx.homeSection.create({
-          data: {
-            clientId,
-            type: section.type,
-            title: section.title,
-            content: section.content,
-            imageUrl: section.imageUrl,
-            buttonText: section.buttonText,
-            buttonUrl: section.buttonUrl,
-            sortOrder: section.sortOrder,
-            isActive: section.isActive !== false
-          }
-        })
-        
-        // Create department relationships if departmentIds is provided
-        if (departmentIds && Array.isArray(departmentIds) && departmentIds.length > 0) {
-          for (const deptId of departmentIds) {
-            await tx.memberDepartment.create({
-              data: {
-                homeSectionId: createdSection.id,
-                departmentId: deptId
-              }
-            })
-          }
+
+    // Delete all member department relationships first
+    await prisma.memberDepartment.deleteMany({
+      where: {
+        homeSection: {
+          clientId
         }
       }
-    })
+    }).catch(() => {})
+
+    // Delete all existing sections
+    await prisma.homeSection.deleteMany({ where: { clientId } }).catch(() => {})
+
+    // Create new sections and department relationships
+    for (let section of sections) {
+      const { departmentIds, ...sectionData } = section
+
+      // Handle content - if it's an object, stringify it
+      let content = section.content
+      if (typeof content === 'object' && content !== null) {
+        content = JSON.stringify(content)
+      }
+
+      const createdSection = await prisma.homeSection.create({
+        data: {
+          clientId,
+          type: section.type,
+          title: section.title,
+          content: content,
+          imageUrl: section.imageUrl,
+          buttonText: section.buttonText,
+          buttonUrl: section.buttonUrl,
+          sortOrder: section.sortOrder,
+          isActive: section.isActive !== false
+        }
+      })
+
+      // Create department relationships if departmentIds is provided
+      if (departmentIds && Array.isArray(departmentIds) && departmentIds.length > 0) {
+        for (const deptId of departmentIds) {
+          await prisma.memberDepartment.create({
+            data: {
+              homeSectionId: createdSection.id,
+              departmentId: deptId
+            }
+          })
+        }
+      }
+    }
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -93,9 +98,64 @@ router.put('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const clientId = getClientId(req)
+    const { departmentIds } = req.body
+    let content = req.body.content
+    if (typeof content === 'object' && content !== null) {
+      content = JSON.stringify(content)
+    }
     const section = await prisma.homeSection.create({
-      data: { ...req.body, clientId }
+      data: {
+        clientId,
+        type: req.body.type || 'about',
+        title: req.body.title,
+        content,
+        imageUrl: req.body.imageUrl,
+        buttonText: req.body.buttonText,
+        buttonUrl: req.body.buttonUrl,
+        sortOrder: req.body.sortOrder ?? 0,
+        isActive: req.body.isActive !== false
+      }
     })
+    if (departmentIds && Array.isArray(departmentIds) && departmentIds.length > 0) {
+      for (const deptId of departmentIds) {
+        await prisma.memberDepartment.create({ data: { homeSectionId: section.id, departmentId: deptId } })
+      }
+    }
+    res.json(section)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Update single section
+router.put('/:id', async (req, res) => {
+  try {
+    const { departmentIds } = req.body
+    let content = req.body.content
+    if (typeof content === 'object' && content !== null) {
+      content = JSON.stringify(content)
+    }
+    const section = await prisma.homeSection.update({
+      where: { id: req.params.id },
+      data: {
+        title: req.body.title,
+        content,
+        imageUrl: req.body.imageUrl,
+        buttonText: req.body.buttonText,
+        buttonUrl: req.body.buttonUrl,
+        sortOrder: req.body.sortOrder,
+        isActive: req.body.isActive,
+        type: req.body.type
+      }
+    })
+    if (departmentIds !== undefined) {
+      await prisma.memberDepartment.deleteMany({ where: { homeSectionId: req.params.id } })
+      if (Array.isArray(departmentIds) && departmentIds.length > 0) {
+        for (const deptId of departmentIds) {
+          await prisma.memberDepartment.create({ data: { homeSectionId: req.params.id, departmentId: deptId } })
+        }
+      }
+    }
     res.json(section)
   } catch (err) {
     res.status(500).json({ error: err.message })

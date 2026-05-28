@@ -101,9 +101,12 @@ export default function LocationsPage({ data, page, banner }) {
   }
 
   // Get images for current location
-  const locationImages = currentLocation.gallery || [];
+  const locationImages = currentLocation.galleryImages || currentLocation.gallery || [];
   const hasImages = locationImages.length > 0;
   const currentImage = hasImages ? (locationImages[currentImageIndex] || locationImages[0]) : null;
+  
+  // Handle if image is an object with url property
+  const imageUrl = currentImage && typeof currentImage === 'object' ? currentImage.url : currentImage;
 
   // Image navigation
   const nextImage = () => {
@@ -259,7 +262,7 @@ export default function LocationsPage({ data, page, banner }) {
             {hasImages ? (
               <>
                 <img
-                  src={currentImage}
+                  src={imageUrl}
                   alt={currentLocation.name}
                   className="w-full h-full object-cover"
                 />

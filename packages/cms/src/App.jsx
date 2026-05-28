@@ -17,6 +17,7 @@ import OperationsSection from './pages/OperationsSection'
 import HomepageBanners from './pages/HomepageBanners'
 import { C } from './theme'
 import ErrorBoundary from './Components/ErrorBoundary'
+import POSOAuthCallback from './pages/POSOAuthCallback'
 
 const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
@@ -44,7 +45,7 @@ const prefetchSiteData = async (siteId, token, queryClient) => {
     queryClient.prefetchQuery({
       queryKey: ['menuItems', siteId],
       queryFn: async () => {
-        const res = await fetch(`${API_URL}/clients/${siteId}/menuItems`, {
+        const res = await fetch(`${API_URL}/clients/${siteId}/menu-items`, {
           headers: { Authorization: 'Bearer ' + token }
         })
         if (!res.ok) throw new Error('Failed to fetch menu items')
@@ -79,18 +80,8 @@ const prefetchSiteData = async (siteId, token, queryClient) => {
       staleTime: 5 * 60 * 1000
     })
 
-    // Prefetch tables
-    queryClient.prefetchQuery({
-      queryKey: ['tables', siteId],
-      queryFn: async () => {
-        const res = await fetch(`${API_URL}/clients/${siteId}/tables`, {
-          headers: { Authorization: 'Bearer ' + token }
-        })
-        if (!res.ok) throw new Error('Failed to fetch tables')
-        return res.json()
-      },
-      staleTime: 10 * 60 * 1000
-    })
+    // Prefetch tables (need location ID first, skip for now)
+    // Tables are location-specific, so we'll fetch them when a location is selected
 
     // Prefetch recent orders (last 50)
     queryClient.prefetchQuery({
@@ -145,6 +136,7 @@ function MainApp() {
   const [activeSite, setActiveSite] = useState(null)
   const [siteNav,    setSiteNav]    = useState('dashboard')
   const [dashboardSubsection, setDashboardSubsection] = useState('analytics')
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // ── Ref so event listener always sees latest activeSite ──
   const activeSiteRef = useRef(null)
@@ -386,10 +378,15 @@ function MainApp() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Failed to delete client')
       }
+      setRefreshKey(prev => prev + 1)
       closeSite()
     } catch (err) {
       alert(err.message)
     }
+  }
+
+  const cloneSite = () => {
+    setRefreshKey(prev => prev + 1)
   }
 
   const globalNavItems = canManageAll
@@ -407,7 +404,8 @@ function MainApp() {
 
     if (canManageAll || !site) return items
 
-    const allowed = user?.clientAccess?.[site.id] || []
+    const entry = user?.clientAccess?.[site.id]
+    const allowed = Array.isArray(entry) ? entry : (entry?.tabs || [])
     return items.filter(t => allowed.includes(t.key))
   }
 
@@ -463,7 +461,7 @@ function MainApp() {
       <Container fill>
         <div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', width:'100%' }}>
           {!activeSite && globalNav === 'home' && (
-            <GlobalHome onOpenSite={openSite} isSuperAdmin={isSuperAdmin} />
+            <GlobalHome key={refreshKey} onOpenSite={openSite} isSuperAdmin={isSuperAdmin} />
           )}
           {!activeSite && isSuperAdmin && globalNav === 'users' && (
             <div style={{ padding:40, color:C.t2 }}>Users management — coming soon.</div>
@@ -494,6 +492,7 @@ function MainApp() {
           )}
           {!activeSite && (canManageAll ? globalNav === 'sites' : true) && (
             <SitesList
+              key={refreshKey}
               onOpenSite={openSite}
               isSuperAdmin={canManageAll}
               clientAccess={user?.clientAccess || {}}
@@ -509,10 +508,10 @@ function MainApp() {
               siteType={activeSite.siteConfig?.settings?.siteType || 'restaurant'}
             />
           )}
-          {activeSite && siteNav === 'operations' && <OperationsSection clientId={activeSite.id} />}
+          {activeSite && siteNav === 'operations' && <OperationsSection clientId={activeSite.id} user={user} />}
           {activeSite && siteNav === 'cms'    && <CmsSection    clientId={activeSite.id} user={user} />}
           {activeSite && siteNav === 'config' && <ConfigSection clientId={activeSite.id} user={user} />}
-          {activeSite && siteNav === 'dashboard' && <DashboardSection key={location.pathname} clientId={activeSite.id} onDeleteSite={deleteSite} subNav={dashboardSubsection} setSubNav={setDashboardSubsection} />}
+          {activeSite && siteNav === 'dashboard' && <DashboardSection key={location.pathname} clientId={activeSite.id} onDeleteSite={deleteSite} onCloneSite={cloneSite} subNav={dashboardSubsection} setSubNav={setDashboardSubsection} />}
         </div>
       </Container>
     </div>
@@ -539,6 +538,7 @@ export default function App() {
             <Routes>
               <Route path="/site-admin/*" element={<SiteAdminApp />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/pos/oauth/square/callback" element={<POSOAuthCallback />} />
               <Route path="/*" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
             </Routes>
           </BrowserRouter>

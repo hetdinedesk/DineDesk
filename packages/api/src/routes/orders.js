@@ -4,14 +4,19 @@ const { sendOrderConfirmation, sendRestaurantNotification } = require('../lib/em
 const { authenticateToken } = require('../middleware/auth')
 const { updateOrderStatuses } = require('../jobs/updateOrderStatus')
 const OrderRouter = require('../pos-adapters')
+const { enqueueOrderPush } = require('../jobs/orderPushWorker')
 const router = express.Router({ mergeParams: true })
 
 const getClientId = (req) => req.params.clientId || req.params.id
 
-// Helper to generate next order number for a client
-async function getNextOrderNumber(clientId) {
+// Helper to generate next order number for a client+location combo
+async function getNextOrderNumber(clientId, locationId) {
+  const where = { clientId }
+  if (locationId) {
+    where.locationId = locationId
+  }
   const lastOrder = await prisma.order.findFirst({
-    where: { clientId },
+    where,
     orderBy: { orderNumber: 'desc' }
   })
   return (lastOrder?.orderNumber || 0) + 1
@@ -122,7 +127,7 @@ router.post('/', async (req, res) => {
     const verifiedDeliveryFee = orderType === 'delivery' ? parseFloat(deliveryFee || 0) : 0
     const verifiedTotal = Math.round((verifiedSubtotal + verifiedTaxAmount + verifiedDeliveryFee - discountAmount) * 100) / 100
 
-    const orderNumber = await getNextOrderNumber(clientId)
+    const orderNumber = await getNextOrderNumber(clientId, locationId || null)
 
     // Loyalty: Check if loyalty is enabled and process points
     let loyaltyConfig = null
@@ -229,7 +234,6 @@ router.post('/', async (req, res) => {
 
     // Get notification config from site config
     const notificationConfig = client.siteConfig?.notifications || {}
-    console.log('[ORDER] Notification config:', JSON.stringify(notificationConfig, null, 2))
 
     // Get location data if locationId is provided
     let locationData = {}
@@ -238,9 +242,20 @@ router.post('/', async (req, res) => {
         where: { id: order.locationId }
       })
       if (location) {
+        // Build full address string from address object
+        const addr = location.address || {}
+        const addressParts = [
+          addr.street,
+          addr.suburb,
+          addr.city,
+          addr.state,
+          addr.zipCode
+        ].filter(Boolean)
+        const fullAddress = addressParts.join(', ')
+
         locationData = {
           name: location.name,
-          address: location.address
+          address: fullAddress
         }
       }
     }
@@ -263,48 +278,10 @@ router.post('/', async (req, res) => {
       sendRestaurantNotification(order, clientName, notificationConfig, restaurantEmail)
     ]).catch(err => console.error('Email notification error:', err))
 
-    // Send order to POS using adapter layer (non-blocking)
-    if (posConfig.posType && posConfig.posType !== 'none') {
-      const orderRouter = new OrderRouter(posConfig)
-      
-      // Format order for POS
-      const posOrder = {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        restaurantName: client.name,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        customerPhone: order.customerPhone,
-        items: order.items,
-        subtotal: order.subtotal,
-        tax: order.taxAmount,
-        taxRate: ordering.tax?.rate || 0,
-        total: order.total,
-        deliveryFee: order.deliveryFee || 0,
-        orderType: order.orderType,
-        paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
-        notes: order.note,
-        scheduledFor: order.pickupTime,
-        transactionId: order.paymentGatewayId
-      }
-
-      // Send to POS asynchronously
-      orderRouter.sendOrder(posOrder)
-        .then(result => {
-          // Update order with POS order ID if successful
-          if (result.success && result.posOrderId) {
-            prisma.order.update({
-              where: { id: order.id },
-              data: { posOrderId: result.posOrderId }
-            }).catch(err => console.error('Failed to update order with POS ID:', err))
-          }
-        })
-        .catch(err => {
-          console.error('Failed to send order to POS:', err)
-          // Order is still created, just log the error
-        })
-    }
+    // Enqueue order for POS push (queue-based with retry logic)
+    enqueueOrderPush(order.id, clientId).catch(err =>
+      console.error('Failed to enqueue order push:', err)
+    )
 
     // If Stripe payment, create PaymentIntent (will be implemented in payments.js)
     let stripeClientSecret = null
@@ -373,14 +350,13 @@ router.patch('/:orderId/status', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid status' })
     }
 
-    // Build update data with timestamp (temporarily disabled until DB migration)
+    // Build update data with timestamp
     const updateData = { status }
-    // TODO: Add timestamp fields after database migration
-    // const now = new Date()
-    // if (status === 'accepted') updateData.acceptedAt = now
-    // if (status === 'preparing') updateData.preparingAt = now
-    // if (status === 'ready') updateData.readyAt = now
-    // if (status === 'completed') updateData.completedAt = now
+    const now = new Date()
+    if (status === 'accepted') updateData.acceptedAt = now
+    if (status === 'preparing') updateData.preparingAt = now
+    if (status === 'ready') updateData.readyAt = now
+    if (status === 'completed') updateData.completedAt = now
 
     const order = await prisma.order.update({
       where: { id: req.params.orderId },

@@ -452,7 +452,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
         <div className="max-w-3xl mx-auto px-6 py-32">
         {/* Order Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-4 p-6 bg-[var(--color-primary)]/10 rounded-full mb-8">
+          <div className="inline-flex items-center gap-4 p-6 bg-[var(--color-secondary)]/5 rounded-2xl mb-8 border border-[var(--color-secondary)]/10">
             <StatusIcon width={32} height={32} strokeWidth={2} style={{ color: statusInfo.color }} />
             <div className="text-left">
               <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">Order #{order.orderNumber}</div>
@@ -464,12 +464,12 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
         {/* Scheduled Order Banner */}
         {isScheduledOrder && scheduledTime && (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-[48px] p-6 mb-12">
+          <div className="bg-[var(--color-secondary)]/5 border border-[var(--color-secondary)]/20 rounded-2xl p-6 mb-12">
             <div className="flex items-center justify-center gap-4">
-              <Calendar width={32} height={32} strokeWidth={2} className="text-amber-600" />
+              <Calendar width={32} height={32} strokeWidth={2} className="text-[var(--color-secondary)]" />
               <div className="text-left">
-                <div className="font-heading text-xl italic text-amber-800">Scheduled Order</div>
-                <div className="font-body text-sm text-amber-700">
+                <div className="font-heading text-xl italic text-[var(--color-secondary)]">Scheduled Order</div>
+                <div className="font-body text-sm text-[var(--color-secondary)]/70">
                   Your order is scheduled for <span className="font-bold">{scheduledTime.toLocaleDateString()}</span> at <span className="font-bold">{scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               </div>
@@ -478,13 +478,13 @@ export default function OrderStatusPage({ data, orderId, template }) {
         )}
 
         {/* Status Progress */}
-        <div className="bg-white rounded-[48px] border border-[var(--color-secondary)]/10 p-8 mb-12">
+        <div className="bg-white rounded-2xl border border-[var(--color-secondary)]/10 p-8 mb-12">
           <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8">Order Progress</h3>
           <div className="flex justify-between relative">
-            {['new', 'preparing', 'packing', 'ready'].map((status, index) => {
-              const statusOrder = ['new', 'preparing', 'almost_ready', 'packing', 'ready', 'completed']
+            {['new', 'accepted', 'preparing', 'packing', 'ready'].map((status, index) => {
+              const statusOrder = ['new', 'accepted', 'preparing', 'almost_ready', 'packing', 'ready', 'completed']
               const currentIndex = statusOrder.indexOf(order.status)
-              const displayOrder = ['new', 'preparing', 'packing', 'ready']
+              const displayOrder = ['new', 'accepted', 'preparing', 'packing', 'ready']
               const displayIndex = displayOrder.indexOf(status)
               const isComplete = currentIndex >= statusOrder.indexOf(status)
               const isActive = order.status === status
@@ -509,33 +509,33 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
         {/* Loyalty Points Section */}
         {(order.pointsEarned > 0 || order.pointsUsed > 0) && (
-          <div className="bg-gradient-to-br from-amber-50 to-green-50 rounded-[48px] border border-[var(--color-primary)]/20 p-8 mb-12">
+          <div className="bg-[var(--color-secondary)]/5 rounded-2xl border border-[var(--color-secondary)]/20 p-8 mb-12">
             <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8 flex items-center gap-3">
               <Star width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)]" />
               Loyalty Rewards
             </h3>
             <div className="grid gap-6">
               {order.pointsEarned > 0 && (
-                <div className="flex items-center gap-4 p-6 bg-white rounded-full">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <Star width={24} height={24} strokeWidth={2} className="text-green-600" />
+                <div className="flex items-center gap-4 p-6 bg-white rounded-2xl">
+                  <div className="w-12 h-12 bg-[var(--color-primary)]/10 rounded-full flex items-center justify-center">
+                    <Star width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)]" />
                   </div>
                   <div>
-                    <div className="font-body text-sm font-bold text-green-700">Points Earned</div>
-                    <div className="font-heading text-2xl italic text-green-600">+{order.pointsEarned} points</div>
+                    <div className="font-body text-sm font-bold text-[var(--color-secondary)]">Points Earned</div>
+                    <div className="font-heading text-2xl italic text-[var(--color-primary)]">+{order.pointsEarned} points</div>
                   </div>
                 </div>
               )}
               {order.pointsUsed > 0 && (
-                <div className="flex items-center gap-4 p-6 bg-white rounded-full">
-                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-                    <Gift width={24} height={24} strokeWidth={2} className="text-amber-600" />
+                <div className="flex items-center gap-4 p-6 bg-white rounded-2xl">
+                  <div className="w-12 h-12 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
+                    <Gift width={24} height={24} strokeWidth={2} className="text-[var(--color-secondary)]" />
                   </div>
                   <div>
-                    <div className="font-body text-sm font-bold text-amber-800">Points Redeemed</div>
-                    <div className="font-heading text-2xl italic text-amber-600">-{order.pointsUsed} points</div>
+                    <div className="font-body text-sm font-bold text-[var(--color-secondary)]">Points Redeemed</div>
+                    <div className="font-heading text-2xl italic text-[var(--color-secondary)]">-{order.pointsUsed} points</div>
                     {order.rewardUsed && (
-                      <div className="font-body text-xs text-amber-700">{order.rewardUsed.name}</div>
+                      <div className="font-body text-xs text-[var(--color-secondary)]/60">{order.rewardUsed.name}</div>
                     )}
                   </div>
                 </div>
@@ -546,7 +546,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Order Details */}
-          <div className="bg-white rounded-[48px] border border-[var(--color-secondary)]/10 p-8">
+          <div className="bg-white rounded-2xl border border-[var(--color-secondary)]/10 p-8">
             <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8 flex items-center gap-3">
               <Receipt width={24} height={24} strokeWidth={2} />
               Order Details
@@ -591,7 +591,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
               {order.discountAmount > 0 && (
                 <div className="flex justify-between">
                   <span className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">Discount{order.rewardUsed?.name ? ` (${order.rewardUsed.name})` : ''}</span>
-                  <span className="text-xs font-body font-bold tracking-widest text-green-600 uppercase">-${order.discountAmount.toFixed(2)}</span>
+                  <span className="text-xs font-body font-bold tracking-widest text-[var(--color-primary)] uppercase">-${order.discountAmount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between pt-4">
@@ -603,7 +603,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
           {/* Customer & Pickup Info */}
           <div className="flex flex-col gap-8">
-            <div className="bg-white rounded-[48px] border border-[var(--color-secondary)]/10 p-8">
+            <div className="bg-white rounded-2xl border border-[var(--color-secondary)]/10 p-8">
               <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8 flex items-center gap-3">
                 <User width={24} height={24} strokeWidth={2} />
                 Customer Information
@@ -611,7 +611,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
               <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
                     <User width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
@@ -621,7 +621,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
                     <Mail width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
@@ -631,7 +631,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
                     <Phone width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
@@ -642,7 +642,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
               </div>
             </div>
 
-            <div className="bg-white rounded-[48px] border border-[var(--color-secondary)]/10 p-8">
+            <div className="bg-white rounded-2xl border border-[var(--color-secondary)]/10 p-8">
               <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8 flex items-center gap-3">
                 <Calendar width={24} height={24} strokeWidth={2} />
                 Pickup Information
@@ -650,7 +650,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
               <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
                     <Package width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
@@ -660,7 +660,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
                     <Clock width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
@@ -674,7 +674,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
                     <Receipt width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
@@ -684,12 +684,12 @@ export default function OrderStatusPage({ data, orderId, template }) {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 rounded-full flex items-center justify-center">
                     <CheckCircle width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
                     <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">Payment Status</div>
-                    <div className={`font-body font-bold capitalize ${order.paymentStatus === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>
+                    <div className={`font-body font-bold capitalize ${order.paymentStatus === 'paid' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary)]'}`}>
                       {order.paymentStatus}
                     </div>
                   </div>
@@ -697,7 +697,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
               </div>
 
               {order.note && (
-                <div className="mt-8 p-6 bg-[var(--color-accent)] rounded-full">
+                <div className="mt-8 p-6 bg-[var(--color-secondary)]/5 rounded-2xl">
                   <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase mb-2">Special Instructions</div>
                   <div className="font-body text-sm text-[var(--color-secondary)]">{order.note}</div>
                 </div>
@@ -715,13 +715,13 @@ export default function OrderStatusPage({ data, orderId, template }) {
               const siteId = isProd ? '' : (router.query.site || '')
               router.push(isProd ? '/' : `/?site=${siteId}`)
             }}
-            className="px-8 py-4 bg-white border border-[var(--color-secondary)]/20 rounded-full font-body font-bold text-sm text-[var(--color-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+            className="px-8 py-4 bg-white border border-[var(--color-secondary)]/20 rounded-2xl font-body font-bold text-sm text-[var(--color-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
           >
             Return Home
           </button>
           <button
             onClick={() => setShowReceiptModal(true)}
-            className="px-8 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg flex items-center gap-3"
+            className="px-8 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-2xl font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg flex items-center gap-3"
           >
             <Receipt width={18} height={18} strokeWidth={2} />
             View Receipt
@@ -732,7 +732,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
       {/* Receipt Modal */}
       {showReceiptModal && (
         <div className="fixed top-0 left-0 right-0 bottom-0 bg-[var(--color-secondary)]/50 backdrop-blur-sm flex items-center justify-center z-[1000] p-6">
-          <div className="bg-white rounded-[48px] max-w-[700px] w-[90%] max-h-[90vh] overflow-auto relative">
+          <div className="bg-white rounded-2xl max-w-[700px] w-[90%] max-h-[90vh] overflow-auto relative">
             <button
               onClick={() => setShowReceiptModal(false)}
               className="absolute top-6 right-6 bg-none border-none cursor-pointer p-3 rounded-full hover:bg-[var(--color-accent)] transition-colors z-10"

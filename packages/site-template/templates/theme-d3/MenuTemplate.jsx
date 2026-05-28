@@ -2,17 +2,25 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Search, Plus, Check, Gift, Phone, Sparkles, Heart, ArrowRight } from 'lucide-react';
+import { useWishlist } from '../../contexts/WishlistContext';
+import { Search, Plus, Check, Gift, Phone, Sparkles, Heart, ArrowRight, Clock } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 import ItemCustomizationModal from '../../components/ItemCustomizationModal';
+import { isRestaurantOpen, formatOperatingHours } from '../../lib/operatingHours';
 
 export default function MenuPage({ data, page, banner }) {
-  const { menuCategories, menuItems, shortcodes, contentPages, ordering } = useCMS();
+  const { menuCategories, menuItems, shortcodes, contentPages, ordering, locations } = useCMS();
   const { addItem, isEnabled: orderingEnabled } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [addedItems, setAddedItems] = useState({});
   const [customizingItem, setCustomizingItem] = useState(null);
+
+  // Check if restaurant is currently open based on operating hours
+  const primaryLocation = locations?.find(loc => loc.isPrimary) || locations?.[0];
+  const isRestaurantCurrentlyOpen = isRestaurantOpen(primaryLocation?.hours);
+  const currentOperatingHours = formatOperatingHours(primaryLocation?.hours);
 
   // Get loyalty config from data instead of hook
   const loyaltyConfig = data?.loyaltyConfig;
@@ -111,14 +119,16 @@ export default function MenuPage({ data, page, banner }) {
     <div className="min-h-screen bg-[var(--color-accent)]">
       {/* Hero Banner */}
       <div className="bg-[var(--color-secondary)] py-48 px-6 text-center text-[var(--color-accent)] relative overflow-hidden">
-        {/* Background Image */}
-        <div className="absolute inset-0 z-0 opacity-20 mix-blend-overlay">
-          <img 
-            src={pageBanner?.imageUrl || 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?q=80&w=2070&auto=format&fit=crop'} 
-            alt="" 
-            className="w-full h-full object-cover"
-          />
-        </div>
+        {/* Background Image from CMS Banner */}
+        {pageBanner?.imageUrl && (
+          <div className="absolute inset-0 z-0 opacity-20 mix-blend-overlay">
+            <img 
+              src={pageBanner.imageUrl} 
+              alt="" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
         
         {/* Content */}
         <div className="relative z-10 space-y-8 max-w-4xl mx-auto">
@@ -174,6 +184,7 @@ export default function MenuPage({ data, page, banner }) {
           </motion.div>
         </div>
       )}
+
 
       {/* Filter Bar */}
       <div className="bg-[var(--color-accent)]/90 backdrop-blur-xl border-b border-[var(--color-secondary)]/5 py-8 px-6">
@@ -240,8 +251,15 @@ export default function MenuPage({ data, page, banner }) {
                     alt={name}
                     className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                   />
-                  <button className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-all duration-500">
-                    <Heart width={16} height={16} strokeWidth={2} />
+                  <button
+                    onClick={() => toggleWishlist(item)}
+                    className={`absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center transition-all duration-500 ${
+                      isInWishlist(item.id)
+                        ? 'text-red-500 hover:bg-red-500 hover:text-white'
+                        : 'text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white'
+                    }`}
+                  >
+                    <Heart width={16} height={16} strokeWidth={2} fill={isInWishlist(item.id) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
                 

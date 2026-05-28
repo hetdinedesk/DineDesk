@@ -79,7 +79,7 @@ function generateCustomerReceiptHtml(order, clientName, clientData = {}, locatio
 
           <div class="info-box">
             <div class="info-label">Order Status</div>
-            <div style="font-weight: 600;">${order.status || 'New'}</div>
+            <div style="font-weight: 600;">${order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'New'}</div>
           </div>
 
           <div class="info-box">
@@ -416,6 +416,7 @@ async function sendEnquiryEmail(enquiry, clientName, notificationConfig, clientD
       const msg = {
         to: toEmail,
         from: notificationConfig.sendgridFrom || notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`,
+        replyTo: enquiry.email, // Set reply-to to the enquiry sender's email
         subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
         html: html
       }
@@ -425,28 +426,155 @@ async function sendEnquiryEmail(enquiry, clientName, notificationConfig, clientD
     }
 
     // Fallback to SMTP
-    if (notificationConfig?.smtpHost && notificationConfig?.smtpUser && notificationConfig?.smtpPassword) {
-      const emailTransporter = getTransporter(notificationConfig)
-      if (!emailTransporter) {
-        return { success: false, message: 'Failed to create email transporter' }
-      }
-
-      const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
-      const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
-
-      await emailTransporter.sendMail({
-        from: fromEmail,
-        to: toEmail,
-        subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
-        html
-      })
-
-      return { success: true, message: 'Enquiry email sent via SMTP' }
+    const emailTransporter = getTransporter(notificationConfig)
+    if (!emailTransporter) {
+      return { success: false, message: 'No email provider configured' }
     }
 
-    return { success: false, message: 'No email provider configured (SendGrid or SMTP)' }
+    const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
+    const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
+
+    await Promise.race([
+      emailTransporter.sendMail({
+        from: fromEmail,
+        to: toEmail,
+        replyTo: enquiry.email,
+        subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
+        html
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email sending timeout after 10 seconds')), 10000)
+      )
+    ])
+    return { success: true, message: 'Enquiry email sent via SMTP' }
   } catch (err) {
-    console.error('[EMAIL] Failed to send enquiry email:', err)
+    return { success: false, message: err.message }
+  }
+}
+
+function generateBookingConfirmationHtml(booking, clientName, clientData = {}, locationData = {}) {
+  const primaryColor = clientData.colours?.primary || '#2563eb'
+  const logoUrl = clientData.logo || ''
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; }
+        .header { text-align: center; padding-bottom: 30px; border-bottom: 2px solid ${primaryColor}; }
+        .logo { max-width: 150px; margin-bottom: 20px; }
+        h1 { color: ${primaryColor}; margin: 0; font-size: 28px; }
+        .content { padding: 30px 0; }
+        .info-box { background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .info-label { color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .info-value { font-size: 16px; font-weight: 600; color: #333; }
+        .message-box { background-color: #e8f4f8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${primaryColor}; }
+        .footer { text-align: center; padding-top: 30px; border-top: 1px solid #e0e0e0; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          ${logoUrl ? `<img src="${logoUrl}" alt="${clientName}" class="logo" />` : ''}
+          <h1>🎉 Booking Confirmed!</h1>
+          <p>${clientName}</p>
+        </div>
+        <div class="content">
+          <div class="info-box">
+            <div class="info-label">Customer</div>
+            <div class="info-value">${booking.customerName}</div>
+            <div style="margin-top: 8px; color: #666;">${booking.customerEmail}</div>
+            <div style="color: #666;">${booking.customerPhone}</div>
+          </div>
+          
+          <div class="info-box">
+            <div class="info-label">Booking Details</div>
+            <div class="info-value">${new Date(booking.bookingDate).toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+            <div class="info-value" style="margin-top: 8px;">${booking.bookingTime}</div>
+            <div class="info-value" style="margin-top: 8px;">Party of ${booking.partySize}</div>
+            ${locationData.name ? `<div style="margin-top: 8px; color: #666;">Location: ${locationData.name}</div>` : ''}
+          </div>
+          
+          ${booking.table ? `
+          <div class="info-box">
+            <div class="info-label">Table Assigned</div>
+            <div class="info-value">Table ${booking.table.tableNumber}</div>
+            <div style="margin-top: 8px; color: #666;">Capacity: ${booking.table.capacity} seats</div>
+          </div>
+          ` : ''}
+          
+          ${booking.notes ? `
+          <div class="message-box">
+            <div class="info-label">Special Requests</div>
+            <div>${booking.notes}</div>
+          </div>
+          ` : ''}
+          
+          <div class="message-box" style="background-color: #f0f9f0; border-left-color: #22c55e;">
+            <p style="margin: 0; color: #166534;">We look forward to seeing you! Please arrive on time. If you need to cancel or modify your booking, please contact us directly.</p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>This is an automated confirmation email. Please do not reply.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+async function sendBookingConfirmation(booking, clientName, notificationConfig, clientData = {}, locationData = {}) {
+  if (!booking.customerEmail) {
+    return { success: false, message: 'No customer email provided' }
+  }
+
+  try {
+    // Try SendGrid first
+    if (notificationConfig.sendgridApiKey) {
+      sgMail.setApiKey(notificationConfig.sendgridApiKey)
+
+      const html = generateBookingConfirmationHtml(booking, clientName, clientData, locationData)
+
+      const msg = {
+        to: booking.customerEmail,
+        from: notificationConfig.sendgridFrom || notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`,
+        subject: `Booking Confirmed - ${clientName}`,
+        html: html
+      }
+
+      await sgMail.send(msg)
+      return { success: true, message: 'Booking confirmation sent via SendGrid' }
+    }
+
+    // Fallback to SMTP
+    const emailTransporter = getTransporter(notificationConfig)
+    if (!emailTransporter) {
+      // Log the failure but don't fail the booking
+      console.log('[Email] No email provider configured for booking confirmation')
+      return { success: false, message: 'No email provider configured' }
+    }
+
+    const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
+    const html = generateBookingConfirmationHtml(booking, clientName, clientData, locationData)
+
+    await Promise.race([
+      emailTransporter.sendMail({
+        from: fromEmail,
+        to: booking.customerEmail,
+        subject: `Booking Confirmed - ${clientName}`,
+        html
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email sending timeout after 10 seconds')), 10000)
+      )
+    ])
+    return { success: true, message: 'Booking confirmation sent via SMTP' }
+  } catch (err) {
+    console.error('[Email] Booking confirmation error:', err)
     return { success: false, message: err.message }
   }
 }
@@ -455,5 +583,6 @@ module.exports = {
   sendOrderConfirmation,
   sendRestaurantNotification,
   sendEnquiryEmail,
+  sendBookingConfirmation,
   sendFallbackEmail
 }

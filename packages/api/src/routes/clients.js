@@ -5,6 +5,7 @@ const { prisma } = require('../lib/prisma')
 const { authenticateToken, requireRole } = require('../middleware/auth')
 const { validateSiteConfig } = require('../lib/validation')
 const { geocodeAddress, hasAddressChanged } = require('../lib/geocoding')
+const { sendBookingConfirmation } = require('../lib/email')
 const multer = require('multer')
 const sharp = require('sharp')
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
@@ -170,8 +171,8 @@ router.get('/:id/bookings/availability', availabilityLimiter, async (req, res) =
       }
     })
 
-    // If we have table information, use it for more accurate availability
-    const actualMaxTables = Math.min(maxTables, totalTables)
+    // If tables are configured, use actual table count; otherwise use maxTables config
+    const actualMaxTables = totalTables > 0 ? totalTables : maxTables
 
     if (time) {
       where.bookingTime = time
@@ -181,11 +182,6 @@ router.get('/:id/bookings/availability', availabilityLimiter, async (req, res) =
 
     // Calculate available tables
     let availableTables = actualMaxTables - existingBookings
-    
-    // If no tables are configured, show 0 available
-    if (totalTables === 0) {
-      availableTables = 0
-    }
 
     res.json({
       maxTables: actualMaxTables,
@@ -221,13 +217,22 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
 
     // Handle table assignment
     let assignedTableId = tableId
+    let resolvedLocationId = locationId
+
+    // If no locationId provided, resolve from client's primary/first location
+    if (!resolvedLocationId) {
+      const loc = await prisma.location.findFirst({
+        where: { clientId, isPrimary: true }
+      }) || await prisma.location.findFirst({ where: { clientId } })
+      if (loc) resolvedLocationId = loc.id
+    }
     
-    if (!assignedTableId && autoAssignTable && locationId) {
+    if (!assignedTableId && autoAssignTable && resolvedLocationId) {
       // Auto-assign the best fit table based on party size
       const suitableTables = await prisma.restaurantTable.findMany({
         where: {
           clientId,
-          locationId,
+          locationId: resolvedLocationId,
           capacity: { gte: parseInt(partySize) },
           isActive: true,
           bookingId: null // Not already booked
@@ -244,12 +249,12 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
     }
 
     // If a table is specified, validate it's available
-    if (assignedTableId && locationId) {
+    if (assignedTableId && resolvedLocationId) {
       const table = await prisma.restaurantTable.findFirst({
         where: {
           id: assignedTableId,
           clientId,
-          locationId,
+          locationId: resolvedLocationId,
           isActive: true
         }
       })
@@ -286,8 +291,8 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
     }
 
     // If locationId is provided, filter by location
-    if (locationId) {
-      where.locationId = locationId
+    if (resolvedLocationId) {
+      where.locationId = resolvedLocationId
     }
 
     const existingBookings = await prisma.booking.count({ where })
@@ -300,7 +305,7 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
     const booking = await prisma.booking.create({
       data: {
         clientId,
-        locationId,
+        locationId: resolvedLocationId,
         customerName,
         customerEmail,
         customerPhone,
@@ -309,20 +314,47 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
         bookingTime,
         notes,
         confirmationMethod,
+        tableId: assignedTableId || null,
         status: 'pending'
       },
       include: {
         location: true,
-        tables: true
+        table: true
       }
     })
 
-    // If a table was assigned, update the table with the booking reference
-    if (assignedTableId) {
-      await prisma.restaurantTable.update({
-        where: { id: assignedTableId },
-        data: { bookingId: booking.id }
+    // Don't set RestaurantTable.bookingId for future reservations
+    // The Booking.tableId field links the reservation to the table
+    // RestaurantTable.bookingId is only for current walk-in bookings
+
+    // Send booking confirmation email
+    try {
+      const client = await prisma.client.findUnique({
+        where: { id: clientId },
+        select: {
+          name: true,
+          logo: true,
+          colours: true
+        }
       })
+
+      const siteConfig = await prisma.siteConfig.findUnique({
+        where: { id: clientId },
+        select: { notifications: true }
+      })
+
+      if (client && customerEmail) {
+        await sendBookingConfirmation(
+          booking,
+          client.name,
+          siteConfig?.notifications || {},
+          client,
+          booking.location
+        )
+      }
+    } catch (emailError) {
+      console.error('Failed to send booking confirmation email:', emailError)
+      // Don't fail the booking if email fails
     }
 
     res.json(booking)
@@ -560,18 +592,14 @@ router.get('/:id/export', async (req, res) => {
       prisma.teamDepartment.findMany({
         where: { clientId: id, isActive: true },
         orderBy: { sortOrder: 'asc' },
-        select: {
-          id: true,
-          name: true,
-          isActive: true,
-          sortOrder: true,
+        include: {
           memberDepartments: {
-            select: {
-              homeSectionId: true
+            include: {
+              homeSection: true
             }
           }
         }
-      }),
+      }).catch(() => null), // Handle missing table gracefully
       prisma.specialsConfig.findUnique({
         where: { clientId: id }
       }).catch(() => null), // Handle missing table gracefully
@@ -691,7 +719,18 @@ const exportData = {
   promoConfig: promoConfig || { heading: null, subheading: null, isActive: true },
   featuredConfig: featuredConfig || { heading: null, subheading: null, isActive: true },
   welcomeContent: welcomeContent || { subtitle: null, heading: null, text: null, imageUrl: null, ctaText: null, ctaUrl: null, isExternal: false, isActive: true },
-  teamDepartments: teamDepartments || [],
+  teamDepartments: (teamDepartments || []).map(dept => ({
+    ...dept,
+    members: (() => {
+      const memberMap = new Map();
+      dept.memberDepartments?.forEach(md => {
+        if (md.homeSection && !memberMap.has(md.homeSection.id)) {
+          memberMap.set(md.homeSection.id, md.homeSection);
+        }
+      });
+      return Array.from(memberMap.values());
+    })() || []
+  })),
   specialsConfig: specialsConfig || { heading: null, subheading: null, showOnHomepage: false, maxItems: 2 },
   homepageLayout: homepageLayout || { components: [] },
   customTextBlocks: customTextBlocks || [],
@@ -745,7 +784,7 @@ const exportData = {
     enableFooter: cfg?.reviews?.enableFooter !== false,
     enableFloating: cfg?.reviews?.enableFloating !== false,
     // Carousel content options - use Config settings for visibility
-    showReviewsCarousel: reviewsConfig.showReviewsCarousel === true,
+    showReviewsCarousel: reviewsConfig.showReviewsCarousel !== false,
     carouselHeading: cfg?.reviews?.carouselHeading || '',
     carouselSubHeading: cfg?.reviews?.carouselSubHeading || '',
     carouselContent: cfg?.reviews?.carouselContent || '',
@@ -1123,7 +1162,8 @@ router.post('/:id/clone', clientAdminOnly, async (req, res) => {
         homeSections: true,
         homepageLayout: true,
         customTextBlocks: true,
-        legalDocs: true
+        legalDocs: true,
+        locations: true
       }
     })
 
@@ -1204,15 +1244,43 @@ router.post('/:id/clone', clientAdminOnly, async (req, res) => {
             imageUrl: item.imageUrl,
             sortOrder: item.sortOrder,
             isAvailable: item.isAvailable,
-            isFeatured: item.isFeatured
+            isFeatured: item.isFeatured,
+            sizes: item.sizes,
+            addons: item.addons,
+            hasVariants: item.hasVariants
           }
         })
       }
     }
 
-    // Clone pages
+    // Clone banners FIRST (so bannerIdMap is available for pages)
+    const bannerIdMap = {}
+    for (const banner of sourceClient.banners) {
+      const clonedBanner = await prisma.banner.create({
+        data: {
+          clientId: clonedClient.id,
+          imageUrl: banner.imageUrl,
+          title: banner.title,
+          subtitle: banner.subtitle,
+          text: banner.text,
+          buttonText: banner.buttonText,
+          buttonUrl: banner.buttonUrl,
+          isActive: banner.isActive,
+          sortOrder: banner.sortOrder,
+          location: banner.location,
+          assignTo: banner.assignTo,
+          widthPx: banner.widthPx,
+          heightPx: banner.heightPx,
+          isExternal: banner.isExternal
+        }
+      })
+      bannerIdMap[banner.id] = clonedBanner.id
+    }
+
+    // Clone pages (map banner IDs to cloned banners)
+    const pageIdMap = {}
     for (const page of sourceClient.pages) {
-      await prisma.page.create({
+      const clonedPage = await prisma.page.create({
         data: {
           clientId: clonedClient.id,
           slug: page.slug,
@@ -1224,26 +1292,50 @@ router.post('/:id/clone', clientAdminOnly, async (req, res) => {
           status: page.status,
           inNavigation: page.inNavigation,
           pageType: page.pageType,
-          bannerId: null,
+          bannerId: page.bannerId ? (bannerIdMap[page.bannerId] || null) : null,
           parentId: null,
-          navOrder: page.navOrder
+          navOrder: page.navOrder,
+          showEnquiryForm: page.showEnquiryForm,
+          showLocationMap: page.showLocationMap
         }
       })
+      pageIdMap[page.id] = clonedPage.id
     }
 
-    // Clone navigation items
-    for (const navItem of sourceClient.navigationItems) {
-      await prisma.navigationItem.create({
+    // Clone navigation items (preserve hierarchy - first pass: top-level/headers)
+    const navIdMap = {}
+    const topLevelNavItems = sourceClient.navigationItems.filter(n => !n.parentId)
+    for (const navItem of topLevelNavItems) {
+      const clonedNav = await prisma.navigationItem.create({
         data: {
           clientId: clonedClient.id,
           label: navItem.label,
-          pageId: null,
+          pageId: navItem.pageId ? (pageIdMap[navItem.pageId] || null) : null,
           url: navItem.url,
           parentId: null,
           sortOrder: navItem.sortOrder,
-          isActive: navItem.isActive
+          isActive: navItem.isActive,
+          imageUrl: navItem.imageUrl
         }
       })
+      navIdMap[navItem.id] = clonedNav.id
+    }
+    // Second pass: child nav items
+    const childNavItems = sourceClient.navigationItems.filter(n => n.parentId)
+    for (const navItem of childNavItems) {
+      const clonedNav = await prisma.navigationItem.create({
+        data: {
+          clientId: clonedClient.id,
+          label: navItem.label,
+          pageId: navItem.pageId ? (pageIdMap[navItem.pageId] || null) : null,
+          url: navItem.url,
+          parentId: navIdMap[navItem.parentId] || null,
+          sortOrder: navItem.sortOrder,
+          isActive: navItem.isActive,
+          imageUrl: navItem.imageUrl
+        }
+      })
+      navIdMap[navItem.id] = clonedNav.id
     }
 
     // Clone footer sections
@@ -1280,20 +1372,6 @@ router.post('/:id/clone', clientAdminOnly, async (req, res) => {
           content: legalDoc.content,
           urlSlug: legalDoc.urlSlug,
           isActive: legalDoc.isActive
-        }
-      })
-    }
-
-    // Clone banners
-    for (const banner of sourceClient.banners) {
-      await prisma.banner.create({
-        data: {
-          clientId: clonedClient.id,
-          imageUrl: banner.imageUrl,
-          title: banner.title,
-          subtitle: banner.subtitle,
-          isActive: banner.isActive,
-          sortOrder: banner.sortOrder
         }
       })
     }
@@ -1450,6 +1528,32 @@ router.post('/:id/clone', clientAdminOnly, async (req, res) => {
       })
     }
 
+    // Clone locations
+    for (const location of sourceClient.locations || []) {
+      await prisma.location.create({
+        data: {
+          clientId: clonedClient.id,
+          name: location.name,
+          displayName: location.displayName,
+          address: location.address,
+          suburb: location.suburb,
+          city: location.city,
+          state: location.state,
+          postcode: location.postcode,
+          country: location.country,
+          phone: location.phone,
+          bookingPhone: location.bookingPhone,
+          deliveryPhone: location.deliveryPhone,
+          lat: location.lat,
+          lng: location.lng,
+          email: location.email,
+          hours: location.hours,
+          isPrimary: location.isPrimary,
+          isActive: location.isActive
+        }
+      })
+    }
+
     log({
       action: 'CLIENT_CLONED', entity: 'Client', entityName: clonedClient.name,
       userId: req.user.id, userName: req.user.name,
@@ -1504,17 +1608,36 @@ router.delete('/:id', clientAdminOnly, async (req, res) => {
   try {
     const id = req.params.id
     await prisma.$transaction(async (tx) => {
+      // Check if client exists first
+      const client = await tx.client.findUnique({ where: { id } })
+      if (!client) {
+        throw new Error('Client not found')
+      }
+
       // Delete in dependency order (children before parents)
+      // Orders & bookings (reference tables/locations)
       await tx.order.deleteMany({ where: { clientId: id } })
+      await tx.booking.deleteMany({ where: { clientId: id } })
+      // Restaurant tables (reference locations)
+      await tx.restaurantTable.deleteMany({ where: { clientId: id } })
+      // Rewards (reference loyaltyConfig)
+      await tx.reward.deleteMany({ where: { clientId: id } })
+      await tx.loyaltyConfig.deleteMany({ where: { clientId: id } })
+      // Customers
+      await tx.customer.deleteMany({ where: { clientId: id } })
+      // Form submissions, deployments, activity logs
       await tx.formSubmission.deleteMany({ where: { clientId: id } })
       await tx.deployment.deleteMany({ where: { clientId: id } })
       await tx.activityLog.deleteMany({ where: { clientId: id } })
+      // Legal, payment, alerts
       await tx.legalDoc.deleteMany({ where: { clientId: id } })
       await tx.paymentGateway.deleteMany({ where: { clientId: id } })
       await tx.alertPopup.deleteMany({ where: { clientId: id } })
+      // Home sections & team departments
       await tx.homeSection.deleteMany({ where: { clientId: id } })
-      // Footer links → footer sections (cascade handles links, but be safe)
-      await tx.footerLink.deleteMany({ where: { footerSection: { clientId: id } } })
+      await tx.teamDepartment.deleteMany({ where: { clientId: id } })
+      // Footer links (all, including unassigned) → footer sections
+      await tx.footerLink.deleteMany({ where: { clientId: id } })
       await tx.footerSection.deleteMany({ where: { clientId: id } })
       // Navigation items reference pages, delete nav first
       await tx.navigationItem.deleteMany({ where: { clientId: id } })
@@ -1522,13 +1645,32 @@ router.delete('/:id', clientAdminOnly, async (req, res) => {
       await tx.page.updateMany({ where: { clientId: id }, data: { bannerId: null, parentId: null } })
       await tx.banner.deleteMany({ where: { clientId: id } })
       await tx.page.deleteMany({ where: { clientId: id } })
+      // Menu
       await tx.menuItem.deleteMany({ where: { clientId: id } })
       await tx.menuCategory.deleteMany({ where: { clientId: id } })
+      // Specials, promo, featured, welcome, custom text, homepage layout
       await tx.special.deleteMany({ where: { clientId: id } })
+      await tx.promoTile.deleteMany({ where: { clientId: id } })
+      await tx.promoConfig.deleteMany({ where: { clientId: id } })
+      await tx.specialsConfig.deleteMany({ where: { clientId: id } })
+      await tx.featuredConfig.deleteMany({ where: { clientId: id } })
+      await tx.welcomeContent.deleteMany({ where: { clientId: id } })
+      await tx.customTextBlock.deleteMany({ where: { clientId: id } })
+      await tx.homepageLayout.deleteMany({ where: { clientId: id } })
+      // Locations (after tables/bookings/orders removed)
       await tx.location.deleteMany({ where: { clientId: id } })
+      // Site config
       await tx.siteConfig.deleteMany({ where: { clientId: id } })
-      await tx.client.delete({ where: { id } })
-    })
+      // Finally delete the client (if not already deleted by cascade)
+      try {
+        await tx.client.delete({ where: { id } })
+      } catch (e) {
+        // Client may have been cascade-deleted, ignore
+        if (!e.message.includes('Record to delete does not exist')) {
+          throw e
+        }
+      }
+    }, { timeout: 30000 })
 
     log({
       action: 'CLIENT_DELETED', entity: 'Client',

@@ -7,8 +7,14 @@ import { replaceShortcodes } from '../../lib/shortcodes';
 export default function TeamPage({ data, page, banner }) {
   const { homepageSections, teamDepartments, shortcodes, siteConfig } = useCMS();
 
-  // Get team members from homeSections with type 'about'
-  const teamMembers = homepageSections?.filter(s => s.type === 'about' && s.isActive !== false) || [];
+  // Get team members directly from homepageSections (same as theme-d1/d2)
+  // homepageSections already includes departmentIds via memberDepartments
+  const teamMembers = useMemo(() =>
+    homepageSections?.filter(s =>
+      (s.type === 'about' || s.type === 'team') &&
+      s.isActive !== false
+    ) || []
+  , [homepageSections]);
 
   // Get page data with shortcodes
   const pageTitle = replaceShortcodes(page?.title || 'Meet the Artists', shortcodes);
@@ -20,23 +26,44 @@ export default function TeamPage({ data, page, banner }) {
 
   // Get team member specialty/skill from content
   const getSpecialty = (member) => {
-    const content = typeof member.content === 'object' ? member.content : {};
-    return content.specialty || content.skill || member.department?.name || '';
+    let content = member.content;
+    if (typeof content === 'string') {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        content = {};
+      }
+    }
+    return content?.specialty || content?.skill || member.department?.name || '';
   };
 
   // Get bio from member content
   const getBio = (member) => {
-    const content = typeof member.content === 'object' ? member.content : {};
-    return content.bio || content.description || '';
+    let content = member.content;
+    if (typeof content === 'string') {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        content = {};
+      }
+    }
+    return content?.bio || content?.description || '';
   };
 
   // Get social links from content
   const getSocialLinks = (member) => {
-    const content = typeof member.content === 'object' ? member.content : {};
+    let content = member.content;
+    if (typeof content === 'string') {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        content = {};
+      }
+    }
     return {
-      instagram: content.instagram || content.social?.instagram,
-      twitter: content.twitter || content.social?.twitter,
-      linkedin: content.linkedin || content.social?.linkedin,
+      instagram: content?.instagram || content?.social?.instagram,
+      twitter: content?.twitter || content?.social?.twitter,
+      linkedin: content?.linkedin || content?.social?.linkedin,
     };
   };
 
@@ -47,8 +74,15 @@ export default function TeamPage({ data, page, banner }) {
 
   // Get member role from content
   const getMemberRole = (member) => {
-    const content = typeof member.content === 'object' ? member.content : {};
-    return content.role || content.position || '';
+    let content = member.content;
+    if (typeof content === 'string') {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        content = {};
+      }
+    }
+    return content?.role || content?.position || '';
   };
 
   // Group team members by department
@@ -103,13 +137,15 @@ export default function TeamPage({ data, page, banner }) {
       {/* Hero Section */}
       <div className="bg-[var(--color-secondary)] py-48 px-6 text-center text-[var(--color-accent)] relative overflow-hidden">
         {/* Background Image from CMS Banner */}
-        <div className="absolute inset-0 z-0 opacity-20 mix-blend-overlay">
-          <img 
-            src={pageBanner?.imageUrl || 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=2070&auto=format&fit=crop'} 
-            alt="" 
-            className="w-full h-full object-cover"
-          />
-        </div>
+        {pageBanner?.imageUrl && (
+          <div className="absolute inset-0 z-0 opacity-20 mix-blend-overlay">
+            <img 
+              src={pageBanner.imageUrl} 
+              alt="" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
         
         <div className="relative z-10 space-y-8 max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-4 text-[var(--color-primary)] font-sans font-semibold uppercase tracking-[0.4em] text-[10px]">
@@ -290,19 +326,25 @@ export default function TeamPage({ data, page, banner }) {
                     {/* Content */}
                     <div className="space-y-4 px-4">
                       <div className="space-y-2">
-                        <div className="text-[var(--color-primary)] font-sans font-bold text-[9px] uppercase tracking-widest">
-                          {specialty}
-                        </div>
                         <h3 className="font-serif text-3xl italic text-[var(--color-secondary)] group-hover:text-[var(--color-primary)] transition-colors duration-500">
                           {member.title}
                         </h3>
-                        <p className="text-[var(--color-secondary)]/30 font-sans font-bold uppercase text-[9px] tracking-[0.2em]">
-                          {memberRole}
-                        </p>
+                        {memberRole && (
+                          <p className="text-[var(--color-secondary)]/30 font-sans font-bold uppercase text-[9px] tracking-[0.2em]">
+                            {memberRole}
+                          </p>
+                        )}
+                        {specialty && (
+                          <div className="text-[var(--color-primary)] font-sans font-bold text-[9px] uppercase tracking-widest">
+                            {specialty}
+                          </div>
+                        )}
                       </div>
-                      <p className="text-[var(--color-secondary)]/60 font-sans text-xs font-light leading-relaxed">
-                        {bio}
-                      </p>
+                      {bio && (
+                        <p className="text-[var(--color-secondary)]/60 font-sans text-xs font-light leading-relaxed">
+                          {bio}
+                        </p>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -330,7 +372,7 @@ export default function TeamPage({ data, page, banner }) {
                     {replaceShortcodes(siteConfig?.careers?.description || "We're always looking for passionate people to join our growing family.", shortcodes)}
                   </p>
                   <a
-                    href={siteConfig?.careers?.url || '#careers'}
+                    href={`mailto:${data?.client?.email || data?.settings?.email || 'careers@example.com'}?subject=${encodeURIComponent('Job Application - ' + (data?.client?.name || 'Your Restaurant'))}&body=${encodeURIComponent('I am interested in joining your team. Please find my details below.')}`}
                     className="inline-block bg-[var(--color-primary)] text-[var(--color-accent)] px-12 py-5 rounded-full font-bold text-lg hover:bg-[var(--color-secondary)] transition-all duration-300"
                   >
                     {siteConfig?.careers?.buttonText || 'Apply Now'}

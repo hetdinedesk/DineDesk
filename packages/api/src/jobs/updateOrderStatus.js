@@ -22,16 +22,19 @@ function parsePrepTime(prepTimeString) {
 }
 
 /**
- * Update order statuses based on time elapsed since order creation
+ * Update order statuses based on time elapsed since order acceptance
  * This should be called periodically (e.g., every minute via cron job)
  */
 async function updateOrderStatuses() {
   try {
-    // Get all active orders (not completed or cancelled)
+    // Get all active orders (not completed or cancelled) - only process accepted orders
     const activeOrders = await prisma.order.findMany({
       where: {
         status: {
-          in: ['new', 'preparing', 'almost_ready', 'packing']
+          in: ['accepted', 'preparing', 'almost_ready', 'packing']
+        },
+        acceptedAt: {
+          not: null
         }
       },
       include: {
@@ -50,9 +53,10 @@ async function updateOrderStatuses() {
       const prepTimeString = ordering.estimatedPrepTime || '15-25 min'
       const prepTimeMinutes = parsePrepTime(prepTimeString)
 
-      const orderCreatedAt = new Date(order.createdAt)
+      // Use acceptedAt as the start time for timer
+      const orderStartTime = new Date(order.acceptedAt)
       const now = new Date()
-      const elapsedMinutes = (now - orderCreatedAt) / (1000 * 60)
+      const elapsedMinutes = (now - orderStartTime) / (1000 * 60)
       const percentageElapsed = (elapsedMinutes / prepTimeMinutes) * 100
 
       let newStatus = null
@@ -64,15 +68,20 @@ async function updateOrderStatuses() {
         newStatus = 'packing'
       } else if (percentageElapsed >= 70 && order.status === 'preparing') {
         newStatus = 'almost_ready'
-      } else if (percentageElapsed >= 10 && order.status === 'new') {
+      } else if (percentageElapsed >= 10 && order.status === 'accepted') {
         newStatus = 'preparing'
       }
 
       // Update status if it should change
       if (newStatus && newStatus !== order.status) {
+        const updateData = { status: newStatus }
+        const now = new Date()
+        if (newStatus === 'preparing') updateData.preparingAt = now
+        if (newStatus === 'ready') updateData.readyAt = now
+
         await prisma.order.update({
           where: { id: order.id },
-          data: { status: newStatus }
+          data: updateData
         })
         updatedCount++
       }

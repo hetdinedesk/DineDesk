@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Search, Plus, Check, Gift, Phone, MapPin } from 'lucide-react';
+import { Search, Plus, Check, Gift, Phone, MapPin, Clock } from 'lucide-react';
 import { replaceShortcodes } from '../../lib/shortcodes';
 import ItemCustomizationModal from '../../components/ItemCustomizationModal';
 import { getCurrentTableInfo, formatTableDisplay } from '../../lib/tableDetection';
+import { isRestaurantOpen, formatOperatingHours } from '../../lib/operatingHours';
 import { useRouter } from 'next/router';
 
 // Image URLs
@@ -22,7 +23,7 @@ const IMAGES = {
 
 export default function MenuPage({ data, page, banner }) {
   const router = useRouter();
-  const { menuCategories, menuItems, shortcodes, contentPages, ordering } = useCMS();
+  const { menuCategories, menuItems, shortcodes, contentPages, ordering, locations } = useCMS();
   const { addItem, isEnabled: orderingEnabled } = useCart();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,6 +34,11 @@ export default function MenuPage({ data, page, banner }) {
   // Get loyalty config from data instead of hook
   const loyaltyConfig = data?.loyaltyConfig;
   const isLoyaltyEnabled = loyaltyConfig?.enabled || false;
+
+  // Check if restaurant is currently open based on operating hours
+  const primaryLocation = locations?.find(loc => loc.isPrimary) || locations?.[0];
+  const isRestaurantCurrentlyOpen = isRestaurantOpen(primaryLocation?.hours);
+  const currentOperatingHours = formatOperatingHours(primaryLocation?.hours);
 
   const menuPage = (contentPages || []).find(p => p.slug === 'menu' || p.pageType === 'menu');
   const pageTitle = replaceShortcodes(menuPage?.title || 'Our Menu', shortcodes);
@@ -227,6 +233,7 @@ export default function MenuPage({ data, page, banner }) {
           </motion.div>
         </div>
       )}
+
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Search and Filter */}

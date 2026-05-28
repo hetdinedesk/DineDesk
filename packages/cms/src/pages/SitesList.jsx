@@ -29,7 +29,8 @@ export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {},
       setClients(data)
     } else {
       setClients(data.filter(c => {
-        const tabs = clientAccess[c.id] || []
+        const entry = clientAccess[c.id]
+        const tabs = Array.isArray(entry) ? entry : (entry?.tabs || [])
         return tabs.length > 0
       }))
     }
@@ -141,7 +142,7 @@ export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {},
               <span style={{ fontWeight: 600, color: C.acc }}>{c.name}</span>
               {!isSuperAdmin && (
                 <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
-                  {(clientAccess[c.id] || []).map(tab => (
+                  {(Array.isArray(clientAccess[c.id]) ? clientAccess[c.id] : (clientAccess[c.id]?.tabs || [])).map(tab => (
                     <span key={tab} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', background: '#FF6B2B20', color: '#FF6B2B', padding: '1px 5px', borderRadius: 3 }}>{tab}</span>
                   ))}
                 </div>

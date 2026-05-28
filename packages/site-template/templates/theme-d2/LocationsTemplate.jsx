@@ -52,23 +52,25 @@ export default function LocationsPage({ data, page, banner }) {
   // Navigate images
   const nextImage = (location) => {
     const currentIdx = getImageIndex(location.id);
-    const maxIdx = (location.gallery?.length || 1) - 1;
+    const maxIdx = (location.galleryImages?.length || location.gallery?.length || 1) - 1;
     setImageIndex(location.id, currentIdx >= maxIdx ? 0 : currentIdx + 1);
   };
 
   const prevImage = (location) => {
     const currentIdx = getImageIndex(location.id);
-    const maxIdx = (location.gallery?.length || 1) - 1;
+    const maxIdx = (location.galleryImages?.length || location.gallery?.length || 1) - 1;
     setImageIndex(location.id, currentIdx <= 0 ? maxIdx : currentIdx - 1);
   };
 
   // Get image for a location at current index
   const getLocationImage = (location) => {
-    const gallery = location.gallery || [];
+    const gallery = location.galleryImages || location.gallery || [];
     const idx = getImageIndex(location.id);
     
     if (gallery.length > 0) {
-      return gallery[idx] || gallery[0];
+      const image = gallery[idx] || gallery[0];
+      // Handle if image is an object with url property
+      return typeof image === 'object' ? image.url : image;
     }
     if (location.exteriorImage) {
       return location.exteriorImage;
@@ -197,7 +199,7 @@ export default function LocationsPage({ data, page, banner }) {
                   />
                   
                   {/* Gallery Navigation */}
-                  {(location.gallery?.length || 0) > 1 && (
+                  {(location.galleryImages?.length || location.gallery?.length || 0) > 1 && (
                     <>
                       {/* Prev/Next Buttons */}
                       <button

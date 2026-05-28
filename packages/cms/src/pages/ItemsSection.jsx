@@ -484,10 +484,11 @@ function MenuItemsTab({ clientId }) {
                 />
                 <input
                   type="number"
-                  value={size.priceAdjustment || ''}
+                  value={size.priceAdjustment === 0 ? '0' : (size.priceAdjustment || '')}
                   onChange={e => {
+                    const value = e.target.value
                     const newSizes = [...(newItem.sizes || [])]
-                    newSizes[idx] = { ...newSizes[idx], priceAdjustment: parseFloat(e.target.value) || 0 }
+                    newSizes[idx] = { ...newSizes[idx], priceAdjustment: value === '' ? 0 : parseFloat(value) }
                     setNewItem(p => ({...p, sizes: newSizes}))
                   }}
                   placeholder="Price adjustment"
@@ -537,10 +538,11 @@ function MenuItemsTab({ clientId }) {
                 />
                 <input
                   type="number"
-                  value={addon.price || ''}
+                  value={addon.price === 0 ? '0' : (addon.price || '')}
                   onChange={e => {
+                    const value = e.target.value
                     const newAddons = [...(newItem.addons || [])]
-                    newAddons[idx] = { ...newAddons[idx], price: parseFloat(e.target.value) || 0 }
+                    newAddons[idx] = { ...newAddons[idx], price: value === '' ? 0 : parseFloat(value) }
                     setNewItem(p => ({...p, addons: newAddons}))
                   }}
                   placeholder="Price"

@@ -51,17 +51,21 @@ router.post('/', async (req, res) => {
   }
 })
 
-// UPDATE user — name, email, clientAccess
+// UPDATE user — name, email, password, clientAccess
 router.put('/:id', async (req, res) => {
   try {
-    const { name, email, clientAccess } = req.body
+    const { name, email, password, clientAccess } = req.body
+    const updateData = {
+      ...(name ? { name } : {}),
+      ...(email ? { email } : {}),
+      clientAccess: clientAccess || {}
+    }
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10)
+    }
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: {
-        ...(name  ? { name }  : {}),
-        ...(email ? { email } : {}),
-        clientAccess: clientAccess || {}
-      }
+      data: updateData
     })
     log({
       action: 'USER_EDITED', entity: 'User', entityName: user.name,

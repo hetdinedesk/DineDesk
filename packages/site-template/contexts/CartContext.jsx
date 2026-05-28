@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { getCurrentTableInfo, shouldUseDineInOrdering, getOrderType, getPaymentPreference } from '../lib/tableDetection';
 
-const CART_STORAGE_KEY = 'dinedesk_cart';
 const CART_EXPIRY_MINUTES = 10;
 
 const CartContext = createContext(null);
@@ -14,7 +13,7 @@ export const useCart = () => {
   return context;
 };
 
-export const CartProvider = ({ children, ordering = {}, query = {} }) => {
+export const CartProvider = ({ children, ordering = {}, query = {}, siteId = '' }) => {
   const [items, setItems] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [tableInfo, setTableInfo] = useState(null);
@@ -22,6 +21,9 @@ export const CartProvider = ({ children, ordering = {}, query = {} }) => {
   const isEnabled = ordering?.enabled === true;
   const taxRate = ordering?.taxRate || 0;
   const taxLabel = ordering?.taxLabel || 'Tax';
+
+  // Site-specific storage key
+  const CART_STORAGE_KEY = `dinedesk_cart_${siteId || 'default'}`;
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -31,7 +33,7 @@ export const CartProvider = ({ children, ordering = {}, query = {} }) => {
         const { items: savedItems, timestamp } = JSON.parse(savedCart);
         const now = Date.now();
         const expiryTime = CART_EXPIRY_MINUTES * 60 * 1000;
-        
+
         // Only restore if cart is less than 10 minutes old
         if (now - timestamp < expiryTime) {
           setItems(savedItems);
@@ -43,7 +45,7 @@ export const CartProvider = ({ children, ordering = {}, query = {} }) => {
     } catch (error) {
       // Failed to load cart from localStorage
     }
-  }, []);
+  }, [CART_STORAGE_KEY]);
 
   // Load table information on mount
   useEffect(() => {
@@ -110,7 +112,7 @@ export const CartProvider = ({ children, ordering = {}, query = {} }) => {
   const clearCart = useCallback(() => {
     setItems([]);
     localStorage.removeItem(CART_STORAGE_KEY);
-  }, []);
+  }, [CART_STORAGE_KEY]);
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);

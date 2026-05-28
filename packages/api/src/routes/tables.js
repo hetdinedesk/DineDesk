@@ -23,7 +23,7 @@ router.get('/:clientId/locations/:locationId/tables', async (req, res) => {
     
     const tables = await prisma.restaurantTable.findMany({
       where: { clientId, locationId },
-      orderBy: { tableNumber: 'asc' },
+      orderBy: { capacity: 'asc' },
       include: {
         booking: {
           select: {

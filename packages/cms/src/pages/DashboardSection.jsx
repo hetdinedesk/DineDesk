@@ -15,7 +15,7 @@ const DASH_NAV = [
   { key: 'analytics', label: 'Analytics', Icon: BarChart3 },
 ]
 
-export default function DashboardSection({ clientId, onDeleteSite, subNav, setSubNav }) {
+export default function DashboardSection({ clientId, onDeleteSite, onCloneSite, subNav, setSubNav }) {
   const navigate = useNavigate()
   const [period, setPeriod] = useState('M')
   const isMobile = useMediaQuery('(max-width: 768px)')
@@ -231,7 +231,7 @@ function OverviewTab({ clientId, period, onDeleteSite }) {
 
   const handleCloneClient = async () => {
     if (!confirm(`Clone "${client?.name}"? This will create a duplicate with all settings and content.`)) return
-    
+
     try {
       const res = await fetch(`${API}/clients/${clientId}/clone`, {
         method: 'POST',
@@ -243,6 +243,7 @@ function OverviewTab({ clientId, period, onDeleteSite }) {
       }
       const clonedClient = await res.json()
       alert(`Successfully cloned "${client?.name}" as "${clonedClient.name}"`)
+      if (onCloneSite) onCloneSite()
     } catch (err) { alert(err.message) }
   }
 
