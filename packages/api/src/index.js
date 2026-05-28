@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3001
 // Trust proxy only in production (Railway deployment)
 // Required for rate limiting behind proxy, but not needed in local development
 if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', true)
+  app.set('trust proxy', 1)
 }
 
 const corsOrigins = process.env.CORS_ORIGINS
