@@ -13,4 +13,4 @@ RUN npx prisma generate
 
 EXPOSE 8080
 
-CMD npx prisma db push --accept-data-loss && echo "=== Starting Node.js server ===" && node src/index.js 2>&1
+CMD ["node", "src/index.js"]
