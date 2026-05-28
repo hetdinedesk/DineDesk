@@ -1,3 +1,5 @@
-[variables]
-# Env vars are set via Railway Variables tab, not .env.example
-# This file prevents nixpacks from injecting blank ENV vars from .env.example
+[phases.build]
+cmds = ["cd packages/api && npm install && npx prisma generate"]
+
+[start]
+cmd = "cd packages/api && npx prisma db push --accept-data-loss --skip-generate && node src/index.js"
