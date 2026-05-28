@@ -7,7 +7,8 @@ const { validateSiteConfig } = require('../lib/validation')
 const { geocodeAddress, hasAddressChanged } = require('../lib/geocoding')
 const { sendBookingConfirmation } = require('../lib/email')
 const multer = require('multer')
-const sharp = require('sharp')
+let sharp = null
+try { sharp = require('sharp') } catch (e) { console.warn('[startup] sharp not available, image resizing disabled:', e.message) }
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const fs = require('fs')
 const path = require('path')
@@ -2564,11 +2565,10 @@ router.post('/:clientId/images', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file provided' })
     }
 
-    // Optimize image
-    const optimized = await sharp(req.file.buffer)
-      .resize({ width: 1920, withoutEnlargement: true })
-      .webp({ quality: 85 })
-      .toBuffer()
+    // Optimize image (skip if sharp not available)
+    const optimized = sharp
+      ? await sharp(req.file.buffer).resize({ width: 1920, withoutEnlargement: true }).webp({ quality: 85 }).toBuffer()
+      : req.file.buffer
 
     const key = `${req.params.clientId}/${Date.now()}.webp`
 
