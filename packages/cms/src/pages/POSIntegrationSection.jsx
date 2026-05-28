@@ -203,7 +203,9 @@ function OAuthForm({ posType, clientId, posConfig, onSuccess }) {
       }
       const redirectUri = `${window.location.origin}/pos/oauth/square/callback`
       const state = encodeURIComponent(JSON.stringify({ clientId }))
-      window.location.href = `https://connect.squareupsandbox.com/oauth2/authorize?client_id=${SQUARE_APP_ID}&scope=MERCHANT_PROFILE_READ+ORDERS_WRITE+ORDERS_READ+INVENTORY_READ&session=false&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
+      const isSandbox = SQUARE_APP_ID.startsWith('sandbox-')
+      const squareHost = isSandbox ? 'connect.squareupsandbox.com' : 'connect.squareup.com'
+      window.location.href = `https://${squareHost}/oauth2/authorize?client_id=${SQUARE_APP_ID}&scope=MERCHANT_PROFILE_READ+ORDERS_WRITE+ORDERS_READ+INVENTORY_READ&session=false&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
     } else if (isClover) {
       if (!CLOVER_APP_ID) {
         setOauthError('Clover OAuth not configured — enter your access token manually below.')
