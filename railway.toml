@@ -1,6 +1,6 @@
 [build]
-builder = "nixpacks"
-buildCommand = "cd packages/api && npx prisma generate && npx prisma db push --accept-data-loss"
+builder = "dockerfile"
+dockerfilePath = "packages/api/Dockerfile"
 
 [deploy]
-startCommand = "cd packages/api && npx prisma db push --accept-data-loss && node src/index.js"
+startCommand = "npx prisma db push --accept-data-loss && node src/index.js"
