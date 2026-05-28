@@ -44,7 +44,7 @@ const RIGHT = {
     { key:'ordering-config', label:'Ordering Config', Icon: Store },
     { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
     { key:'notifications', label:'Notifications', Icon: Bell },
-    { key:'pos-integration', label:'POS Integration', Icon: Server }
+    { key:'pos-integration', label:'POS Integration', Icon: Server },
   ],
   settings: [
     { key:'toolbox', label:'Toolbox (Coming Soon)', Icon: Wrench },
@@ -100,7 +100,7 @@ export default function CmsSection({ clientId, user }) {
           { key:'ordering-config', label:'Ordering Config', Icon: Store },
           { key:'payment-settings', label:'Payment Settings', Icon: CreditCard },
           { key:'notifications', label:'Notifications', Icon: Bell },
-          // POS Integration excluded for limited access
+          { key:'pos-integration', label:'POS Integration', Icon: Server },
         ],
       }
     }

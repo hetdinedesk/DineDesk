@@ -14,7 +14,6 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import { Settings, Palette, Code, FileText, Layout, Share2, Star, Calendar, BarChart3, Globe, ShoppingCart, CreditCard, Bell, Store, Gift, Zap } from 'lucide-react'
-import POSIntegrationSection from './POSIntegrationSection'
 import { C } from '../theme'
 
 const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
@@ -37,9 +36,6 @@ const SIDEBAR = [
   ]},
   { group:'Loyalty', Icon: Gift, items:[
     { key:'loyalty',        label:'Loyalty Program', Icon: Gift },
-  ]},
-  { group:'Integrations', Icon: Zap, items:[
-    { key:'pos-integration', label:'POS Integration', Icon: Zap },
   ]},
   { group:'Deploy', Icon: Globe, items:[
     { key:'analytics',      label:'Analytics', Icon: BarChart3 },
@@ -196,7 +192,6 @@ export default function ConfigSection({ clientId, user }) {
         case 'table-management': return <TableManagementConfig {...common} />
         case 'loyalty':        return <LoyaltyConfigUI {...common} activeKey={activeKey} />
         case 'netlify':        return <NetlifyConfig   {...common} client={client} />
-        case 'pos-integration': return <POSIntegrationSection clientId={clientId} />
         default: return <div style={{color:C.t3}}>Coming soon.</div>
       }
     } catch (err) {

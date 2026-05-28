@@ -4,6 +4,7 @@ import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Ser
 import { getConfig, saveConfig } from '../api/config'
 import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe } from '../api/payments'
 import { C } from '../theme'
+import POSIntegrationSection from './POSIntegrationSection'
 
 const labelStyle = { display:'block', fontSize:12, fontWeight:600, color:C.t2, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.5px' }
 const inputStyle = { width:'100%', padding:'10px 12px', background:C.card, border:`1px solid ${C.border2}`, borderRadius:8, color:C.t0, fontSize:14, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }
@@ -571,6 +572,10 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
       )}
 
       {subsection === 'pos-integration' && (
+        <POSIntegrationSection clientId={clientId} />
+      )}
+
+      {subsection === 'pos-integration-OLD-UNUSED' && (
         <>
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
@@ -763,6 +768,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
           </div>
         </>
       )}
+      {/* end OLD unused pos block */}
     </div>
   )
 }
