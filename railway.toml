@@ -1,9 +1,6 @@
 [build]
-builder = "dockerfile"
-dockerfilePath = "packages/api/Dockerfile"
-dockerContext = "packages/api"
+builder = "nixpacks"
+buildCommand = "cd packages/api && npm install && npx prisma generate"
 
 [deploy]
-startCommand = "npx prisma db push --accept-data-loss --skip-generate && node src/index.js"
-healthcheckPath = "/health"
-healthcheckTimeout = 30
+startCommand = "cd packages/api && npx prisma db push --accept-data-loss && node src/index.js"
