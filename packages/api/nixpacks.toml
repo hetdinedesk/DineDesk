@@ -1,3 +1,0 @@
-[variables]
-# Env vars are set via Railway Variables tab, not .env.example
-# This file prevents nixpacks from injecting blank ENV vars from .env.example
