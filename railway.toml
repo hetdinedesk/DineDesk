@@ -1,6 +1,9 @@
 [build]
 builder = "dockerfile"
 dockerfilePath = "packages/api/Dockerfile"
+dockerContext = "packages/api"
 
 [deploy]
-startCommand = "npx prisma db push --accept-data-loss && node src/index.js"
+startCommand = "npx prisma db push --accept-data-loss --skip-generate && node src/index.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
