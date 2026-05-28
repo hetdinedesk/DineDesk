@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_18", "openssl"]
+
+[phases.install]
+cmds = ["cd packages/api && npm install"]
+
+[phases.build]
+cmds = ["cd packages/api && npx prisma generate"]
+
+[start]
+cmd = "cd packages/api && npx prisma db push --accept-data-loss --skip-generate && node src/index.js"

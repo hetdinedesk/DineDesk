@@ -1,9 +1,0 @@
-node_modules
-packages/api/node_modules
-packages/cms/node_modules
-packages/site-template/node_modules
-packages/marketing-website/node_modules
-packages/api/.env
-packages/api/uploads
-*.log
-.git
