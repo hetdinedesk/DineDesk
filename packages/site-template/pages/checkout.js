@@ -1144,6 +1144,13 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     </div>
                   )}
 
+                  {paymentMethod === 'stripe' && clientSecret && !stripePromise && (
+                    <div className="mt-6 p-6 border border-[var(--color-secondary)]/20 rounded-full bg-[var(--color-accent)] text-center">
+                      <Loader2 width={24} height={24} strokeWidth={2} className="animate-spin mx-auto mb-3" />
+                      <p className="text-sm text-[var(--color-secondary)]">Loading payment form...</p>
+                    </div>
+                  )}
+
                   {paymentMethod === 'stripe' && !clientSecret && (
                     <button
                       onClick={handlePlaceOrder}
