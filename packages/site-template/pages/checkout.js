@@ -48,6 +48,7 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
   const elements = useElements()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [elementsReady, setElementsReady] = useState(false)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -78,6 +79,11 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
   return (
     <form onSubmit={handleSubmit}>
       <div className="p-6 border border-[var(--color-secondary)]/20 rounded-full mt-6 bg-[var(--color-accent)]">
+        {!elementsReady && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 width={24} height={24} strokeWidth={2} className="animate-spin text-[var(--color-secondary)]" />
+          </div>
+        )}
         <PaymentElement
           options={{
             layout: 'tabs',
@@ -85,6 +91,14 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
               applePay: 'auto',
               googlePay: 'auto'
             }
+          }}
+          onReady={() => {
+            console.log('✅ PaymentElement ready')
+            setElementsReady(true)
+          }}
+          onLoadError={(error) => {
+            console.error('❌ PaymentElement load error:', error)
+            setError('Failed to load payment form. Please try again or use cash payment.')
           }}
         />
       </div>
@@ -95,7 +109,7 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
       )}
       <button
         type="submit"
-        disabled={!stripe || loading}
+        disabled={!stripe || loading || !elementsReady}
         className="w-full mt-6 py-5 rounded-full text-[10px] font-bold tracking-widest uppercase text-[var(--color-accent)] transition-all duration-300 shadow-lg flex items-center justify-center gap-3 bg-[var(--color-primary)] hover:bg-[var(--color-secondary)] disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? <Loader2 width={18} height={18} strokeWidth={2} className="animate-spin" /> : 'PAY NOW'}
