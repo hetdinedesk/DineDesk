@@ -480,7 +480,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
         {/* Status Progress */}
         <div className="bg-white rounded-2xl border border-[var(--color-secondary)]/10 p-8 mb-12">
           <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8">Order Progress</h3>
-          <div className="flex justify-between relative">
+          <div className="flex justify-between relative overflow-x-auto pb-4 -mx-8 px-8">
             {['new', 'accepted', 'preparing', 'packing', 'ready'].map((status, index) => {
               const statusOrder = ['new', 'accepted', 'preparing', 'almost_ready', 'packing', 'ready', 'completed']
               const currentIndex = statusOrder.indexOf(order.status)
@@ -491,16 +491,16 @@ export default function OrderStatusPage({ data, orderId, template }) {
               const StatusIcon = statusConfig[status]?.icon || Clock
 
               return (
-                <div key={status} className="flex flex-col items-center flex-1 relative">
+                <div key={status} className="flex flex-col items-center flex-shrink-0 w-20 relative">
                   {index > 0 && (
-                    <div className={`absolute top-6 left-[-50%] w-full h-0.5 z-0 ${isComplete ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-secondary)]/20'}`} />
+                    <div className={`absolute top-6 left-[-20px] w-10 h-0.5 z-0 ${isComplete ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-secondary)]/20'}`} />
                   )}
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center z-10 mb-4 ${
                     isComplete ? 'bg-[var(--color-primary)] text-[var(--color-accent)]' : isActive ? 'bg-[var(--color-primary)] text-[var(--color-accent)]' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]/60'
                   }`}>
                     {isComplete ? <Check width={20} height={20} strokeWidth={2} /> : <StatusIcon width={20} height={20} strokeWidth={2} />}
                   </div>
-                  <div className="text-xs font-body font-bold tracking-widest uppercase text-[var(--color-secondary)]/60">{status.replace('_', ' ')}</div>
+                  <div className="text-xs font-body font-bold tracking-widest uppercase text-[var(--color-secondary)]/60 whitespace-nowrap">{status.replace('_', ' ')}</div>
                 </div>
               )
             })}
