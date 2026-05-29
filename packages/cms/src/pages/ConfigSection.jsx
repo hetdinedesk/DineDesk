@@ -5059,6 +5059,33 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
       setVerifying(false)
     }
   }
+
+  // Sync site details from Netlify (updates preview URL, domain, etc.)
+  const syncFromNetlify = async () => {
+    setVerifying(true)
+    setVerifyStatus(null)
+    try {
+      const res = await fetch(`${API_URL}/clients/${clientId}/netlify/sync`, {
+        headers: { Authorization: 'Bearer ' + token() }
+      })
+      const data = await res.json()
+      
+      if (res.ok) {
+        setVerifyStatus('exists')
+        setVerifyMessage('✅ Synced from Netlify! Details updated.')
+        // Refresh config to get updated data
+        qc.invalidateQueries(['config', clientId])
+      } else {
+        setVerifyStatus('error')
+        setVerifyMessage('❌ ' + (data.error || 'Sync failed'))
+      }
+    } catch (err) {
+      setVerifyStatus('error')
+      setVerifyMessage(`❌ Sync failed: ${err.message}`)
+    } finally {
+      setVerifying(false)
+    }
+  }
   
   // Trigger Netlify rebuild
   const triggerRebuild = async () => {
@@ -5465,6 +5492,13 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
                       color: verifying ? C.t3 : C.t2, fontWeight:600, fontSize:12,
                       cursor: verifying ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
                     {verifying ? 'Checking...' : 'Verify'}
+                  </button>
+                  <button onClick={syncFromNetlify} disabled={verifying}
+                    style={{ padding:'8px 14px', background:'transparent',
+                      border:`1px solid ${C.border2}`, borderRadius:6,
+                      color: verifying ? C.t3 : C.t2, fontWeight:600, fontSize:12,
+                      cursor: verifying ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                    {verifying ? 'Syncing...' : 'Sync from Netlify'}
                   </button>
                   <button onClick={triggerRebuild}
                     disabled={rebuilding || buildStatus === 'building'}

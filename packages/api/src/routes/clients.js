@@ -3186,6 +3186,53 @@ router.put('/:id/netlify/env', async (req, res) => {
   }
 })
 
+// GET sync site details from Netlify and update database
+router.get('/:id/netlify/sync', async (req, res) => {
+  try {
+    const config = await prisma.siteConfig.findUnique({ where: { clientId: req.params.id } })
+    const siteId = config?.netlify?.siteId
+    if (!siteId) return res.status(400).json({ error: 'No Netlify site configured' })
+
+    // Fetch current site details from Netlify
+    const axios = require('axios')
+    const netlify = axios.create({
+      baseURL: 'https://api.netlify.com/api/v1',
+      headers: { Authorization: 'Bearer ' + process.env.NETLIFY_TOKEN }
+    })
+    const siteRes = await netlify.get(`/sites/${siteId}`)
+    const siteData = siteRes.data
+
+    // Update database with current Netlify details
+    const updatedConfig = await prisma.siteConfig.update({
+      where: { clientId: req.params.id },
+      data: {
+        netlify: {
+          ...config.netlify,
+          siteId: siteData.id,
+          previewUrl: siteData.ssl_url || siteData.url,
+          customDomain: siteData.custom_domain || null,
+          domainLive: siteData.custom_domain ? true : false,
+          repoLinked: !!siteData.repo,
+        }
+      }
+    })
+
+    log({
+      action: 'NETLIFY_SYNCED', entity: 'Deployment',
+      userId: req.user.id, userName: req.user.name, clientId: req.params.id
+    })
+
+    res.json({ 
+      success: true, 
+      message: 'Site details synced from Netlify',
+      data: updatedConfig.netlify 
+    })
+  } catch (err) {
+    console.error('❌ Sync from Netlify error:', err.message)
+    res.status(500).json({ error: 'Failed to sync from Netlify', details: err.message })
+  }
+})
+
 // POST restore env vars after manual repo linking in Netlify UI
 // This restores the required env vars (NEXT_PUBLIC_SITE_ID, SITE_TEMPLATE, NEXT_PUBLIC_CMS_API_URL)
 router.post('/:id/netlify/restore-env', async (req, res) => {
