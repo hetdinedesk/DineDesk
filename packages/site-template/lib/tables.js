@@ -2,7 +2,7 @@
  * Tables API client for managing restaurant tables
  */
 
-const API_BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:3001/api'
+export const API_BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:3001/api'
 
 export class TablesAPI {
   /**
