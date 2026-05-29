@@ -90,7 +90,8 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
             wallets: {
               applePay: 'auto',
               googlePay: 'auto'
-            }
+            },
+            paymentMethodOrder: ['card', 'applepay', 'googlepay']
           }}
           onReady={() => {
             console.log('✅ PaymentElement ready')
