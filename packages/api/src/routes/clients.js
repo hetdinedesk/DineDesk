@@ -628,7 +628,9 @@ router.get('/:id/export', async (req, res) => {
           cashEnabled: true,
           cashLabel: true,
           testMode: true,
-          config: true
+          config: true,
+          stripeAccountId: true,
+          stripeConnectStatus: true
         }
       }),
       prisma.legalDoc.findMany({
@@ -761,7 +763,9 @@ const exportData = {
     cashLabel: paymentGateway.cashLabel,
     testMode: paymentGateway.testMode,
     testPublishableKey: paymentGateway.config?.testPublishableKey || '',
-    livePublishableKey: paymentGateway.config?.livePublishableKey || ''
+    livePublishableKey: paymentGateway.config?.livePublishableKey || '',
+    stripeAccountId: paymentGateway.stripeAccountId || null,
+    stripeConnectStatus: paymentGateway.stripeConnectStatus || 'not_connected'
   } : {},
   legalDocs: legalDocs || [],
   siteType:   cfg?.settings?.siteType || 'restaurant',
