@@ -253,12 +253,21 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   // Initialize Stripe with publishable key
   useEffect(() => {
     if (paymentGateway?.isActive && paymentGateway?.provider === 'stripe') {
-      const publishableKey = paymentGateway.testMode 
-        ? paymentGateway.testPublishableKey 
-        : paymentGateway.livePublishableKey
+      let publishableKey
+      
+      // If Stripe Connect is connected, use platform publishable key
+      if (paymentGateway.stripeConnectStatus === 'connected') {
+        publishableKey = paymentGateway.platformPublishableKey
+        console.log('🔑 Using Stripe Connect with platform key:', publishableKey?.substring(0, 10) + '...')
+      } else {
+        // Legacy manual keys path
+        publishableKey = paymentGateway.testMode
+          ? paymentGateway.testPublishableKey
+          : paymentGateway.livePublishableKey
+        console.log('🔑 Using manual Stripe keys:', publishableKey?.substring(0, 10) + '...')
+      }
       
       if (publishableKey) {
-        console.log('🔑 Loading Stripe with publishable key:', publishableKey.substring(0, 10) + '...')
         setStripeLoadError(null)
         
         // Add timeout to detect if Stripe fails to load

@@ -765,7 +765,9 @@ const exportData = {
     testPublishableKey: paymentGateway.config?.testPublishableKey || '',
     livePublishableKey: paymentGateway.config?.livePublishableKey || '',
     stripeAccountId: paymentGateway.stripeAccountId || null,
-    stripeConnectStatus: paymentGateway.stripeConnectStatus || 'not_connected'
+    stripeConnectStatus: paymentGateway.stripeConnectStatus || 'not_connected',
+    // Platform publishable key for Stripe Connect (frontend needs this to initialize Stripe.js)
+    platformPublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || ''
   } : {},
   legalDocs: legalDocs || [],
   siteType:   cfg?.settings?.siteType || 'restaurant',
