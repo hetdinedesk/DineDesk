@@ -131,12 +131,14 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
     const defaultCloseHour = 22
 
     // Get day of week from selected booking date, or current day
-    let targetDay
+    let targetDayFull, targetDayShort
     if (formData.bookingDate) {
       const bookingDateObj = new Date(formData.bookingDate + 'T00:00:00')
-      targetDay = bookingDateObj.toLocaleDateString('en-US', { weekday: 'long' })
+      targetDayFull = bookingDateObj.toLocaleDateString('en-US', { weekday: 'long' })
+      targetDayShort = bookingDateObj.toLocaleDateString('en-US', { weekday: 'short' })
     } else {
-      targetDay = new Date().toLocaleDateString('en-US', { weekday: 'long' })
+      targetDayFull = new Date().toLocaleDateString('en-US', { weekday: 'long' })
+      targetDayShort = new Date().toLocaleDateString('en-US', { weekday: 'short' })
     }
 
     // Parse time string to { hour, min } in 24h format
@@ -164,14 +166,14 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
 
     if (Array.isArray(locationHours)) {
       // Array format from CMSContext: [{ day: 'Monday', open: '6am', close: '9:30pm', closed: false }, ...]
-      const entry = locationHours.find(h => h.day === targetDay)
+      const entry = locationHours.find(h => h.day === targetDayFull || h.day === targetDayShort)
       if (entry && !entry.closed && entry.open && entry.close) {
         dayOpen = parseTime(entry.open)
         dayClose = parseTime(entry.close)
       }
     } else if (locationHours && typeof locationHours === 'object') {
       // Object format: { Monday: { open: '6am', close: '9:30pm' }, ... }
-      const entry = locationHours[targetDay]
+      const entry = locationHours[targetDayFull] || locationHours[targetDayShort]
       if (entry && !entry.closed && entry.open && entry.close) {
         dayOpen = parseTime(entry.open)
         dayClose = parseTime(entry.close)

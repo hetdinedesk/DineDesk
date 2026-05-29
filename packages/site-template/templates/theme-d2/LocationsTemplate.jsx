@@ -9,13 +9,17 @@ function formatHoursDisplay(hours) {
   if (!hours || hours.length === 0) return 'Contact for hours';
   
   // Find patterns in hours to simplify display
+  // Support both full and abbreviated day names
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const dayOrder = days.reduce((acc, day) => {
-    const hour = hours.find(h => h.day === day);
+  const dayShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  
+  const dayOrder = days.reduce((acc, day, idx) => {
+    // Try full name first, then abbreviated
+    const hour = hours.find(h => h.day === day || h.day === dayShort[idx]);
     if (hour && !hour.closed && hour.open && hour.close) {
       const timeStr = `${hour.open} - ${hour.close}`;
       acc[timeStr] = acc[timeStr] || [];
-      acc[timeStr].push(day);
+      acc[timeStr].push(day); // Use full name for display
     }
     return acc;
   }, {});
