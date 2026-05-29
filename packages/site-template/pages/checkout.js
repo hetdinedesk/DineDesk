@@ -278,7 +278,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
   // Check if restaurant is currently open
   const primaryLocation = data?.locations?.find(loc => loc.isPrimary) || data?.locations?.[0]
-  const isRestaurantCurrentlyOpen = isRestaurantOpen(primaryLocation?.hours)
+  const isRestaurantCurrentlyOpen = isRestaurantOpen(primaryLocation?.hours, primaryLocation?.timezone)
 
   // Auto-select first location if only one active location exists
   useEffect(() => {

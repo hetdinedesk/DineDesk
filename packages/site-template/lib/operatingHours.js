@@ -1,15 +1,16 @@
 /**
  * Check if restaurant is currently open based on operating hours
  * @param {Object|Array} hours - Object with day keys or Array of { day, open, close, closed } objects
+ * @param {string} timezone - IANA timezone string (e.g., 'Australia/Sydney', 'America/New_York')
  * @returns {boolean} - True if restaurant is currently open
  */
-export function isRestaurantOpen(hours) {
+export function isRestaurantOpen(hours, timezone) {
   if (!hours) {
     // If no hours data, assume open
     return true;
   }
 
-  const now = new Date();
+  const now = timezone ? new Date(new Date().toLocaleString('en-US', { timeZone: timezone })) : new Date();
   const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
   const currentTime = now.getHours() * 60 + now.getMinutes(); // Minutes since midnight
 
