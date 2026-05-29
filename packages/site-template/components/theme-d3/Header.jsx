@@ -433,7 +433,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
                 <img
                   src={displayLogo}
                   alt={restaurant?.name || 'Restaurant'}
-                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-32"
+                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-10 md:max-h-14"
                 />
               )}
               <span
