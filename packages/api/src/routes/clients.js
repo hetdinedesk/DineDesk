@@ -3058,6 +3058,11 @@ router.post('/:id/netlify/rebuild', async (req, res) => {
     
     const config = await prisma.siteConfig.findUnique({ where: { clientId: client.id } })
     const buildHook = config?.netlify?.buildHook
+    const siteId = config?.netlify?.siteId
+    
+    console.log(`🔨 Rebuild triggered for client ${client.id} (${client.name})`)
+    console.log(`   Site ID: ${siteId}`)
+    console.log(`   Build Hook: ${buildHook}`)
     
     if (!buildHook) {
       return res.status(400).json({ error: 'No build hook configured. Please recreate the site.' })
