@@ -7,6 +7,7 @@
 export function isRestaurantOpen(hours, timezone) {
   if (!hours) {
     // If no hours data, assume open
+    console.log('🕐 No hours data, assuming open');
     return true;
   }
 
@@ -14,16 +15,24 @@ export function isRestaurantOpen(hours, timezone) {
   const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
   const currentTime = now.getHours() * 60 + now.getMinutes(); // Minutes since midnight
 
+  console.log(`🕐 Checking hours for ${currentDay} at ${Math.floor(currentTime/60)}:${String(currentTime%60).padStart(2, '0')} (timezone: ${timezone || 'local'})`);
+  console.log(`🕐 Hours data:`, JSON.stringify(hours, null, 2));
+
   // Handle object format: { Monday: { open, close, closed }, Tuesday: {...} }
   if (typeof hours === 'object' && !Array.isArray(hours)) {
     const todayHours = hours[currentDay];
+    console.log(`🕐 Today's hours:`, JSON.stringify(todayHours, null, 2));
     if (!todayHours || todayHours.closed) {
+      console.log('🕐 Restaurant is closed (no hours or marked as closed)');
       return false;
     }
     if (!todayHours.open || !todayHours.close) {
+      console.log('🕐 Restaurant is closed (missing open/close times)');
       return false;
     }
-    return checkTimeRange(todayHours.open, todayHours.close, currentTime);
+    const isOpen = checkTimeRange(todayHours.open, todayHours.close, currentTime);
+    console.log(`🕐 Time range check (${todayHours.open} - ${todayHours.close}): ${isOpen ? 'OPEN' : 'CLOSED'}`);
+    return isOpen;
   }
 
   // Handle array format: [{ day, open, close, closed }, ...]
