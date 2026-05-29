@@ -248,6 +248,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const [clientSecret, setClientSecret] = useState(null)
   const [orderId, setOrderId] = useState(null)
   const [stripePromise, setStripePromise] = useState(null)
+  const [stripeLoadError, setStripeLoadError] = useState(null)
 
   // Initialize Stripe with publishable key
   useEffect(() => {
@@ -257,7 +258,34 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         : paymentGateway.livePublishableKey
       
       if (publishableKey) {
-        setStripePromise(loadStripe(publishableKey))
+        console.log('🔑 Loading Stripe with publishable key:', publishableKey.substring(0, 10) + '...')
+        setStripeLoadError(null)
+        
+        // Add timeout to detect if Stripe fails to load
+        const timeoutId = setTimeout(() => {
+          console.error('❌ Stripe loading timeout')
+          setStripeLoadError('Payment system is taking too long to load. Please try again or use cash payment.')
+        }, 10000) // 10 second timeout
+        
+        loadStripe(publishableKey)
+          .then(stripe => {
+            clearTimeout(timeoutId)
+            if (stripe) {
+              console.log('✅ Stripe loaded successfully')
+              setStripePromise(stripe)
+            } else {
+              console.error('❌ Stripe returned null')
+              setStripeLoadError('Payment system failed to load. Please try again or use cash payment.')
+            }
+          })
+          .catch(err => {
+            clearTimeout(timeoutId)
+            console.error('❌ Stripe load error:', err)
+            setStripeLoadError('Payment system failed to load. Please try again or use cash payment.')
+          })
+      } else {
+        console.error('❌ No Stripe publishable key found')
+        setStripeLoadError('Payment gateway is not configured properly. Please contact support.')
       }
     }
   }, [paymentGateway])
@@ -1144,10 +1172,23 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     </div>
                   )}
 
-                  {paymentMethod === 'stripe' && clientSecret && !stripePromise && (
+                  {paymentMethod === 'stripe' && clientSecret && !stripePromise && !stripeLoadError && (
                     <div className="mt-6 p-6 border border-[var(--color-secondary)]/20 rounded-full bg-[var(--color-accent)] text-center">
                       <Loader2 width={24} height={24} strokeWidth={2} className="animate-spin mx-auto mb-3" />
                       <p className="text-sm text-[var(--color-secondary)]">Loading payment form...</p>
+                    </div>
+                  )}
+
+                  {paymentMethod === 'stripe' && stripeLoadError && (
+                    <div className="mt-6 p-6 border border-red-200 rounded-full bg-red-50 text-center">
+                      <X width={24} height={24} strokeWidth={2} className="text-red-500 mx-auto mb-3" />
+                      <p className="text-sm text-red-700 mb-4">{stripeLoadError}</p>
+                      <button
+                        onClick={() => setPaymentMethod('cash')}
+                        className="px-6 py-3 bg-[var(--color-primary)] text-white rounded-full font-bold text-sm hover:bg-[var(--color-secondary)] transition-colors"
+                      >
+                        Switch to Cash Payment
+                      </button>
                     </div>
                   )}
 
