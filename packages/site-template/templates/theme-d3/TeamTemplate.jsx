@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCMS } from '../../contexts/CMSContext';
-import { Heart, Coffee, Instagram, Twitter, Linkedin, Sparkles, Flower2, Building2, Users } from 'lucide-react';
+import { Heart, Coffee, Linkedin, Sparkles, Flower2, Building2, Users } from 'lucide-react';
+import { FaInstagram, FaTwitter } from 'react-icons/fa';
 import { replaceShortcodes } from '../../lib/shortcodes';
 
 export default function TeamPage({ data, page, banner }) {
@@ -295,7 +296,7 @@ export default function TeamPage({ data, page, banner }) {
                                 rel="noopener noreferrer"
                                 className="text-[var(--color-accent)] hover:text-[var(--color-secondary)] transition-colors duration-300"
                               >
-                                <Instagram width={18} height={18} strokeWidth={2} />
+                                <FaInstagram size={18} />
                               </a>
                             )}
                             {socials.twitter && (
@@ -305,7 +306,7 @@ export default function TeamPage({ data, page, banner }) {
                                 rel="noopener noreferrer"
                                 className="text-[var(--color-accent)] hover:text-[var(--color-secondary)] transition-colors duration-300"
                               >
-                                <Twitter width={18} height={18} strokeWidth={2} />
+                                <FaTwitter size={18} />
                               </a>
                             )}
                             {socials.linkedin && (

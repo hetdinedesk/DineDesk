@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCMS } from '../../contexts/CMSContext';
 import { withSiteParam, getSiteId } from '../../lib/links';
-import { Leaf, Instagram, Twitter, Facebook, MapPin, Phone, Mail } from 'lucide-react';
+import { Leaf, MapPin, Phone, Mail } from 'lucide-react';
+import { FaFacebook, FaInstagram, FaTwitter } from 'react-icons/fa';
 
 export const Footer = () => {
   const { footerColumns, unassignedFooterLinks, siteConfig, locations, restaurant, rawData, social } = useCMS();
@@ -58,17 +59,17 @@ export const Footer = () => {
             <div className="flex gap-6">
               {socialLinks.instagram && (
                 <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
-                  <Instagram width={18} height={18} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
+                  <FaInstagram size={18} className="group-hover:scale-110 transition-transform" />
                 </a>
               )}
               {socialLinks.twitter && (
                 <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
-                  <Twitter width={18} height={18} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
+                  <FaTwitter size={18} className="group-hover:scale-110 transition-transform" />
                 </a>
               )}
               {socialLinks.facebook && (
                 <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
-                  <Facebook width={18} height={18} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
+                  <FaFacebook size={18} className="group-hover:scale-110 transition-transform" />
                 </a>
               )}
             </div>
