@@ -273,6 +273,15 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       if (paymentGateway.stripeConnectStatus === 'connected') {
         publishableKey = paymentGateway.platformPublishableKey
         console.log('🔑 Using Stripe Connect with platform key:', publishableKey?.substring(0, 10) + '...')
+        
+        // Fallback to manual keys if platform key is missing
+        if (!publishableKey) {
+          console.warn('⚠️ Platform publishable key missing, falling back to manual keys')
+          publishableKey = paymentGateway.testMode
+            ? paymentGateway.testPublishableKey
+            : paymentGateway.livePublishableKey
+          console.log('🔑 Using manual Stripe keys as fallback:', publishableKey?.substring(0, 10) + '...')
+        }
       } else {
         // Legacy manual keys path
         publishableKey = paymentGateway.testMode
