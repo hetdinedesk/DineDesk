@@ -640,7 +640,7 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
                 <img
                   src={displayLogo}
                   alt={restaurant?.name || 'Restaurant'}
-                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-32"
+                  className="w-auto h-auto object-contain transition-all duration-300 group-hover:scale-105 max-h-10 md:max-h-12"
                 />
               )}
               <span
@@ -655,7 +655,7 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
             </Link>
 
             {/* Right side: Cart and Menu buttons grouped */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* Cart */}
               {orderingEnabled && (
                 <button
