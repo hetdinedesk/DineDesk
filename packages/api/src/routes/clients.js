@@ -2779,6 +2779,11 @@ router.post('/:id/netlify/create', async (req, res) => {
     // 2 — Set env vars so the build knows which client/template to use
     let envVarsSet = false
     try {
+      console.log(`🔧 Setting env vars for site ${netlifyData.id}:`)
+      console.log(`   NEXT_PUBLIC_SITE_ID: ${client.id}`)
+      console.log(`   SITE_TEMPLATE: ${template}`)
+      console.log(`   NEXT_PUBLIC_CMS_API_URL: ${apiUrl}`)
+      
       await netlifyService.setEnvVars(netlifyData.id, {
         // Note: SITE_ID is reserved by Netlify, so we only set NEXT_PUBLIC_SITE_ID
         // The site-template code checks for both and will use NEXT_PUBLIC_SITE_ID as fallback
@@ -2787,6 +2792,7 @@ router.post('/:id/netlify/create', async (req, res) => {
         NEXT_PUBLIC_CMS_API_URL:    apiUrl,
       })
       envVarsSet = true
+      console.log('✅ Env vars set successfully')
     } catch (err) {
       console.warn('⚠️  Environment variables could not be set automatically:', err.message)
       console.warn('   This usually means your Netlify token needs "env:write" scope')
