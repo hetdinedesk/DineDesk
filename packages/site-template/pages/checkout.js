@@ -57,22 +57,35 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
     setLoading(true)
     setError(null)
 
-    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      clientSecret,
-      confirmParams: {
-        return_url: window.location.href,
-      },
-      redirect: 'if_required'
-    })
+    console.log('🔵 Submitting payment...')
 
-    if (stripeError) {
-      setError(stripeError.message)
+    try {
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: 'if_required'
+      })
+
+      console.log('🔵 Payment response:', { stripeError, paymentIntent })
+
+      if (stripeError) {
+        console.error('❌ Payment error:', stripeError)
+        setError(stripeError.message)
+        setLoading(false)
+        onError(stripeError.message)
+      } else {
+        console.log('✅ Payment successful:', paymentIntent)
+        setLoading(false)
+        onSuccess(paymentIntent)
+      }
+    } catch (err) {
+      console.error('❌ Payment submission error:', err)
+      setError('Payment failed. Please try again.')
       setLoading(false)
-      onError(stripeError.message)
-    } else {
-      setLoading(false)
-      onSuccess(paymentIntent)
+      onError(err.message)
     }
   }
 
