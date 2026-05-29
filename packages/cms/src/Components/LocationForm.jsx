@@ -293,9 +293,9 @@ export default function LocationForm({
     setSaving(true)
     
     // Always include current image state - use pending if changed, otherwise form
-    // Check if pendingImages arrays actually have items (not just key exists)
-    const hasPendingExterior = pendingImages.exteriorImages?.length > 0
-    const hasPendingGallery = pendingImages.galleryImages?.length > 0
+    // Check if pendingImages arrays have been set (even if empty for removal)
+    const hasPendingExterior = pendingImages.exteriorImages !== undefined
+    const hasPendingGallery = pendingImages.galleryImages !== undefined
     
     const saveData = {
       ...form,
@@ -379,7 +379,7 @@ export default function LocationForm({
     // Remove automatic draft saving
   }
 
-  const hasPendingImages = pendingImages.exteriorImages.length > 0 || pendingImages.galleryImages.length > 0
+  const hasPendingImages = pendingImages.exteriorImages !== undefined || pendingImages.galleryImages !== undefined
   const hasCoordinates = form.lat && form.lng
   
   // Check if form has been modified from original location data
