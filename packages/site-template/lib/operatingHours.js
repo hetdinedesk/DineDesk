@@ -12,15 +12,17 @@ export function isRestaurantOpen(hours, timezone) {
   }
 
   const now = timezone ? new Date(new Date().toLocaleString('en-US', { timeZone: timezone })) : new Date();
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const currentDayFull = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const currentDayShort = now.toLocaleDateString('en-US', { weekday: 'short' });
   const currentTime = now.getHours() * 60 + now.getMinutes(); // Minutes since midnight
 
-  console.log(`🕐 Checking hours for ${currentDay} at ${Math.floor(currentTime/60)}:${String(currentTime%60).padStart(2, '0')} (timezone: ${timezone || 'local'})`);
+  console.log(`🕐 Checking hours for ${currentDayFull} (${currentDayShort}) at ${Math.floor(currentTime/60)}:${String(currentTime%60).padStart(2, '0')} (timezone: ${timezone || 'local'})`);
   console.log(`🕐 Hours data:`, JSON.stringify(hours, null, 2));
 
   // Handle object format: { Monday: { open, close, closed }, Tuesday: {...} }
   if (typeof hours === 'object' && !Array.isArray(hours)) {
-    const todayHours = hours[currentDay];
+    // Try both full day name and short day name (e.g., "Friday" and "Fri")
+    const todayHours = hours[currentDayFull] || hours[currentDayShort];
     console.log(`🕐 Today's hours:`, JSON.stringify(todayHours, null, 2));
     if (!todayHours || todayHours.closed) {
       console.log('🕐 Restaurant is closed (no hours or marked as closed)');
@@ -37,7 +39,8 @@ export function isRestaurantOpen(hours, timezone) {
 
   // Handle array format: [{ day, open, close, closed }, ...]
   if (Array.isArray(hours)) {
-    const todayHours = hours.find(h => h.day === currentDay);
+    // Try both full day name and short day name
+    const todayHours = hours.find(h => h.day === currentDayFull || h.day === currentDayShort);
     if (!todayHours || todayHours.closed) {
       return false;
     }
