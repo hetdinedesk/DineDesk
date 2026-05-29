@@ -456,7 +456,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         })
 
         if (!response.ok) {
-          const errorData = await response.json()
+          const errorData = await response.json().catch(() => ({ error: 'Failed to create order' }))
           throw new Error(errorData.error || 'Failed to create order')
         }
 
@@ -475,10 +475,16 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         })
 
         if (!paymentResponse.ok) {
-          throw new Error('Failed to create payment')
+          const errorData = await paymentResponse.json().catch(() => ({ error: 'Failed to create payment' }))
+          throw new Error(errorData.error || 'Failed to create payment')
         }
 
         const paymentResult = await paymentResponse.json()
+        
+        if (!paymentResult.clientSecret) {
+          throw new Error('No client secret returned from payment creation')
+        }
+        
         setClientSecret(paymentResult.clientSecret)
         setLoading(false)
       } else {
@@ -1099,18 +1105,18 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     <button
                       onClick={() => setPaymentMethod('stripe')}
                       className={`w-full p-6 border rounded-full font-sans font-bold text-sm transition-all flex items-center gap-4 ${
-                        paymentMethod === 'stripe' 
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]' 
+                        paymentMethod === 'stripe'
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                           : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50'
                       }`}
                     >
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-2 items-center flex-shrink-0">
                         <CreditCard width={24} height={24} strokeWidth={2} />
                         <span className="text-2xl">💳</span>
                       </div>
-                      <div className="text-left flex-1">
+                      <div className="text-left flex-1 min-w-0">
                         <div>Card Payment</div>
-                        <div className="text-xs font-normal text-[var(--color-secondary)]/60 flex items-center gap-2">
+                        <div className="text-xs font-normal text-[var(--color-secondary)]/60 flex flex-wrap items-center gap-1">
                           <span>Visa</span>
                           <span>•</span>
                           <span>Mastercard</span>
@@ -1122,7 +1128,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                           <span>Google Pay</span>
                         </div>
                       </div>
-                      {paymentMethod === 'stripe' && <Check width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)]" />}
+                      {paymentMethod === 'stripe' && <Check width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)] flex-shrink-0" />}
                     </button>
                   )}
 
