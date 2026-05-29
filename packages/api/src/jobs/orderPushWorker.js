@@ -9,6 +9,26 @@ function retryDelayMs(attemptNumber) {
   return RETRY_DELAYS_MS[attemptNumber - 1] ?? 60_000
 }
 
+/**
+ * Handle P1017 connection errors by forcing Prisma reconnect
+ * Railway and similar platforms close idle connections
+ */
+async function handleConnectionError(err) {
+  if (err.code === 'P1017' || err.message?.includes('closed the connection')) {
+    console.log('[OrderPushWorker] Database connection closed, reconnecting...')
+    try {
+      await prisma.$disconnect()
+      await prisma.$connect()
+      console.log('[OrderPushWorker] Reconnected successfully')
+      return true
+    } catch (reconnectErr) {
+      console.error('[OrderPushWorker] Reconnect failed:', reconnectErr.message)
+      return false
+    }
+  }
+  return false
+}
+
 async function processOrderPushQueue() {
   let processed = 0
   try {
@@ -26,7 +46,10 @@ async function processOrderPushQueue() {
       processed++
     }
   } catch (err) {
-    console.error('[OrderPushWorker] Queue processing error:', err)
+    const reconnected = await handleConnectionError(err)
+    if (!reconnected) {
+      console.error('[OrderPushWorker] Queue processing error:', err)
+    }
   }
   return processed
 }

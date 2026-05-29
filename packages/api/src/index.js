@@ -4,6 +4,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') })
 const express = require('express')
 const cors = require('cors')
 const path = require('path')
+const { prisma } = require('./lib/prisma')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -105,7 +106,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Server error' })
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 API Server running on http://localhost:${PORT}`)
-  console.log(`📱 Health: http://localhost:${PORT}/health`)
-})
+// Connect to database before starting server
+async function startServer() {
+  try {
+    await prisma.$connect()
+    console.log('📦 Database connected')
+  } catch (err) {
+    console.error('❌ Failed to connect to database:', err.message)
+    process.exit(1)
+  }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 API Server running on http://localhost:${PORT}`)
+    console.log(`📱 Health: http://localhost:${PORT}/health`)
+  })
+}
+
+startServer()
