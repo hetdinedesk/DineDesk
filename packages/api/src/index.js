@@ -91,7 +91,10 @@ app.use('/api/loyalty', require('./routes/loyalty'))
 app.use('/api/enquiries', require('./routes/enquiries'))
 
 // Global Stripe webhook endpoint (doesn't require clientId)
-app.use('/api/stripe', require('./routes/payments'))
+app.use('/api/stripe', (req, res, next) => {
+  console.log('🔔 Request to /api/stripe:', req.method, req.url)
+  next()
+}, require('./routes/payments'))
 
 // GROUPS ROUTE - for organizing sites
 app.use('/api/groups', require('./routes/groups'))
