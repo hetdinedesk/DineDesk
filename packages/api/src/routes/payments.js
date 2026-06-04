@@ -207,6 +207,14 @@ router.post('/webhook', async (req, res) => {
   }
 })
 
+// Test endpoint to verify webhook route is accessible
+router.get('/webhook-test', (req, res) => {
+  res.json({ 
+    message: 'Webhook route is accessible',
+    timestamp: new Date().toISOString()
+  })
+})
+
 // Global webhook endpoint (doesn't require clientId in URL)
 router.post('/webhook', async (req, res) => {
   try {
