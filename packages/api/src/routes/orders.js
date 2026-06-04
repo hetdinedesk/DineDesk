@@ -147,11 +147,7 @@ router.post('/', async (req, res) => {
           })
         } else {
           // Otherwise, find or create customer by phone
-          let normalizedPhone = customerPhone.replace(/[\s\-()]/g, '')
-          // Convert +61 to 0 for Australian numbers
-          if (normalizedPhone.startsWith('+61')) {
-            normalizedPhone = '0' + normalizedPhone.substring(3)
-          }
+          const normalizedPhone = customerPhone.replace(/[\s\-()]/g, '')
 
           customer = await prisma.customer.findUnique({
             where: {
@@ -386,11 +382,13 @@ router.get('/update-statuses', async (req, res) => {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const clientId = getClientId(req)
-    const { status, limit = 500, locationId } = req.query
+    const { status, limit = 50, locationId } = req.query
 
     const where = { clientId }
     if (status) where.status = status
     if (locationId) where.locationId = locationId
+    // Never show pending_payment orders to restaurant - these are not confirmed yet
+    if (!status) where.status = { not: 'pending_payment' }
 
     const orders = await prisma.order.findMany({
       where,

@@ -115,7 +115,8 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
             wallets: {
               applePay: 'auto',
               googlePay: 'auto'
-            }
+            },
+            paymentMethodOrder: ['card', 'applepay', 'googlepay']
           }}
           onReady={() => {
             console.log('✅ PaymentElement ready')
@@ -596,13 +597,29 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     }
   }
 
-  const handlePaymentSuccess = (paymentIntent) => {
+  const handlePaymentSuccess = async (paymentIntent) => {
     const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
     const isProd = !!envSiteId
     const siteId = isProd ? '' : (router.query.site || '')
+    const clientId = data?.client?.id
+
+    // Immediately confirm payment on backend so order shows as paid before redirect
+    try {
+      await fetch(`${CMS_API_URL}/clients/${clientId}/payments/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          paymentIntentId: paymentIntent?.id
+        })
+      })
+    } catch (err) {
+      console.error('❌ Failed to confirm payment on backend:', err)
+      // Still redirect even if this fails - webhook will catch it
+    }
+
+    clearCart()
     router.push(isProd ? `/order/${orderId}` : `/order/${orderId}?site=${siteId}`)
-    // Clear cart after redirect to prevent empty cart flash
-    setTimeout(() => clearCart(), 100)
   }
 
   const handlePaymentError = async (errorMessage) => {

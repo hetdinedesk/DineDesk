@@ -140,15 +140,63 @@ router.post('/create-intent', async (req, res) => {
   }
 })
 
+// POST /confirm-payment - Called by frontend after successful payment to immediately mark order as paid
+router.post('/confirm-payment', async (req, res) => {
+  try {
+    const clientId = getClientId(req)
+    const { orderId, paymentIntentId } = req.body
+
+    if (!orderId || !paymentIntentId) {
+      return res.status(400).json({ error: 'orderId and paymentIntentId are required' })
+    }
+
+    // Verify the payment with Stripe to ensure it actually succeeded
+    const paymentGateway = await prisma.paymentGateway.findUnique({
+      where: { clientId }
+    })
+
+    let verified = false
+
+    if (paymentGateway?.stripeAccountId && paymentGateway?.stripeConnectStatus === 'connected') {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+      const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
+      verified = intent.status === 'succeeded'
+    } else {
+      const config = paymentGateway?.config || {}
+      const stripeSecretKey = paymentGateway?.testMode ? config.testSecretKey : config.liveSecretKey
+      if (stripeSecretKey) {
+        const stripe = new Stripe(stripeSecretKey)
+        const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
+        verified = intent.status === 'succeeded'
+      }
+    }
+
+    if (!verified) {
+      return res.status(400).json({ error: 'Payment not confirmed by Stripe' })
+    }
+
+    // Update order to paid and visible to restaurant
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: 'paid',
+        status: 'new'
+      }
+    })
+
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // POST /webhook - Stripe webhook to handle payment events
 router.post('/webhook', async (req, res) => {
   try {
-    console.log('🔔 Stripe webhook received')
     const sig = req.headers['stripe-signature']
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
 
     if (!endpointSecret) {
-      console.error('❌ Webhook not configured - STRIPE_WEBHOOK_SECRET missing')
       return res.status(500).json({ error: 'Webhook not configured' })
     }
 
@@ -156,9 +204,7 @@ router.post('/webhook', async (req, res) => {
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
-      console.log('✅ Webhook signature verified, event type:', event.type)
     } catch (err) {
-      console.error('❌ Webhook signature verification failed:', err.message)
       return res.status(400).send(`Webhook Error: ${err.message}`)
     }
 
@@ -166,19 +212,15 @@ router.post('/webhook', async (req, res) => {
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object
       const orderId = paymentIntent.metadata.orderId
-      console.log('💰 Payment succeeded for order:', orderId, 'Amount:', paymentIntent.amount / 100)
 
       if (orderId) {
-        const updatedOrder = await prisma.order.update({
+        await prisma.order.update({
           where: { id: orderId },
           data: {
             paymentStatus: 'paid',
             status: 'new' // Move from pending_payment to new so restaurant sees it
           }
         })
-        console.log('✅ Order updated to paid:', updatedOrder.id)
-      } else {
-        console.error('❌ No orderId in paymentIntent metadata')
       }
     }
 
@@ -186,7 +228,6 @@ router.post('/webhook', async (req, res) => {
     if (event.type === 'payment_intent.payment_failed') {
       const paymentIntent = event.data.object
       const orderId = paymentIntent.metadata.orderId
-      console.log('❌ Payment failed for order:', orderId)
 
       if (orderId) {
         await prisma.order.update({
@@ -196,107 +237,11 @@ router.post('/webhook', async (req, res) => {
             status: 'cancelled' // Cancel the order if payment fails
           }
         })
-        console.log('✅ Order cancelled due to payment failure:', orderId)
       }
     }
 
     res.json({ received: true })
   } catch (err) {
-    console.error('❌ Webhook processing error:', err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Test endpoint to verify webhook route is accessible
-router.get('/webhook-test', (req, res) => {
-  res.json({ 
-    message: 'Webhook route is accessible',
-    timestamp: new Date().toISOString()
-  })
-})
-
-// Global webhook endpoint (doesn't require clientId in URL)
-router.post('/webhook', async (req, res) => {
-  console.log('🔔🔔🔔 WEBHOOK HIT - POST /api/stripe/webhook')
-  try {
-    console.log('🔔 Global Stripe webhook received')
-    console.log('🔔 Headers:', JSON.stringify(req.headers, null, 2))
-    console.log('🔔 Body length:', req.body ? req.body.length : 'empty')
-
-    const sig = req.headers['stripe-signature']
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
-
-    console.log('🔔 STRIPE_WEBHOOK_SECRET exists:', !!endpointSecret)
-
-    if (!endpointSecret) {
-      console.error('❌ Webhook not configured - STRIPE_WEBHOOK_SECRET missing')
-      return res.status(500).json({ error: 'Webhook not configured' })
-    }
-
-    let event
-    try {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
-      console.log('✅ Webhook signature verified, event type:', event.type)
-    } catch (err) {
-      console.error('❌ Webhook signature verification failed:', err.message)
-      console.error('❌ Error details:', err)
-      return res.status(400).send(`Webhook Error: ${err.message}`)
-    }
-
-    console.log('🔔 Processing event:', event.type)
-
-    // Handle payment_intent.succeeded event
-    if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.object
-      const orderId = paymentIntent.metadata.orderId
-      console.log('💰 Payment succeeded for order:', orderId, 'Amount:', paymentIntent.amount / 100)
-      console.log('💰 PaymentIntent metadata:', paymentIntent.metadata)
-
-      if (orderId) {
-        try {
-          const updatedOrder = await prisma.order.update({
-            where: { id: orderId },
-            data: {
-              paymentStatus: 'paid',
-              status: 'new' // Move from pending_payment to new so restaurant sees it
-            }
-          })
-          console.log('✅ Order updated to paid:', updatedOrder.id, 'Status:', updatedOrder.status)
-        } catch (updateErr) {
-          console.error('❌ Failed to update order:', updateErr.message)
-        }
-      } else {
-        console.error('❌ No orderId in paymentIntent metadata')
-      }
-    }
-
-    // Handle payment_intent.payment_failed event
-    if (event.type === 'payment_intent.payment_failed') {
-      const paymentIntent = event.data.object
-      const orderId = paymentIntent.metadata.orderId
-      console.log('❌ Payment failed for order:', orderId)
-
-      if (orderId) {
-        try {
-          await prisma.order.update({
-            where: { id: orderId },
-            data: {
-              paymentStatus: 'failed',
-              status: 'cancelled' // Cancel the order if payment fails
-            }
-          })
-          console.log('✅ Order cancelled due to payment failure:', orderId)
-        } catch (updateErr) {
-          console.error('❌ Failed to cancel order:', updateErr.message)
-        }
-      }
-    }
-
-    res.json({ received: true })
-  } catch (err) {
-    console.error('❌ Webhook processing error:', err)
-    console.error('❌ Error stack:', err.stack)
     res.status(500).json({ error: err.message })
   }
 })
