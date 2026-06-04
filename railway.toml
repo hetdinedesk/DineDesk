@@ -3,4 +3,4 @@ builder = "dockerfile"
 dockerfilePath = "packages/api/Dockerfile"
 
 [deploy]
-startCommand = "cd packages/api && echo 'Running migrations...' && npx prisma migrate deploy --preview-feature && echo 'Migrations complete' && node src/index.js"
+startCommand = "cd packages/api && echo 'Running migrations...' && npx prisma migrate deploy && echo 'Migrations complete' && node src/scripts/ensureTimezoneColumn.js && node src/index.js"
