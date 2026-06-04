@@ -15,8 +15,12 @@ router.get('/customers/:phone', async (req, res) => {
       return res.status(400).json({ error: 'clientId is required' })
     }
 
-    // Normalize phone number (remove spaces, dashes, etc.)
-    const normalizedPhone = phone.replace(/[\s\-()]/g, '')
+    // Normalize phone number (remove spaces, dashes, etc., and handle +61 prefix)
+    let normalizedPhone = phone.replace(/[\s\-()]/g, '')
+    // Convert +61 to 0 for Australian numbers
+    if (normalizedPhone.startsWith('+61')) {
+      normalizedPhone = '0' + normalizedPhone.substring(3)
+    }
 
     const customer = await prisma.customer.findUnique({
       where: {
@@ -46,7 +50,12 @@ router.post('/customers', async (req, res) => {
       return res.status(400).json({ error: 'clientId and phone are required' })
     }
 
-    const normalizedPhone = phone.replace(/[\s\-()]/g, '')
+    // Normalize phone number (remove spaces, dashes, etc., and handle +61 prefix)
+    let normalizedPhone = phone.replace(/[\s\-()]/g, '')
+    // Convert +61 to 0 for Australian numbers
+    if (normalizedPhone.startsWith('+61')) {
+      normalizedPhone = '0' + normalizedPhone.substring(3)
+    }
 
     // Try to find existing customer
     let customer = await prisma.customer.findUnique({

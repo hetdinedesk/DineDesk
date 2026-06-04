@@ -147,7 +147,11 @@ router.post('/', async (req, res) => {
           })
         } else {
           // Otherwise, find or create customer by phone
-          const normalizedPhone = customerPhone.replace(/[\s\-()]/g, '')
+          let normalizedPhone = customerPhone.replace(/[\s\-()]/g, '')
+          // Convert +61 to 0 for Australian numbers
+          if (normalizedPhone.startsWith('+61')) {
+            normalizedPhone = '0' + normalizedPhone.substring(3)
+          }
 
           customer = await prisma.customer.findUnique({
             where: {
