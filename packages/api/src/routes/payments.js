@@ -96,16 +96,14 @@ router.post('/create-intent', async (req, res) => {
       if (!process.env.STRIPE_SECRET_KEY) {
         return res.status(500).json({ error: 'Platform Stripe key not configured' })
       }
-      // Use Stripe-Account header to create PI on connected account directly
-      // This allows Apple Pay to use the client's domain verification
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-        stripeAccount: paymentGateway.stripeAccountId
-      })
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
       paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100),
         currency: useCurrency.toLowerCase(),
         metadata: { orderId, clientId },
-        automatic_payment_methods: { enabled: true }
+        automatic_payment_methods: { enabled: true },
+        on_behalf_of: paymentGateway.stripeAccountId,
+        transfer_data: { destination: paymentGateway.stripeAccountId }
       })
     } else {
       // --- Legacy manual keys path ---
