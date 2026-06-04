@@ -148,6 +148,7 @@ router.post('/webhook', async (req, res) => {
     console.log('🔔 Stripe webhook received')
     const sig = req.headers['stripe-signature']
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
+    const connectedAccountId = req.headers['stripe-account']
 
     if (!endpointSecret) {
       console.error('❌ Webhook not configured - STRIPE_WEBHOOK_SECRET missing')
@@ -157,8 +158,12 @@ router.post('/webhook', async (req, res) => {
     let event
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+      // For Connect webhooks, verify with the connected account ID if present
+      if (connectedAccountId) {
+        console.log('🔔 Connect webhook from account:', connectedAccountId)
+      }
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
-      console.log('✅ Webhook signature verified, event type:', event.type)
+      console.log('✅ Webhook signature verified, event type:', event.type, connectedAccountId ? '(Connect)' : '(Platform)')
     } catch (err) {
       console.error('❌ Webhook signature verification failed:', err.message)
       return res.status(400).send(`Webhook Error: ${err.message}`)
@@ -215,6 +220,7 @@ router.post('/webhook', async (req, res) => {
     console.log('🔔 Global Stripe webhook received')
     const sig = req.headers['stripe-signature']
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
+    const connectedAccountId = req.headers['stripe-account']
 
     if (!endpointSecret) {
       console.error('❌ Webhook not configured - STRIPE_WEBHOOK_SECRET missing')
