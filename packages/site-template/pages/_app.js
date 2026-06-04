@@ -11,26 +11,35 @@ import ErrorBoundary from '../components/ErrorBoundary'
 // Dynamic theme loading
 function ThemeLoader({ themeKey, children }) {
   const [CartDrawer, setCartDrawer] = useState(null)
+  const [FloatingCartIcon, setFloatingCartIcon] = useState(null)
 
   useEffect(() => {
     const loadTheme = async () => {
       const theme = themeKey || 'theme-d1'
 
-      // Load CartDrawer component
+      // Load CartDrawer and FloatingCartIcon components
       try {
-        const module = await import(`../components/${theme}/CartDrawer`)
-        setCartDrawer(() => module.default)
+        const [cartModule, floatModule] = await Promise.all([
+          import(`../components/${theme}/CartDrawer`),
+          import(`../components/${theme}/FloatingCartIcon`)
+        ])
+        setCartDrawer(() => cartModule.default)
+        setFloatingCartIcon(() => floatModule.default)
       } catch (error) {
-        console.warn(`Failed to load CartDrawer for theme ${theme}, falling back to theme-d1`)
-        const module = await import('../components/theme-d1/CartDrawer')
-        setCartDrawer(() => module.default)
+        console.warn(`Failed to load components for theme ${theme}, falling back to theme-d1`)
+        const [cartModule, floatModule] = await Promise.all([
+          import('../components/theme-d1/CartDrawer'),
+          import('../components/theme-d1/FloatingCartIcon')
+        ])
+        setCartDrawer(() => cartModule.default)
+        setFloatingCartIcon(() => floatModule.default)
       }
     }
 
     loadTheme()
   }, [themeKey])
 
-  return <>{children(CartDrawer)}</>
+  return <>{children(CartDrawer, FloatingCartIcon)}</>
 }
 
 export default function App({ Component, pageProps }) {
@@ -131,13 +140,14 @@ export default function App({ Component, pageProps }) {
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
       <ErrorBoundary>
-        <CartProvider ordering={data.ordering} siteId={data.client?.id || data.id}>
+        <CartProvider ordering={data.ordering} siteId={data.id}>
           <WishlistProvider>
             <ThemeLoader themeKey={themeKey}>
-              {(CartDrawer) => (
+              {(CartDrawer, FloatingCartIcon) => (
                 <>
                   <Component {...pageProps}/>
                   {CartDrawer && <CartDrawer />}
+                  {FloatingCartIcon && <FloatingCartIcon />}
                 </>
               )}
             </ThemeLoader>
