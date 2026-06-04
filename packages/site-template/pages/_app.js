@@ -3,6 +3,7 @@ import { buildThemeCSS } from '../lib/theme'
 import { CartProvider } from '../contexts/CartContext'
 import { WishlistProvider } from '../contexts/WishlistContext'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import '../styles/theme-d1/index.css'
 import '../styles/theme-d2/index.css'
 import '../styles/theme-d3/index.css'
@@ -43,6 +44,7 @@ function ThemeLoader({ themeKey, children }) {
 }
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter()
   const data      = pageProps.data     || {}
   const settings  = data.settings      || {}
   const analytics = data.analytics     || {}
@@ -52,6 +54,9 @@ export default function App({ Component, pageProps }) {
   const siteName  = settings.displayName || settings.restaurantName || data.client?.name || 'Restaurant'
   const faviconUrl = settings.favicon || colours.logoLight || colours.logoDark || null
   const themeKey  = data.themeKey || 'theme-d1'
+
+  // Only show floating cart on menu and specials pages
+  const showFloatingCart = router.pathname === '/menu' || router.pathname === '/specials'
 
   return (
     <>
@@ -147,7 +152,7 @@ export default function App({ Component, pageProps }) {
                 <>
                   <Component {...pageProps}/>
                   {CartDrawer && <CartDrawer />}
-                  {FloatingCartIcon && <FloatingCartIcon />}
+                  {FloatingCartIcon && showFloatingCart && <FloatingCartIcon />}
                 </>
               )}
             </ThemeLoader>
