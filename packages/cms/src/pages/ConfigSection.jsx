@@ -152,6 +152,7 @@ export default function ConfigSection({ clientId, user }) {
 
   useEffect(() => {                                   // ← moved inside
     if (!clientId) return
+    setClient(null) // Reset client while fetching new one
     fetch(`${API_URL}/clients/${clientId}`, {
       headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') }
     }).then(r => r.json()).then(setClient).catch(() => {})
