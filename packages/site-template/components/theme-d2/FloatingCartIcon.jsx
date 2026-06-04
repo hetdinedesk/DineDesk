@@ -1,21 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { ShoppingCart } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 
 export const FloatingCartIcon = () => {
   const { totalItems, total, openCart } = useCart();
-  const [isVisible, setIsVisible] = useState(false);
-
-  // Show floating cart when items are added
-  useEffect(() => {
-    if (totalItems > 0) {
-      setIsVisible(true);
-    } else {
-      setIsVisible(false);
-    }
-  }, [totalItems]);
-
-  if (!isVisible) return null;
 
   return (
     <button
