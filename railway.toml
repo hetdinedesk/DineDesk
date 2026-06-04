@@ -3,4 +3,4 @@ builder = "dockerfile"
 dockerfilePath = "packages/api/Dockerfile"
 
 [deploy]
-startCommand = "cd packages/api && npx prisma db push --accept-data-loss --skip-generate && node src/index.js"
+startCommand = "cd packages/api && npx prisma migrate deploy && node src/index.js"
