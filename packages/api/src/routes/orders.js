@@ -382,7 +382,7 @@ router.get('/update-statuses', async (req, res) => {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const clientId = getClientId(req)
-    const { status, limit = 50, locationId } = req.query
+    const { status, limit = 500, locationId } = req.query
 
     const where = { clientId }
     if (status) where.status = status
