@@ -7,21 +7,6 @@ const router = express.Router({ mergeParams: true })
 // Helper to get clientId from params (handles both /:clientId and /:id)
 const getClientId = (req) => req.params.clientId || req.params.id
 
-// Diagnostic endpoint to check payment system status
-router.get('/diagnostic', async (req, res) => {
-  try {
-    const checks = {
-      stripeSecretKey: !!process.env.STRIPE_SECRET_KEY,
-      stripeWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
-      nodeEnv: process.env.NODE_ENV,
-      timestamp: new Date().toISOString()
-    }
-    res.json(checks)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
 // Get payment config (admin only — includes config for CMS editing)
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -161,7 +146,6 @@ router.post('/webhook', async (req, res) => {
     console.log('🔔 Stripe webhook received')
     const sig = req.headers['stripe-signature']
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
-    const connectedAccountId = req.headers['stripe-account']
 
     if (!endpointSecret) {
       console.error('❌ Webhook not configured - STRIPE_WEBHOOK_SECRET missing')
@@ -171,12 +155,8 @@ router.post('/webhook', async (req, res) => {
     let event
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-      // For Connect webhooks, verify with the connected account ID if present
-      if (connectedAccountId) {
-        console.log('🔔 Connect webhook from account:', connectedAccountId)
-      }
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
-      console.log('✅ Webhook signature verified, event type:', event.type, connectedAccountId ? '(Connect)' : '(Platform)')
+      console.log('✅ Webhook signature verified, event type:', event.type)
     } catch (err) {
       console.error('❌ Webhook signature verification failed:', err.message)
       return res.status(400).send(`Webhook Error: ${err.message}`)
@@ -230,68 +210,63 @@ router.post('/webhook', async (req, res) => {
 // Global webhook endpoint (doesn't require clientId in URL)
 router.post('/webhook', async (req, res) => {
   try {
-    console.log('🔔 [GLOBAL WEBHOOK] Stripe webhook received at', new Date().toISOString())
+    console.log('🔔 Global Stripe webhook received')
+    console.log('🔔 Headers:', JSON.stringify(req.headers, null, 2))
+    console.log('🔔 Body length:', req.body ? req.body.length : 'empty')
+
     const sig = req.headers['stripe-signature']
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
-    const connectedAccountId = req.headers['stripe-account']
+
+    console.log('🔔 STRIPE_WEBHOOK_SECRET exists:', !!endpointSecret)
 
     if (!endpointSecret) {
-      console.error('❌ [GLOBAL WEBHOOK] STRIPE_WEBHOOK_SECRET missing')
+      console.error('❌ Webhook not configured - STRIPE_WEBHOOK_SECRET missing')
       return res.status(500).json({ error: 'Webhook not configured' })
     }
-
-    console.log('🔔 [GLOBAL WEBHOOK] Signature present:', !!sig, 'Connected account:', connectedAccountId || 'none')
 
     let event
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
-      console.log('✅ [GLOBAL WEBHOOK] Signature verified, event type:', event.type, 'ID:', event.id)
+      console.log('✅ Webhook signature verified, event type:', event.type)
     } catch (err) {
-      console.error('❌ [GLOBAL WEBHOOK] Signature verification failed:', err.message)
+      console.error('❌ Webhook signature verification failed:', err.message)
+      console.error('❌ Error details:', err)
       return res.status(400).send(`Webhook Error: ${err.message}`)
     }
+
+    console.log('🔔 Processing event:', event.type)
 
     // Handle payment_intent.succeeded event
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object
-      const orderId = paymentIntent.metadata?.orderId
-      console.log('💰 [GLOBAL WEBHOOK] Payment succeeded. OrderID:', orderId, 'Amount:', paymentIntent.amount / 100, 'PI:', paymentIntent.id)
+      const orderId = paymentIntent.metadata.orderId
+      console.log('💰 Payment succeeded for order:', orderId, 'Amount:', paymentIntent.amount / 100)
+      console.log('💰 PaymentIntent metadata:', paymentIntent.metadata)
 
       if (orderId) {
         try {
-          // First check if order exists
-          const existingOrder = await prisma.order.findUnique({
-            where: { id: orderId }
+          const updatedOrder = await prisma.order.update({
+            where: { id: orderId },
+            data: {
+              paymentStatus: 'paid',
+              status: 'new' // Move from pending_payment to new so restaurant sees it
+            }
           })
-          
-          if (!existingOrder) {
-            console.error('❌ [GLOBAL WEBHOOK] Order not found in database:', orderId)
-          } else {
-            console.log('📋 [GLOBAL WEBHOOK] Found order:', existingOrder.id, 'Current status:', existingOrder.status, 'Payment:', existingOrder.paymentStatus)
-            
-            const updatedOrder = await prisma.order.update({
-              where: { id: orderId },
-              data: {
-                paymentStatus: 'paid',
-                status: 'new' // Move from pending_payment to new so restaurant sees it
-              }
-            })
-            console.log('✅ [GLOBAL WEBHOOK] Order updated successfully:', updatedOrder.id, 'New status:', updatedOrder.status, 'Payment:', updatedOrder.paymentStatus)
-          }
+          console.log('✅ Order updated to paid:', updatedOrder.id, 'Status:', updatedOrder.status)
         } catch (updateErr) {
-          console.error('❌ [GLOBAL WEBHOOK] Database error updating order:', updateErr.message)
+          console.error('❌ Failed to update order:', updateErr.message)
         }
       } else {
-        console.error('❌ [GLOBAL WEBHOOK] No orderId in metadata. Full metadata:', JSON.stringify(paymentIntent.metadata))
+        console.error('❌ No orderId in paymentIntent metadata')
       }
     }
 
     // Handle payment_intent.payment_failed event
     if (event.type === 'payment_intent.payment_failed') {
       const paymentIntent = event.data.object
-      const orderId = paymentIntent.metadata?.orderId
-      console.log('❌ [GLOBAL WEBHOOK] Payment failed. OrderID:', orderId)
+      const orderId = paymentIntent.metadata.orderId
+      console.log('❌ Payment failed for order:', orderId)
 
       if (orderId) {
         try {
@@ -299,19 +274,20 @@ router.post('/webhook', async (req, res) => {
             where: { id: orderId },
             data: {
               paymentStatus: 'failed',
-              status: 'cancelled'
+              status: 'cancelled' // Cancel the order if payment fails
             }
           })
-          console.log('✅ [GLOBAL WEBHOOK] Order cancelled due to payment failure:', orderId)
+          console.log('✅ Order cancelled due to payment failure:', orderId)
         } catch (updateErr) {
-          console.error('❌ [GLOBAL WEBHOOK] Failed to cancel order:', updateErr.message)
+          console.error('❌ Failed to cancel order:', updateErr.message)
         }
       }
     }
 
     res.json({ received: true })
   } catch (err) {
-    console.error('❌ [GLOBAL WEBHOOK] Unhandled error:', err)
+    console.error('❌ Webhook processing error:', err)
+    console.error('❌ Error stack:', err.stack)
     res.status(500).json({ error: err.message })
   }
 })
