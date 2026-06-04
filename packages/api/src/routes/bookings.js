@@ -163,14 +163,15 @@ router.post('/', bookingLimiter, async (req, res) => {
     // The Booking.tableId field links the reservation to the table
     // RestaurantTable.bookingId is only for current walk-in bookings
 
-    // Send booking confirmation email
+    // Send booking confirmation email to customer
     try {
       const client = await prisma.client.findUnique({
         where: { id: clientId },
         select: {
           name: true,
           logo: true,
-          colours: true
+          colours: true,
+          email: true
         }
       })
       
@@ -182,6 +183,17 @@ router.post('/', bookingLimiter, async (req, res) => {
       if (client && customerEmail) {
         await sendBookingConfirmation(
           booking,
+          client.name,
+          siteConfig?.notifications || {},
+          client,
+          booking.location
+        )
+      }
+
+      // Send notification to client (restaurant owner)
+      if (client && client.email) {
+        await sendBookingConfirmation(
+          { ...booking, customerName: `${booking.customerName} (Customer)`, customerEmail: client.email },
           client.name,
           siteConfig?.notifications || {},
           client,
@@ -332,6 +344,140 @@ router.get('/:clientId/bookings', async (req, res) => {
   }
 })
 
+// Create a booking from CMS (authenticated)
+router.post('/:clientId/bookings', authenticateToken, async (req, res) => {
+  try {
+    const { clientId } = req.params
+    const { customerName, customerEmail, customerPhone, partySize, bookingDate, bookingTime, notes, tableId, locationId, status = 'confirmed' } = req.body
+
+    // Validate required fields
+    if (!customerName || !partySize || !bookingDate || !bookingTime) {
+      return res.status(400).json({ error: 'Missing required fields' })
+    }
+
+    // If no locationId provided, use the client's primary location
+    let finalLocationId = locationId
+    if (!finalLocationId) {
+      const primaryLocation = await prisma.location.findFirst({
+        where: { clientId, isPrimary: true }
+      })
+      if (primaryLocation) {
+        finalLocationId = primaryLocation.id
+      } else {
+        const anyLocation = await prisma.location.findFirst({
+          where: { clientId }
+        })
+        if (anyLocation) {
+          finalLocationId = anyLocation.id
+        }
+      }
+    }
+
+    // If a table is specified, validate it's available
+    if (tableId && finalLocationId) {
+      const table = await prisma.restaurantTable.findFirst({
+        where: {
+          id: tableId,
+          clientId,
+          locationId: finalLocationId,
+          isActive: true
+        }
+      })
+      
+      if (!table) {
+        return res.status(400).json({ error: 'Table not found or inactive' })
+      }
+      
+      if (table.capacity < parseInt(partySize)) {
+        return res.status(400).json({ error: 'Table capacity insufficient for party size' })
+      }
+      
+      // Check if table is already booked for this time slot
+      const existingTableBooking = await prisma.booking.findFirst({
+        where: {
+          tableId,
+          bookingDate: new Date(bookingDate),
+          bookingTime,
+          status: { in: ['pending', 'confirmed'] }
+        }
+      })
+      
+      if (existingTableBooking) {
+        return res.status(400).json({ error: 'Table already booked for this time slot' })
+      }
+    }
+
+    // Create booking
+    const booking = await prisma.booking.create({
+      data: {
+        clientId,
+        locationId: finalLocationId,
+        customerName,
+        customerEmail,
+        customerPhone,
+        partySize: parseInt(partySize),
+        bookingDate: new Date(bookingDate),
+        bookingTime,
+        notes,
+        tableId: tableId || null,
+        status,
+        confirmationMethod: 'cms'
+      },
+      include: {
+        location: true,
+        tables: true
+      }
+    })
+
+    // Send booking confirmation email
+    try {
+      const client = await prisma.client.findUnique({
+        where: { id: clientId },
+        select: {
+          name: true,
+          logo: true,
+          colours: true,
+          email: true
+        }
+      })
+      
+      const siteConfig = await prisma.siteConfig.findUnique({
+        where: { id: clientId },
+        select: { notifications: true }
+      })
+      
+      if (client && customerEmail) {
+        await sendBookingConfirmation(
+          booking,
+          client.name,
+          siteConfig?.notifications || {},
+          client,
+          booking.location
+        )
+      }
+
+      // Send notification to client (restaurant owner)
+      if (client && client.email) {
+        await sendBookingConfirmation(
+          { ...booking, customerName: `${booking.customerName} (Customer)`, customerEmail: client.email },
+          client.name,
+          siteConfig?.notifications || {},
+          client,
+          booking.location
+        )
+      }
+    } catch (emailError) {
+      console.error('Failed to send booking confirmation email:', emailError)
+      // Don't fail the booking if email fails
+    }
+
+    res.json(booking)
+  } catch (error) {
+    console.error('CMS booking creation error:', error)
+    res.status(500).json({ error: 'Failed to create booking' })
+  }
+})
+
 // Get bookings for a specific location
 router.get('/location/:locationId', async (req, res) => {
   try {
@@ -356,7 +502,7 @@ router.patch('/:id/status', async (req, res) => {
     const { id } = req.params
     const { status } = req.body
 
-    if (!['pending', 'confirmed', 'cancelled'].includes(status)) {
+    if (!['pending', 'confirmed', 'seated', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' })
     }
 

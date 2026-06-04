@@ -114,6 +114,7 @@ model Location {
   lat               String?
   lng               String?
   hours             Json?
+  timezone          String?   @default("Australia/Sydney")
   exteriorImage     String?
   exteriorImages    Json?     @default("[]")
   formEmail         String?

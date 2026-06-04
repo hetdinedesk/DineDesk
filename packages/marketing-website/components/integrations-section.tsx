@@ -13,10 +13,10 @@ const integrations = [
     color: 'from-purple-500 to-indigo-600',
   },
   {
-    icon: Globe,
-    name: 'Netlify',
-    description: 'Fast, reliable global CDN deployment with automatic SSL and continuous deployment.',
-    color: 'from-teal-500 to-cyan-600',
+    icon: CreditCard,
+    name: 'Square POS',
+    description: 'Connect your Square POS to sync online orders with in-store sales and inventory.',
+    color: 'from-emerald-500 to-teal-600',
   },
   {
     icon: Star,

@@ -361,11 +361,31 @@ async function sendSendGridEmail(order, clientName, type, notificationConfig, cl
       ? generateCustomerReceiptHtml(order, clientName, clientData, locationData)
       : generateRestaurantNotificationHtml(order, clientName)
 
+    // Use verified sender from env or client settings, never fake domain
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || notificationConfig.sendgridFrom
+    const fromName = process.env.SENDGRID_FROM_NAME || clientName
+
     const msg = {
       to: toEmail,
-      from: notificationConfig.sendgridFrom || notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`,
+      from: {
+        email: fromEmail,
+        name: fromName
+      },
       subject: subject,
-      html: html
+      html: html,
+      // Add anti-spam headers
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high',
+        'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>`,
+        'X-Mailer': 'DineDesk'
+      },
+      // Add tracking settings
+      trackingSettings: {
+        clickTracking: { enable: true },
+        openTracking: { enable: true }
+      }
     }
 
     await sgMail.send(msg)
@@ -413,12 +433,26 @@ async function sendEnquiryEmail(enquiry, clientName, notificationConfig, clientD
 
       const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
 
+      // Use verified sender from env or client settings
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || notificationConfig.sendgridFrom
+      const fromName = process.env.SENDGRID_FROM_NAME || clientName
+
       const msg = {
         to: toEmail,
-        from: notificationConfig.sendgridFrom || notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`,
-        replyTo: enquiry.email, // Set reply-to to the enquiry sender's email
+        from: {
+          email: fromEmail,
+          name: fromName
+        },
+        replyTo: enquiry.email,
         subject: `📬 New Enquiry from ${enquiry.name} - ${clientName}`,
-        html: html
+        html: html,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'high',
+          'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>`,
+          'X-Mailer': 'DineDesk'
+        }
       }
 
       await sgMail.send(msg)
@@ -431,7 +465,7 @@ async function sendEnquiryEmail(enquiry, clientName, notificationConfig, clientD
       return { success: false, message: 'No email provider configured' }
     }
 
-    const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
+    const fromEmail = notificationConfig.smtpFrom || process.env.SENDGRID_FROM_EMAIL || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
     const html = generateEnquiryEmailHtml(enquiry, clientName, clientData)
 
     await Promise.race([
@@ -529,8 +563,11 @@ function generateBookingConfirmationHtml(booking, clientName, clientData = {}, l
 
 async function sendBookingConfirmation(booking, clientName, notificationConfig, clientData = {}, locationData = {}) {
   if (!booking.customerEmail) {
+    console.log('[Email] Booking confirmation skipped - no customer email provided')
     return { success: false, message: 'No customer email provided' }
   }
+
+  console.log('[Email] Sending booking confirmation to:', booking.customerEmail, 'via SendGrid:', !!notificationConfig.sendgridApiKey)
 
   try {
     // Try SendGrid first
@@ -539,14 +576,29 @@ async function sendBookingConfirmation(booking, clientName, notificationConfig, 
 
       const html = generateBookingConfirmationHtml(booking, clientName, clientData, locationData)
 
+      // Use verified sender from env or client settings
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || notificationConfig.sendgridFrom
+      const fromName = process.env.SENDGRID_FROM_NAME || clientName
+
       const msg = {
         to: booking.customerEmail,
-        from: notificationConfig.sendgridFrom || notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`,
+        from: {
+          email: fromEmail,
+          name: fromName
+        },
         subject: `Booking Confirmed - ${clientName}`,
-        html: html
+        html: html,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'high',
+          'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>`,
+          'X-Mailer': 'DineDesk'
+        }
       }
 
       await sgMail.send(msg)
+      console.log('[Email] Booking confirmation sent successfully via SendGrid')
       return { success: true, message: 'Booking confirmation sent via SendGrid' }
     }
 
@@ -558,7 +610,7 @@ async function sendBookingConfirmation(booking, clientName, notificationConfig, 
       return { success: false, message: 'No email provider configured' }
     }
 
-    const fromEmail = notificationConfig.smtpFrom || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
+    const fromEmail = notificationConfig.smtpFrom || process.env.SENDGRID_FROM_EMAIL || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
     const html = generateBookingConfirmationHtml(booking, clientName, clientData, locationData)
 
     await Promise.race([

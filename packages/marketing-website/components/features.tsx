@@ -422,14 +422,25 @@ function MockPayments() {
               </div>
               <span className="text-white font-medium">Stripe</span>
             </div>
-            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full">Active</span>
+            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full">Connected</span>
           </div>
-          <p className="text-white/40">pk_live_••••••••••••••••••••••••</p>
           <div className="flex gap-2 mt-2">
             {['Cards', 'Apple Pay', 'Google Pay'].map(m => (
               <span key={m} className="px-2 py-0.5 bg-white/5 text-white/50 rounded">{m}</span>
             ))}
           </div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-5 rounded bg-emerald-600 flex items-center justify-center">
+                <span className="text-white text-xs font-bold">□</span>
+              </div>
+              <span className="text-white font-medium">Square POS</span>
+            </div>
+            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full">Active</span>
+          </div>
+          <p className="text-white/40">Sync online orders with in-store POS</p>
         </div>
         <div className="bg-white/5 rounded-lg p-3 flex items-center justify-between">
           <div>
@@ -664,10 +675,10 @@ const features = [
   },
   {
     icon: CreditCard,
-    title: 'Stripe Payments',
-    description: 'Cards, Apple Pay and Google Pay via Stripe. Cash on pickup also supported. Server-side price verification on every order.',
+    title: 'Payments & POS',
+    description: 'Stripe for online payments. Square POS integration for in-store sync. Cash on pickup also supported. Secure, verified transactions.',
     color: 'from-teal-500 to-cyan-500',
-    detail: 'You configure your Stripe publishable and secret keys in the CMS Payment Settings. All card charges are server-side verified — we re-calculate every order total before charging to prevent tampering. Currency, cash toggle and surcharges are all configurable.',
+    detail: 'Connect your Stripe account via OAuth or enter API keys directly. Square POS integration syncs online orders with your in-store system. All card charges are server-side verified — we re-calculate every order total before charging to prevent tampering.',
     demo: <MockPayments />,
   },
   {

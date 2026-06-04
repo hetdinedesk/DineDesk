@@ -64,8 +64,8 @@ const platformFeatures = [
   },
   {
     icon: CreditCard,
-    title: 'Stripe Payments',
-    description: 'Integrated Stripe processing for cards, Apple Pay and Google Pay. Server-side price verification. Cash payment option also supported.',
+    title: 'Stripe & Square Payments',
+    description: 'Accept cards, Apple Pay and Google Pay via Stripe. Square POS integration keeps online and in-store orders in sync. Cash payment also supported.',
     color: 'from-teal-500 to-cyan-500',
   },
   {

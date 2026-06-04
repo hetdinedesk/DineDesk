@@ -63,7 +63,7 @@ const plans = [
       'Advanced roles and permissions',
       'Premium customisation',
       'Higher-priority support',
-      'Future POS / payment integration readiness',
+      'Square POS integration for in-store sync',
     ],
     cta: 'Get Started',
     popular: false,
