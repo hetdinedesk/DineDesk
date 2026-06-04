@@ -6,6 +6,9 @@ export const getBookings = (clientId) =>
 export const getLocationBookings = (locationId) =>
   api.get(`/bookings/location/${locationId}`).then(r => r.data)
 
+export const createBooking = (clientId, data) =>
+  api.post(`/clients/${clientId}/bookings`, data).then(r => r.data)
+
 export const updateBookingStatus = (bookingId, status) =>
   api.patch(`/clients/${bookingId}/status`, { status }).then(r => r.data)
 
