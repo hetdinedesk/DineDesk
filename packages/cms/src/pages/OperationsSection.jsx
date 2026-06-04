@@ -3,10 +3,11 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle, Table, Calendar } from 'lucide-react'
 import { getOrders, updateOrderStatus } from '../api/orders'
 import { getLocations } from '../api/locations'
-import { toggleOrdering } from '../api/config'
+import { toggleOrdering, getConfig } from '../api/config'
 import { getTables, updateTableBookingStatus } from '../api/tables'
 import { getBookings, updateBookingStatus, deleteBooking } from '../api/bookings'
 import { C } from '../theme'
+import ReservationsManager from './ReservationsManager'
 
 const STATUS_COLORS = {
   new: '#00D4FF',
@@ -163,9 +164,9 @@ export default function OperationsSection({ clientId, user: userProp }) {
         ['new', 'accepted', 'preparing', 'ready'].includes(o.status)
       )
     ),
-    refetchInterval: 5000, // Poll every 5 seconds for faster updates
+    refetchInterval: 3000, // Poll every 3 seconds for faster updates
     enabled: !!selectedLocation,
-    staleTime: 10 * 1000, // 10 seconds for live orders
+    staleTime: 0, // Always consider data stale for immediate updates
     gcTime: 5 * 60 * 1000 // Keep for 5 minutes
   })
 
@@ -679,13 +680,12 @@ export default function OperationsSection({ clientId, user: userProp }) {
           />
         )}
 
-        {/* Tables with Bookings */}
+        {/* Tables with Bookings - Reservations Manager */}
         {activeTab === 'tables' && (
-          <TablesTab
+          <ReservationsManager
             clientId={clientId}
             selectedLocation={selectedLocation}
-            bookings={bookings}
-            queryClient={queryClient}
+            clientData={{ name: 'Restaurant' }}
           />
         )}
 
