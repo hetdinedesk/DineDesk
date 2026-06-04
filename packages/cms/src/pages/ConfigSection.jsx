@@ -4876,10 +4876,8 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
   const [deletingSite, setDeletingSite] = useState(false)
 
   useEffect(() => { 
-    if (config.netlify) {
-      setForm(config.netlify)
-      savedFormRef.current = config.netlify
-    }
+    setForm(config.netlify || {})
+    savedFormRef.current = config.netlify || {}
     setHasUnsavedChanges(false)
   }, [config, setHasUnsavedChanges])
 
