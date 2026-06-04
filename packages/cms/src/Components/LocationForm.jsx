@@ -212,8 +212,8 @@ export default function LocationForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedDays, setSelectedDays] = useState([])
   const [pendingImages, setPendingImages] = useState({
-    exteriorImages: [],
-    galleryImages: []
+    exteriorImages: null, // null = not modified, [] = cleared, [...] = changed
+    galleryImages: null
   })
 
   useEffect(() => {
@@ -294,13 +294,10 @@ export default function LocationForm({
     
     // Always include current image state - use pending if changed, otherwise form
     // Check if pendingImages arrays have been set (even if empty for removal)
-    const hasPendingExterior = pendingImages.exteriorImages !== undefined
-    const hasPendingGallery = pendingImages.galleryImages !== undefined
-    
     const saveData = {
       ...form,
-      exteriorImages: hasPendingExterior ? pendingImages.exteriorImages : form.exteriorImages,
-      galleryImages: hasPendingGallery ? pendingImages.galleryImages : form.galleryImages
+      exteriorImages: pendingImages.exteriorImages !== null ? pendingImages.exteriorImages : (form.exteriorImages || []),
+      galleryImages: pendingImages.galleryImages !== null ? pendingImages.galleryImages : (form.galleryImages || [])
     }
     
     mutation.mutate(saveData)
@@ -332,7 +329,7 @@ export default function LocationForm({
   }, [])
 
   const clearPendingImages = useCallback(() => {
-    setPendingImages({ exteriorImages: [], galleryImages: [] })
+    setPendingImages({ exteriorImages: null, galleryImages: null })
   }, [])
 
   const toggleDay = (day) => {
@@ -379,7 +376,7 @@ export default function LocationForm({
     // Remove automatic draft saving
   }
 
-  const hasPendingImages = pendingImages.exteriorImages !== undefined || pendingImages.galleryImages !== undefined
+  const hasPendingImages = pendingImages.exteriorImages !== null || pendingImages.galleryImages !== null
   const hasCoordinates = form.lat && form.lng
   
   // Check if form has been modified from original location data
@@ -462,13 +459,11 @@ export default function LocationForm({
             clientId={clientId}
             label="Exterior Photos"
             hint="Restaurant exterior - first image will be primary. Add multiple angles and views."
-            value={pendingImages.exteriorImages?.length > 0 ? pendingImages.exteriorImages : (form.exteriorImages || [])}
+            value={pendingImages.exteriorImages !== null ? pendingImages.exteriorImages : (form.exteriorImages || [])}
             onChange={v => setImageField('exteriorImages', v)}
-            aspect={16/9}
             maxImages={8}
-            displayDimensions={{ width: 800, height: 450 }}
           />
-          {pendingImages.exteriorImages.length > 0 && (
+          {pendingImages.exteriorImages !== null && (
             <div style={{
               marginTop: 8,
               padding: '8px 12px',
@@ -478,7 +473,7 @@ export default function LocationForm({
               fontSize: 12,
               color: C.acc
             }}>
-              ⚠️ {pendingImages.exteriorImages.length} new image{pendingImages.exteriorImages.length === 1 ? '' : 's'} uploaded - click "Update Location" to save
+              ⚠️ Unsaved image changes — click "Update Location" to save
             </div>
           )}
         </div>

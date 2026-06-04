@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import LoadingSpinner from './LoadingSpinner'
 import { API } from '../api/utils'
 
 const C = {
@@ -15,376 +14,263 @@ export default function MultipleImageUpload({
   hint, 
   value = [], 
   onChange, 
-  aspect = 16/9,
   accept = 'image/*',
   maxImages = 10,
-  displayDimensions = null // { width, height } in pixels
 }) {
   const [uploading, setUploading] = useState(false)
+  const [uploadingCount, setUploadingCount] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState('')
-  const [previews, setPreviews] = useState({})
+  const [hoveredIndex, setHoveredIndex] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null) // index to confirm delete
 
-  const uploadFile = async (file) => {
-    if (!file?.type.startsWith('image/')) {
-      setError('Please select an image file')
-      return
-    }
-    
-    setUploading(true)
-    setError('')
-    
+  const uploadSingle = async (file) => {
     const formData = new FormData()
     formData.append('file', file)
-    
-    try {
-      const res = await fetch(`${API}/clients/${clientId}/images`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('dd_token')}` },
-        body: formData
-      })
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}))
-        throw new Error(errorData.error || `Upload failed: ${res.status}`)
-      }
-      
-      const data = await res.json()
-      if (!data.url) {
-        throw new Error('No URL returned from upload')
-      }
-      
-      const newImages = [...value, data.url]
-      onChange(newImages)
-      setPreviews(prev => ({ ...prev, [data.url]: URL.createObjectURL(file) }))
-    } catch (err) {
-      console.error('Upload error:', err)
-      setError(err.message || 'Upload failed')
-    } finally {
-      setUploading(false)
+    const res = await fetch(`${API}/clients/${clientId}/images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('dd_token')}` },
+      body: formData
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      throw new Error(d.error || `Upload failed (${res.status})`)
     }
+    const data = await res.json()
+    if (!data.url) throw new Error('No URL returned')
+    return data.url
+  }
+
+  const handleFiles = async (files) => {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (!imageFiles.length) { setError('Please select image files only'); return }
+
+    const slots = maxImages - value.length
+    if (slots <= 0) { setError(`Maximum ${maxImages} images reached`); return }
+
+    const toUpload = imageFiles.slice(0, slots)
+    if (imageFiles.length > slots) setError(`Only ${slots} slot${slots === 1 ? '' : 's'} left — uploading first ${slots}`)
+    else setError('')
+
+    setUploading(true)
+    setUploadingCount(toUpload.length)
+    const uploaded = []
+
+    for (const file of toUpload) {
+      try {
+        const url = await uploadSingle(file)
+        uploaded.push(url)
+      } catch (err) {
+        setError(err.message || 'Upload failed')
+      } finally {
+        setUploadingCount(prev => Math.max(0, prev - 1))
+      }
+    }
+
+    if (uploaded.length) onChange([...value, ...uploaded])
+    setUploading(false)
+  }
+
+  const handleClick = () => {
+    if (uploading) return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.multiple = true
+    input.onchange = e => handleFiles(e.target.files)
+    input.click()
   }
 
   const handleDrop = (e) => {
     e.preventDefault()
     setDragging(false)
-    const files = Array.from(e.dataTransfer.files)
-    handleFiles(files)
-  }
-
-  const handleFiles = (files) => {
-    const imageFiles = files.filter(file => file.type.startsWith('image/'))
-    const remainingSlots = maxImages - value.length
-    
-    if (imageFiles.length > remainingSlots) {
-      setError(`Can only add ${remainingSlots} more image${remainingSlots === 1 ? '' : 's'} (max ${maxImages})`)
-      return
-    }
-    
-    imageFiles.forEach(file => uploadFile(file))
-  }
-
-  const handleClick = () => {
-    if (value.length >= maxImages) {
-      setError(`Maximum ${maxImages} images allowed`)
-      return
-    }
-    
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = accept
-    input.multiple = true
-    input.onchange = (e) => handleFiles(Array.from(e.target.files))
-    input.click()
+    handleFiles(e.dataTransfer.files)
   }
 
   const removeImage = (index) => {
-    const newImages = value.filter((_, i) => i !== index)
-    onChange(newImages)
+    setConfirmDelete(null)
+    setHoveredIndex(null)
+    onChange(value.filter((_, i) => i !== index))
   }
 
-  const moveImage = (fromIndex, toIndex) => {
-    const newImages = [...value]
-    const [movedImage] = newImages.splice(fromIndex, 1)
-    newImages.splice(toIndex, 0, movedImage)
-    onChange(newImages)
+  const moveImage = (from, to) => {
+    const imgs = [...value]
+    const [img] = imgs.splice(from, 1)
+    imgs.splice(to, 0, img)
+    onChange(imgs)
   }
 
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div>
       {label && (
-        <div style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: C.t3,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          marginBottom: 6
-        }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
           {label}
         </div>
       )}
-      
-      {hint && (
-        <div style={{ fontSize: 12, color: C.t3, marginBottom: 12 }}>
-          {hint}
-        </div>
-      )}
+      {hint && <div style={{ fontSize: 12, color: C.t3, marginBottom: 10 }}>{hint}</div>}
 
       {/* Image Grid */}
       {value.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: 16,
-          marginBottom: 20
-        }}>
-          {value.map((imageUrl, index) => (
-            <div key={`${imageUrl}-${index}`} style={{
-              position: 'relative',
-              background: C.panel,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
-              overflow: 'hidden'
-            }}>
-              {/* Image Preview */}
-              <div style={{
-                width: '100%',
-                height: 120,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: C.card
-              }}>
-                <img 
-                  src={previews[imageUrl] || imageUrl} 
-                  alt={`Exterior photo ${index + 1}`}
-                  onError={(e) => {
-                    e.target.style.display = 'none'
-                    e.target.nextSibling.style.display = 'flex'
-                  }}
-                  style={{ 
-                    maxWidth: '100%', 
-                    maxHeight: '100%', 
-                    objectFit: 'cover' 
-                  }}
-                />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 12 }}>
+          {value.map((url, index) => (
+            <div
+              key={`${url}-${index}`}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => { setHoveredIndex(null); setConfirmDelete(null) }}
+              style={{
+                position: 'relative',
+                borderRadius: 10,
+                overflow: 'hidden',
+                aspectRatio: '4/3',
+                background: C.card,
+                border: `2px solid ${index === 0 ? C.acc : C.border}`,
+                cursor: 'default',
+                transition: 'border-color 0.15s'
+              }}
+            >
+              <img
+                src={url}
+                alt={`Photo ${index + 1}`}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onError={e => { e.target.style.opacity = '0.15' }}
+              />
+
+              {/* Primary badge */}
+              {index === 0 && (
                 <div style={{
-                  display: 'none',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: C.red,
-                  fontSize: 11,
-                  textAlign: 'center',
-                  padding: 8
+                  position: 'absolute', top: 6, left: 6,
+                  background: C.acc, color: '#fff',
+                  padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 700,
+                  pointerEvents: 'none'
                 }}>
-                  <span>Failed to load</span>
-                  <span style={{fontSize: 9, color: C.t3, marginTop: 4, wordBreak: 'break-all'}}>{imageUrl}</span>
+                  Primary
                 </div>
-              </div>
+              )}
 
-              {/* Image Controls */}
-              <div style={{
-                position: 'absolute',
-                top: 8,
-                right: 8,
-                display: 'flex',
-                gap: 4
-              }}>
-                {/* Move Left */}
-                {index > 0 && (
-                  <button
-                    onClick={() => moveImage(index, index - 1)}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      background: C.panel,
-                      border: `1px solid ${C.border}`,
-                      color: C.t1,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Move left"
-                  >
-                    ←
-                  </button>
-                )}
-                
-                {/* Move Right */}
-                {index < value.length - 1 && (
-                  <button
-                    onClick={() => moveImage(index, index + 1)}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      background: C.panel,
-                      border: `1px solid ${C.border}`,
-                      color: C.t1,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Move right"
-                  >
-                    →
-                  </button>
-                )}
-                
-                {/* Delete */}
-                <button
-                  onClick={() => removeImage(index)}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: C.red,
-                    border: 'none',
-                    color: '#fff',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                  title="Remove photo"
-                >
-                  ✕
-                </button>
-              </div>
+              {/* Hover overlay */}
+              {hoveredIndex === index && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'rgba(8,12,20,0.75)',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 8
+                }}>
+                  {/* Reorder buttons */}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {index > 0 && (
+                      <button
+                        onClick={() => moveImage(index, index - 1)}
+                        title="Move left"
+                        style={{ width: 30, height: 30, borderRadius: 7, background: C.panel, border: `1px solid ${C.border2}`, color: C.t1, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        ←
+                      </button>
+                    )}
+                    {index < value.length - 1 && (
+                      <button
+                        onClick={() => moveImage(index, index + 1)}
+                        title="Move right"
+                        style={{ width: 30, height: 30, borderRadius: 7, background: C.panel, border: `1px solid ${C.border2}`, color: C.t1, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        →
+                      </button>
+                    )}
+                  </div>
 
-              {/* Image Number */}
-              <div style={{
-                position: 'absolute',
-                top: 8,
-                left: 8,
-                background: C.acc,
-                color: '#fff',
-                padding: '4px 8px',
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 600
-              }}>
-                {index + 1}
-              </div>
+                  {/* Delete / confirm delete */}
+                  {confirmDelete === index ? (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => removeImage(index)}
+                        style={{ padding: '5px 12px', borderRadius: 6, background: C.red, border: 'none', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        style={{ padding: '5px 10px', borderRadius: 6, background: C.panel, border: `1px solid ${C.border2}`, color: C.t2, cursor: 'pointer', fontSize: 12 }}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(index)}
+                      style={{ padding: '5px 14px', borderRadius: 6, background: 'rgba(239,68,68,0.15)', border: `1px solid ${C.red}`, color: C.red, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              )}
 
-              {/* Image Info */}
-              <div style={{
-                padding: 12,
-                fontSize: 11,
-                color: C.cyan,
-                fontFamily: 'monospace',
-                textAlign: 'center',
-                background: C.panel
-              }}>
-                {imageUrl.split('/').pop() || `Photo ${index + 1}`}
-              </div>
+              {/* Index badge (non-primary) */}
+              {index > 0 && (
+                <div style={{
+                  position: 'absolute', top: 6, left: 6,
+                  background: 'rgba(0,0,0,0.55)', color: C.t2,
+                  padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600,
+                  pointerEvents: 'none'
+                }}>
+                  {index + 1}
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Upload Area */}
-      {value.length < maxImages && (
-        <div style={{ 
-          border: `2px dashed ${dragging ? C.acc : C.border2}`,
-          borderRadius: 12, 
-          padding: '24px 20px', 
-          textAlign: 'center',
-          background: dragging ? C.hover : 'transparent',
-          cursor: uploading ? 'not-allowed' : 'pointer',
-          transition: 'all 0.2s',
-          position: 'relative'
-        }}
-          onClick={uploading ? null : handleClick}
+      {/* Upload area */}
+      {value.length < maxImages ? (
+        <div
+          onClick={uploading ? undefined : handleClick}
           onDrop={handleDrop}
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
+          style={{
+            border: `2px dashed ${dragging ? C.acc : C.border2}`,
+            borderRadius: 10,
+            padding: '18px 16px',
+            textAlign: 'center',
+            background: dragging ? `${C.acc}12` : 'transparent',
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            transition: 'all 0.18s',
+            userSelect: 'none'
+          }}
         >
-          <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.5 }}>
-            {uploading ? <LoadingSpinner size={32} color={C.acc} /> : '📎'}
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: C.t1, marginBottom: 4 }}>
-            {uploading ? 'Uploading...' : `Add Photos (${value.length}/${maxImages})`}
-          </div>
-          <div style={{ fontSize: 12, color: C.t2 }}>
-            Click to upload or drag & drop multiple images
-          </div>
+          {uploading ? (
+            <>
+              <div style={{ fontSize: 20, marginBottom: 6 }}>⏳</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>
+                Uploading {uploadingCount > 0 ? `${uploadingCount} image${uploadingCount > 1 ? 's' : ''}` : '...'}
+              </div>
+              <div style={{ fontSize: 11, color: C.t3, marginTop: 3 }}>Please wait</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 24, marginBottom: 6, opacity: 0.45 }}>📷</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.t1, marginBottom: 3 }}>
+                Click to upload or drag & drop
+              </div>
+              <div style={{ fontSize: 11, color: C.t3 }}>
+                {value.length}/{maxImages} photos • JPG, PNG, WEBP
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div style={{ fontSize: 11, color: C.t3, textAlign: 'center', padding: '10px 0' }}>
+          Maximum {maxImages} images reached
         </div>
       )}
 
-      {/* Error Message */}
+      {/* Error */}
       {error && (
-        <div style={{ 
-          marginTop: 12,
-          padding: '8px 12px',
-          background: `${C.red}15`,
-          border: `1px solid ${C.red}`,
-          borderRadius: 6,
-          fontSize: 12,
-          color: C.red
-        }}>
-          {error}
+        <div style={{ marginTop: 10, padding: '8px 12px', background: `${C.red}15`, border: `1px solid ${C.red}40`, borderRadius: 7, fontSize: 12, color: C.red, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{error}</span>
+          <button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}>✕</button>
         </div>
       )}
 
-      {/* Instructions */}
-      {value.length > 0 && (
-        <div style={{ 
-          marginTop: 12,
-          fontSize: 11,
-          color: C.t3,
-          textAlign: 'center'
-        }}>
-          Drag images to reorder • First image will be primary exterior photo
-        </div>
-      )}
-
-      {/* Display dimensions preview */}
-      {displayDimensions && value.length > 0 && (
-        <div style={{ 
-          marginTop: 20,
-          background: C.panel, 
-          border: `1px solid ${C.border2}`,
-          borderRadius: 8, 
-          padding: 16 
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', marginBottom: 12 }}>
-            Preview at Display Size ({displayDimensions.width}x{displayDimensions.height}px)
-          </div>
-          <div style={{ 
-            width: displayDimensions.width, 
-            height: displayDimensions.height, 
-            background: C.card,
-            borderRadius: 4, 
-            overflow: 'hidden',
-            margin: '0 auto',
-            maxWidth: '100%',
-            aspectRatio: displayDimensions.width / displayDimensions.height
-          }}>
-            <img 
-              src={previews[value[0]] || value[0]} 
-              alt="Primary exterior photo preview"
-              onError={(e) => {
-                e.target.style.display = 'none'
-              }}
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover',
-                display: 'block'
-              }} />
-          </div>
-          <div style={{ fontSize: 10, color: C.t2, marginTop: 8, textAlign: 'center' }}>
-            This is how the primary exterior photo will appear in the preview site
-          </div>
+      {/* Tip */}
+      {value.length > 1 && !uploading && (
+        <div style={{ marginTop: 8, fontSize: 11, color: C.t3, textAlign: 'center' }}>
+          Hover an image to reorder or remove it · First image is the primary photo
         </div>
       )}
     </div>
