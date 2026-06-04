@@ -201,12 +201,15 @@ router.post('/', async (req, res) => {
     }
 
     // Create order
+    // For Stripe payments, use 'pending_payment' status until payment succeeds
+    // This prevents restaurant seeing unpaid orders in operations
+    const initialStatus = paymentMethod === 'stripe' ? 'pending_payment' : 'new'
     const order = await prisma.order.create({
       data: {
         clientId,
         customerId: customer?.id || null,
         orderNumber,
-        status: 'new',
+        status: initialStatus,
         items: verifiedItems,
         subtotal: verifiedSubtotal,
         taxAmount: verifiedTaxAmount,
@@ -270,13 +273,10 @@ router.post('/', async (req, res) => {
     // Get POS config for email override
     const posConfig = client.siteConfig?.posConfig || {}
 
-    // Send email notifications (non-blocking)
+    // Send email confirmation to customer (non-blocking)
     const clientName = client.name || 'Restaurant'
-    const restaurantEmail = posConfig?.fallbackEmail || client.email
-    Promise.all([
-      sendOrderConfirmation(order, clientName, notificationConfig, clientData, locationData),
-      sendRestaurantNotification(order, clientName, notificationConfig, restaurantEmail)
-    ]).catch(err => console.error('Email notification error:', err))
+    sendOrderConfirmation(order, clientName, notificationConfig, clientData, locationData)
+      .catch(err => console.error('Customer email notification error:', err))
 
     // Enqueue order for POS push (queue-based with retry logic)
     enqueueOrderPush(order.id, clientId).catch(err =>
@@ -345,7 +345,7 @@ router.get('/:orderId', async (req, res) => {
 router.patch('/:orderId/status', authenticateToken, async (req, res) => {
   try {
     const { status } = req.body
-    const validStatuses = ['new', 'accepted', 'preparing', 'almost_ready', 'packing', 'ready', 'completed', 'cancelled']
+    const validStatuses = ['new', 'accepted', 'preparing', 'almost_ready', 'packing', 'ready', 'completed', 'cancelled', 'pending_payment']
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' })
     }

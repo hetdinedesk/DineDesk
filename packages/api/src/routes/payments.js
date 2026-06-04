@@ -168,7 +168,7 @@ router.post('/webhook', async (req, res) => {
           where: { id: orderId },
           data: {
             paymentStatus: 'paid',
-            status: 'new' // Keep as new until restaurant acknowledges
+            status: 'new' // Move from pending_payment to new so restaurant sees it
           }
         })
       }
@@ -183,7 +183,8 @@ router.post('/webhook', async (req, res) => {
         await prisma.order.update({
           where: { id: orderId },
           data: {
-            paymentStatus: 'failed'
+            paymentStatus: 'failed',
+            status: 'cancelled' // Cancel the order if payment fails
           }
         })
       }

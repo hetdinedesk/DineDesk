@@ -606,8 +606,26 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     setTimeout(() => clearCart(), 100)
   }
 
-  const handlePaymentError = (errorMessage) => {
+  const handlePaymentError = async (errorMessage) => {
     setError(errorMessage)
+    // Cancel the order if payment fails on frontend
+    if (orderId) {
+      try {
+        const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+        const isProd = !!envSiteId
+        const siteId = isProd ? '' : (router.query.site || '')
+        const clientId = data?.client?.id
+        
+        await fetch(`${CMS_API_URL}/clients/${clientId}/orders/${orderId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled' })
+        })
+        console.log('✅ Order cancelled due to payment failure')
+      } catch (err) {
+        console.error('❌ Failed to cancel order:', err)
+      }
+    }
   }
 
   // Lookup customer when phone changes
