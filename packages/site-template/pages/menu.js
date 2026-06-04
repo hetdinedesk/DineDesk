@@ -28,7 +28,8 @@ function DynamicMenuTemplate({ themeKey, data, page, banner }) {
       setMenuTemplate(() => templateModule.default)
       setFloatingCartIcon(() => cartModule.default)
       setLoading(false)
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('[menu.js] Failed to load theme components:', err.message, '- falling back to theme-d1')
       // Fallback to theme-d1
       Promise.all([
         import('../components/theme-d1/Header'),

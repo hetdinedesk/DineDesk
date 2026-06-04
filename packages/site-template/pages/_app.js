@@ -131,7 +131,7 @@ export default function App({ Component, pageProps }) {
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
       <ErrorBoundary>
-        <CartProvider ordering={data.ordering} siteId={data.id}>
+        <CartProvider ordering={data.ordering} siteId={data.client?.id || data.id}>
           <WishlistProvider>
             <ThemeLoader themeKey={themeKey}>
               {(CartDrawer) => (
