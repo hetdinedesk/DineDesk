@@ -486,6 +486,123 @@ async function sendEnquiryEmail(enquiry, clientName, notificationConfig, clientD
   }
 }
 
+function generateEnquiryAutoReplyHtml(enquiry, clientName, clientData = {}) {
+  const primaryColor = clientData.colours?.primary || '#2563eb'
+  const logoUrl = clientData.logo || ''
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: ${primaryColor}; padding: 30px 20px; border-radius: 8px 8px 0 0; text-align: center; color: white; }
+        .header h1 { margin: 0 0 8px; color: white; }
+        .header p { margin: 0; color: rgba(255,255,255,0.9); }
+        .logo { max-width: 120px; max-height: 60px; margin-bottom: 16px; }
+        .content { background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
+        .info-box { background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #e5e7eb; }
+        .info-label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+        .footer { text-align: center; color: #666; font-size: 14px; margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 0 0 8px 8px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          ${logoUrl ? `<img src="${logoUrl}" alt="${clientName}" class="logo" />` : ''}
+          <h1>✅ Enquiry Received</h1>
+          <p>${clientName}</p>
+        </div>
+        <div class="content">
+          <p style="font-size: 16px; margin-bottom: 20px;">Thank you for contacting us, ${enquiry.name}!</p>
+          
+          <div class="info-box">
+            <div class="info-label">Your Enquiry</div>
+            <div style="font-weight: 600;">${enquiry.subject}</div>
+            <div style="margin-top: 8px; color: #666; white-space: pre-wrap;">${enquiry.message}</div>
+          </div>
+
+          <p style="margin-top: 20px;">We have received your enquiry and will get back to you shortly.</p>
+          
+          <div style="margin-top: 20px; font-size: 12px; color: #999;">
+            Submitted on: ${new Date().toLocaleString()}
+          </div>
+        </div>
+        <div class="footer">
+          <p style="margin: 0;">This is an automated confirmation email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+async function sendEnquiryAutoReply(enquiry, clientName, notificationConfig, clientData = {}) {
+  if (!enquiry.email) {
+    return { success: false, message: 'No customer email provided' }
+  }
+
+  try {
+    // Try SendGrid first
+    if (notificationConfig.sendgridApiKey) {
+      sgMail.setApiKey(notificationConfig.sendgridApiKey)
+
+      const html = generateEnquiryAutoReplyHtml(enquiry, clientName, clientData)
+
+      // Use verified sender from env or client settings
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || notificationConfig.sendgridFrom
+      const fromName = process.env.SENDGRID_FROM_NAME || clientName
+
+      const msg = {
+        to: enquiry.email,
+        from: {
+          email: fromEmail,
+          name: fromName
+        },
+        subject: `Enquiry Received - ${clientName}`,
+        html: html,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'high',
+          'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>`,
+          'X-Mailer': 'DineDesk'
+        }
+      }
+
+      await sgMail.send(msg)
+      return { success: true, message: 'Enquiry auto-reply sent via SendGrid' }
+    }
+
+    // Fallback to SMTP
+    const emailTransporter = getTransporter(notificationConfig)
+    if (!emailTransporter) {
+      return { success: false, message: 'No email provider configured' }
+    }
+
+    const fromEmail = notificationConfig.smtpFrom || process.env.SENDGRID_FROM_EMAIL || `noreply@${clientName.toLowerCase().replace(/\s+/g, '')}.com`
+    const html = generateEnquiryAutoReplyHtml(enquiry, clientName, clientData)
+
+    await Promise.race([
+      emailTransporter.sendMail({
+        from: fromEmail,
+        to: enquiry.email,
+        subject: `Enquiry Received - ${clientName}`,
+        html
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email sending timeout after 10 seconds')), 10000)
+      )
+    ])
+    return { success: true, message: 'Enquiry auto-reply sent via SMTP' }
+  } catch (err) {
+    return { success: false, message: err.message }
+  }
+}
+
 function generateBookingConfirmationHtml(booking, clientName, clientData = {}, locationData = {}) {
   const primaryColor = clientData.colours?.primary || '#2563eb'
   const logoUrl = clientData.logo || ''
@@ -635,6 +752,7 @@ module.exports = {
   sendOrderConfirmation,
   sendRestaurantNotification,
   sendEnquiryEmail,
+  sendEnquiryAutoReply,
   sendBookingConfirmation,
   sendFallbackEmail
 }

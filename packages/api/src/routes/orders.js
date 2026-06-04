@@ -278,6 +278,13 @@ router.post('/', async (req, res) => {
     sendOrderConfirmation(order, clientName, notificationConfig, clientData, locationData)
       .catch(err => console.error('Customer email notification error:', err))
 
+    // Send notification to restaurant (non-blocking)
+    const restaurantEmail = client.email || notificationConfig.smtpFrom
+    if (restaurantEmail) {
+      sendRestaurantNotification(order, clientName, notificationConfig, restaurantEmail)
+        .catch(err => console.error('Restaurant email notification error:', err))
+    }
+
     // Enqueue order for POS push (queue-based with retry logic)
     enqueueOrderPush(order.id, clientId).catch(err =>
       console.error('Failed to enqueue order push:', err)

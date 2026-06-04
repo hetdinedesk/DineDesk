@@ -1,6 +1,6 @@
 const express = require('express');
 const { prisma } = require('../lib/prisma');
-const { sendEnquiryEmail } = require('../lib/email');
+const { sendEnquiryEmail, sendEnquiryAutoReply } = require('../lib/email');
 
 const router = express.Router();
 
@@ -53,13 +53,21 @@ router.post('/', async (req, res) => {
       sendgridFrom: client.settings?.sendgridFrom
     };
 
-    // Send email
+    // Send email to client (restaurant)
     const emailResult = await sendEnquiryEmail(
       { name, email, phone, subject, message },
       client.name,
       notificationConfig,
       client
     );
+
+    // Send auto-reply to customer (non-blocking)
+    sendEnquiryAutoReply(
+      { name, email, phone, subject, message },
+      client.name,
+      notificationConfig,
+      client
+    ).catch(err => console.error('Enquiry auto-reply error:', err))
 
     if (!emailResult.success) {
       // Still return success to user, but log the error
