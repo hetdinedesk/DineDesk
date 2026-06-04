@@ -208,7 +208,7 @@ router.post('/webhook', async (req, res) => {
 })
 
 // Global webhook endpoint (doesn't require clientId in URL)
-app.post('/api/stripe/webhook', async (req, res) => {
+router.post('/webhook', async (req, res) => {
   try {
     console.log('🔔 Global Stripe webhook received')
     const sig = req.headers['stripe-signature']
