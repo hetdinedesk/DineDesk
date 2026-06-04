@@ -1205,14 +1205,14 @@ router.post('/:id/clone', clientAdminOnly, async (req, res) => {
       }
     })
 
-    // Clone site config
+    // Clone site config (but NOT netlify - cloned site needs its own Netlify site)
     if (sourceClient.siteConfig) {
       await prisma.siteConfig.create({
         data: {
           clientId: clonedClient.id,
           version: 1,
           settings: sourceClient.siteConfig.settings,
-          netlify: sourceClient.siteConfig.netlify,
+          netlify: null, // Cloned site must create its own Netlify site
           colours: sourceClient.siteConfig.colours,
           analytics: sourceClient.siteConfig.analytics,
           shortcodes: sourceClient.siteConfig.shortcodes,
