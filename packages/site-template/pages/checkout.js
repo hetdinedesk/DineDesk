@@ -60,6 +60,18 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
     console.log('🔵 Submitting payment...')
 
     try {
+      // Submit the elements first (required by Stripe)
+      const { error: submitError } = await elements.submit()
+      if (submitError) {
+        console.error('❌ Elements submit error:', submitError)
+        setError(submitError.message)
+        setLoading(false)
+        onError(submitError.message)
+        return
+      }
+
+      console.log('✅ Elements submitted successfully')
+
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         clientSecret,
