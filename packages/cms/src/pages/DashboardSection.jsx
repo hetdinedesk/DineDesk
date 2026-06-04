@@ -70,7 +70,7 @@ export default function DashboardSection({ clientId, onDeleteSite, onCloneSite, 
           <AnalyticsTab clientId={clientId} period={period} setPeriod={setPeriod}/>
         )}
         {subNav === 'overview' && (
-          <OverviewTab clientId={clientId} period={period} onDeleteSite={onDeleteSite}/>
+          <OverviewTab clientId={clientId} period={period} onDeleteSite={onDeleteSite} onCloneSite={onCloneSite}/>
         )}
         {!['analytics','overview'].includes(subNav) && (
           <PlaceholderTab label={DASH_NAV.find(d => d.key===subNav)?.label}/>
@@ -205,7 +205,7 @@ function MiniChart({ data, color, height }) {
 }
 
 // ── Overview Tab ─────────────────────────────────────────────
-function OverviewTab({ clientId, period, onDeleteSite }) {
+function OverviewTab({ clientId, period, onDeleteSite, onCloneSite }) {
   const [deleting, setDeleting] = useState(false)
   const queryClient = useQueryClient()
   const token = () => localStorage.getItem('dd_token')
