@@ -44,11 +44,13 @@ export const Header = () => {
     document.documentElement.style.setProperty('--header-height', hasUtilityBelt ? '120px' : '80px');
   }, [headerOffset, hasUtilityBelt]);
 
-  // Helper to append site param to URLs
+  // Helper to append site param to URLs (preview mode only)
+  const isProd = !!(process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID);
   const withSiteParam = (url) => {
     if (!url || url === '#') return url;
+    if (isProd) return url; // Production: site ID is in env vars, never put in URLs
     if (!siteId) return url;
-    // If URL already has query params, append with &
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
     if (url.includes('?')) {
       return url.includes('site=') ? url : `${url}&site=${siteId}`;
     }

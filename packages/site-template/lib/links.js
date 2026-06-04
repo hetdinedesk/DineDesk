@@ -28,7 +28,7 @@ export const isProductionMode = (router) => {
  * @param {boolean} isProd - Whether we're in production mode
  * @returns {string} The URL with site ID appended (if not production)
  */
-export const withSiteParam = (url, siteId, isProd = false) => {
+export const withSiteParam = (url, siteId, isProd = !!(process.env.NEXT_PUBLIC_SITE_ID)) => {
   if (!url || url === '#') return url;
   
   // In production mode, don't append site param
