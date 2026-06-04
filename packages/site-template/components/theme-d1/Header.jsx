@@ -69,7 +69,7 @@ export const Header = () => {
 
   // Filter headings: only show if they have at least one child page
   const activeNavItems = (navigation || [])
-    .filter((item) => item.isActive && !item.parentId && childrenMap[item.id]?.length > 0)
+    .filter((item) => item.isActive && !item.parentId && (childrenMap[item.id]?.length > 0 || item.url))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Common logic for all header types
@@ -394,7 +394,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
   // Filter headings: only show if they have at least one child page
   const childrenMap = buildChildrenMap(navigation);
   const activeNavItems = (navigation || [])
-    .filter((item) => item.isActive && !item.parentId && childrenMap[item.id]?.length > 0)
+    .filter((item) => item.isActive && !item.parentId && (childrenMap[item.id]?.length > 0 || item.url))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const midIndex = Math.ceil(activeNavItems.length / 2);
@@ -613,7 +613,7 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
   // Filter headings: only show if they have at least one child page
   const childrenMap = buildChildrenMap(navigation);
   const activeNavItems = (navigation || [])
-    .filter((item) => item.isActive && !item.parentId && childrenMap[item.id]?.length > 0)
+    .filter((item) => item.isActive && !item.parentId && (childrenMap[item.id]?.length > 0 || item.url))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Lock body scroll when menu is open
