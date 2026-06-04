@@ -10,6 +10,8 @@ RUN npm install --omit=dev
 
 COPY . .
 RUN npx prisma generate
-RUN npx prisma db push --accept-data-loss
+
+# Note: prisma db push runs in railway.toml startCommand (runtime, not build)
+# to ensure DATABASE_URL env var is available
 
 CMD ["node", "src/index.js"]
