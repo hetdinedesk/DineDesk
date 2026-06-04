@@ -90,6 +90,9 @@ app.use('/api/clients/:clientId/pos', require('./routes/pos')) // POS Integratio
 app.use('/api/loyalty', require('./routes/loyalty'))
 app.use('/api/enquiries', require('./routes/enquiries'))
 
+// Global Stripe webhook endpoint (doesn't require clientId)
+app.use('/api/stripe/webhook', require('./routes/payments'))
+
 // GROUPS ROUTE - for organizing sites
 app.use('/api/groups', require('./routes/groups'))
 
