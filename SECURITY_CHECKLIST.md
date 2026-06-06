@@ -63,7 +63,7 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 **Rotation Steps:**
 1. Go to Google Cloud Console → APIs & Services → Credentials
-2. Delete key: `AIzaSyDDFOmz-hE89-0aSejA6zztq8PYJeQdcr4`
+2. Delete key: `AIza-REDACTED` (see internal password manager for full value)
 3. Create new API key
 4. Restrict key to:
    - Places API only
