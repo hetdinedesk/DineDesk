@@ -9,6 +9,7 @@ import {
   Home,
   ArrowRight,
   Check,
+  ExternalLink,
   Layout,
   Settings,
   Image as ImageIcon,
@@ -22,30 +23,33 @@ import {
 const themes = [
   {
     id: 'theme-d1',
-    name: 'Theme D1',
+    name: 'Classic',
     icon: Utensils,
-    description: 'Classic restaurant design with banner carousel, featured items, and promo tiles.',
-    features: ['Banner carousel', 'Featured items section', 'Promo tiles', 'Reviews widget'],
+    description: 'Clean, content-rich layout with a specials announcement banner, loyalty & ordering hero CTAs, specials tiles, customer reviews and multi-location footer.',
+    features: ['Specials announcement banner', 'Loyalty, Order & Book hero CTAs', 'Current specials section', 'Customer reviews section', 'Multi-location footer', 'Meet the team page'],
     color: 'from-dine-orange to-dine-coral',
     bgColor: 'bg-gradient-to-br from-dine-orange/10 to-dine-coral/10',
+    demoUrl: 'https://harbour-brew-cafe-theme-d1.netlify.app/',
   },
   {
     id: 'theme-d2',
-    name: 'Theme D2',
+    name: 'Modern',
     icon: Coffee,
-    description: 'Modern layout with enhanced animations and interactive elements.',
-    features: ['Smooth animations', 'Interactive elements', 'Cart integration', 'Loyalty widget'],
+    description: 'Story-forward layout with a rich hero, full brand about section, specials tiles, customer reviews and prominent order online CTAs throughout.',
+    features: ['Full-width hero with brand story', 'Order Online hero CTA', 'Specials & promotions tiles', 'Customer reviews section', 'Multi-location support', 'Meet the team page'],
     color: 'from-blue-500 to-indigo-600',
     bgColor: 'bg-gradient-to-br from-blue-500/10 to-indigo-600/10',
+    demoUrl: 'https://harbour-brew-cafe-theme-d2.netlify.app/',
   },
   {
     id: 'theme-d3',
-    name: 'Theme D3',
+    name: 'Bold',
     icon: Home,
-    description: 'Clean, minimal design focused on content and quick navigation.',
-    features: ['Minimal layout', 'Quick navigation', 'Mobile optimized', 'Fast loading'],
+    description: 'High-impact design with a seasonal announcement bar, an integrated loyalty program widget on the homepage, specials section and streamlined ordering flow.',
+    features: ['Seasonal announcement bar', 'Loyalty program hero widget', 'Earn & redeem points display', 'Current specials section', 'Multi-location support', 'Meet the team page'],
     color: 'from-green-500 to-emerald-600',
     bgColor: 'bg-gradient-to-br from-green-500/10 to-emerald-600/10',
+    demoUrl: 'https://harbour-brew-cafe-theme-d3.netlify.app/',
   },
 ]
 
@@ -76,8 +80,8 @@ export function Themes() {
             transition={{ delay: 0.1 }}
             className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-6"
           >
-            Stunning Themes for{' '}
-            <span className="gradient-text">Every Restaurant</span>
+            Three Themes, One{' '}
+            <span className="gradient-text">Real Demo Restaurant</span>
           </motion.h2>
           
           <motion.p
@@ -86,8 +90,8 @@ export function Themes() {
             transition={{ delay: 0.2 }}
             className="text-lg text-white/60 max-w-2xl mx-auto"
           >
-            Choose from 3 professionally designed themes. Each theme is fully customizable 
-            with colors, fonts, and layouts to match your brand.
+            All three themes are live on a real café — Harbour Brew Cafe, Sydney. Same content,
+            completely different look and feel. Fully customisable to match your brand.
           </motion.p>
         </div>
 
@@ -118,7 +122,19 @@ export function Themes() {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-display font-bold text-white">{theme.name}</h3>
-                    <p className="text-sm text-white/50">{theme.description}</p>
+                    <p className="text-sm text-white/50 mb-1">{theme.description}</p>
+                    {activeTheme.id === theme.id && (
+                      <a
+                        href={theme.demoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-dine-orange hover:opacity-80 transition-opacity"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        See a live example
+                      </a>
+                    )}
                   </div>
                   <ArrowRight className={`w-5 h-5 transition-transform ${
                     activeTheme.id === theme.id ? 'text-dine-orange translate-x-1' : 'text-white/30'

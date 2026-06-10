@@ -577,7 +577,7 @@ function SAUsers() {
               })}
             </div>
             {/* Location access */}
-            {clientLocations.length > 1 && hasAccess && (
+            {clientLocations.length >= 1 && hasAccess && (
               <div style={{ padding:'8px 14px 12px', borderTop:`1px solid ${C.border}` }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
                   <label style={{ fontSize:11, fontWeight:700, color:C.t3,

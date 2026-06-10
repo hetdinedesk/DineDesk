@@ -525,45 +525,6 @@ function MockStaffAccess() {
   )
 }
 
-function MockDeployment() {
-  const [phase, setPhase] = useState(0)
-  const phases = ['Idle', 'Building…', 'Deployed ✓']
-  return (
-    <div className="bg-[#0f1117] rounded-xl overflow-hidden text-xs border border-white/10">
-      <div className="px-4 py-3 border-b border-white/10">
-        <p className="text-white font-semibold">Netlify Deployment</p>
-        <p className="text-white/40">bellavista.com.au</p>
-      </div>
-      <div className="p-4 space-y-3">
-        <div className="flex gap-2">
-          {phases.map((p, i) => (
-            <div key={p} className={`flex-1 text-center py-1.5 rounded text-xs ${i === phase ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-white/5 text-white/30'}`}>{p}</div>
-          ))}
-        </div>
-        {phase === 2 ? (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
-            <CheckCircle className="w-6 h-6 text-green-400 mx-auto mb-1" />
-            <p className="text-green-400 font-semibold">Live at bellavista.com.au</p>
-            <p className="text-white/40">SSL active · CDN cached · 99.9% uptime</p>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {['Site build started', 'Installing dependencies', 'Next.js build', 'Deploying to CDN', 'SSL provisioned'].map((s, i) => (
-              <div key={s} className={`flex items-center gap-2 py-1 ${phase === 1 && i <= 2 ? 'text-white' : 'text-white/30'}`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${phase === 1 && i === 2 ? 'bg-orange-400 animate-pulse' : phase === 1 && i < 2 ? 'bg-green-400' : 'bg-white/20'}`} />
-                {s}
-              </div>
-            ))}
-          </div>
-        )}
-        <button onClick={() => setPhase(p => (p + 1) % 3)}
-          className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors">
-          {phase === 0 ? 'Deploy Site' : phase === 1 ? 'Building…' : 'Redeploy'}
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function MockMultiLocation() {
   return (
@@ -696,14 +657,6 @@ const features = [
     color: 'from-cyan-500 to-blue-500',
     detail: 'Invite staff from the CMS user management. SUPER_ADMIN has full access. MANAGER can access all sections for their site. EDITOR access is restricted — you choose which sections (menu, CMS, operations) they can see per site.',
     demo: <MockStaffAccess />,
-  },
-  {
-    icon: Zap,
-    title: 'Netlify Deployment',
-    description: 'One-click deploy to Netlify with automatic SSL and CDN. Custom domain connection. Manage deploys from your CMS Config.',
-    color: 'from-lime-500 to-green-500',
-    detail: 'The Deploy section of your Config panel connects to Netlify. One click builds and deploys your site. Your custom domain is connected with automatic SSL provisioning. You can trigger redeployments anytime after making content changes.',
-    demo: <MockDeployment />,
   },
 ]
 

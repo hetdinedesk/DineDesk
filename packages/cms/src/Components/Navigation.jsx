@@ -139,24 +139,23 @@ export function SiteActionBar({
   deploying,
   navigate,
   previewUrl,
-  setPreviewUrl
+  setPreviewUrl,
+  canDeploy
 }) {
   const isMobile = useMediaQuery('(max-width: 768px)')
   const [hoverTimeout, setHoverTimeout] = React.useState(null)
 
   // Load preview URL from config on mount
   React.useEffect(() => {
-    if (activeSite?.id && !previewUrl) {
+    if (activeSite?.id) {
       fetch(`${API}/clients/${activeSite.id}/config`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
         .then(r => r.json())
         .then(cfg => {
-          if (cfg.netlify?.previewUrl) {
-            setPreviewUrl(cfg.netlify.previewUrl)
-          }
+          setPreviewUrl(cfg.netlify?.previewUrl || null)
         })
         .catch(err => console.error('Failed to load preview URL:', err))
     }
-  }, [activeSite?.id, previewUrl, setPreviewUrl])
+  }, [activeSite?.id, setPreviewUrl])
 
   const handleMouseEnter = () => {
     if (hoverTimeout) clearTimeout(hoverTimeout)
@@ -197,7 +196,7 @@ export function SiteActionBar({
             border: `1px solid ${activeSite.status === 'live' && activeSite.indexing === 'allowed' ? '#22C55E40' : '#F59E0B40'}`,
             padding: '2px 8px', borderRadius: 4
           }}>{activeSite.status === 'live' && activeSite.indexing === 'allowed' ? 'Live' : 'Draft'}</span>
-          {!isMobile && deployStatus === 'success' && <span style={{ fontSize: 11, color: '#22C55E' }}>Build triggered</span>}
+          {canDeploy && !isMobile && deployStatus === 'success' && <span style={{ fontSize: 11, color: '#22C55E' }}>Build triggered</span>}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 8, flexShrink: 0 }}>
@@ -206,7 +205,7 @@ export function SiteActionBar({
             {isMobile ? 'View' : 'Preview'}<span style={{ fontSize: 10, lineHeight: 1 }}>↗</span>
           </button>
 
-          <div style={{ position: 'relative' }} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+          {canDeploy && <div style={{ position: 'relative' }} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
             <button type="button" onClick={async () => {
               setDeploying(true); setDeployStatus(null)
               try {
@@ -279,7 +278,7 @@ export function SiteActionBar({
                 ))}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </Container>
     </div>

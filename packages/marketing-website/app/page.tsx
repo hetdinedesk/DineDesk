@@ -3,8 +3,8 @@ import { Hero } from '@/components/hero'
 import { HomePlatformOverview } from '@/components/home-platform-overview'
 import { HomeThemesPreview } from '@/components/home-themes-preview'
 import { HomeHowItWorks } from '@/components/home-how-it-works'
-import { HomeTestimonials } from '@/components/home-testimonials'
 import { HomeComparison } from '@/components/home-comparison'
+import { HomeMarketingTools } from '@/components/home-marketing-tools'
 import { GoogleReviewsSection } from '@/components/google-reviews-section'
 import { AnalyticsSection } from '@/components/analytics-section'
 import { FAQSection } from '@/components/faq-section'
@@ -23,7 +23,7 @@ export default function Home() {
       <HomeThemesPreview />
       <HomeHowItWorks />
       <HomeComparison />
-      <HomeTestimonials />
+      <HomeMarketingTools />
       
       {/* View All Features - Mobile Only */}
       <div className="px-4 sm:px-6 lg:px-8 py-16 sm:hidden">

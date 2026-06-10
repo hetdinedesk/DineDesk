@@ -181,6 +181,7 @@ function MainApp() {
                 indexing: cfg?.settings?.indexing || 'blocked'
               }
               setActiveSite(merged)
+              setPreviewUrl(null)
               setSiteNav(section)
               sessionStorage.setItem('dd_active_site', JSON.stringify(merged))
               sessionStorage.setItem('dd_site_nav', section)
@@ -441,7 +442,7 @@ function MainApp() {
         navigate={navigate}
       />
 
-      {activeSite && (
+      {activeSite && canManageAll && (
         <SiteActionBar
           activeSite={activeSite}
           siteNav={siteNav}
@@ -455,6 +456,7 @@ function MainApp() {
           navigate={navigate}
           previewUrl={previewUrl}
           setPreviewUrl={setPreviewUrl}
+          canDeploy={canManageAll}
         />
       )}
 
