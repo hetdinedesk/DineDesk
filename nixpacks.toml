@@ -1,2 +1,0 @@
-[start]
-cmd = "cd packages/api && npx prisma db push --accept-data-loss --skip-generate && node src/index.js"
