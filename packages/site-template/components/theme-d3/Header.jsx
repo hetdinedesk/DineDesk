@@ -147,9 +147,19 @@ const getNavUrl = (item, children = []) => {
   return item.url || '#';
 };
 
-const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, isDark }) => {
+const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, isDark, isD3 = false, scrolled = true }) => {
   const [open, setOpen] = useState(false);
   const isActive = router.asPath === item.url || children.some(c => router.asPath === c.url);
+  
+  // Theme D3 specific styling — when not scrolled (transparent), always use white
+  const d3LinkCls = `transition-all duration-700 font-sans text-[10px] font-bold tracking-[0.25em] uppercase relative group ${
+    isActive
+      ? (scrolled ? (isDark ? 'text-white' : 'text-[var(--color-secondary)]') : 'text-white')
+      : (scrolled ? (isDark ? 'text-white/50 hover:text-white' : 'text-[var(--color-secondary)]/40 hover:text-[var(--color-secondary)]') : 'text-white/70 hover:text-white')
+  }`;
+  const d3Underline = <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-[1px] bg-[var(--color-primary)] transition-all duration-700 group-hover:w-full ${isActive ? 'w-full' : 'w-0'}`} />;
+  
+  // Default styling
   const linkCls = `text-sm font-medium tracking-wide transition-colors relative group ${isActive ? 'text-[var(--color-secondary)]' : 'hover:text-[var(--color-secondary)]'}`;
   const underline = <span className={`absolute -bottom-1 left-0 w-0 h-0.5 bg-[var(--color-secondary)] transition-all group-hover:w-full ${isActive ? 'w-full' : ''}`} />;
 
@@ -157,8 +167,8 @@ const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, 
   const firstChildUrl = children.length > 0 ? (children[0].url || '#') : (item.url || '#');
 
   if (children.length <= 1) return (
-    <Link href={withSiteParam(firstChildUrl)} className={linkCls} style={{ color: isActive ? 'var(--color-secondary)' : headerTextColor }}>
-      {item.label}{underline}
+    <Link href={withSiteParam(firstChildUrl)} className={isD3 ? d3LinkCls : linkCls} style={{ color: isActive ? 'var(--color-secondary)' : headerTextColor }}>
+      {item.label}{isD3 ? d3Underline : underline}
     </Link>
   );
 
@@ -174,10 +184,10 @@ const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, 
         {/* Heading links to first child page */}
         <Link 
           href={withSiteParam(firstChildUrl)} 
-          className={linkCls} 
+          className={isD3 ? d3LinkCls : linkCls} 
           style={{ color: isActive ? 'var(--color-secondary)' : headerTextColor }}
         >
-          {item.label}{underline}
+          {item.label}{isD3 ? d3Underline : underline}
         </Link>
         {/* Dropdown trigger for accessing other pages */}
         <button
@@ -195,7 +205,7 @@ const NavItem = ({ item, children = [], headerTextColor, router, withSiteParam, 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.13 }}
-            className="absolute top-full left-0 mt-2 rounded-xl shadow-2xl overflow-hidden z-50"
+            className="absolute top-full left-0 mt-2 rounded-xl shadow-2xl overflow-hidden z-[200]"
             style={{ minWidth: 180, background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
           >
             {children.map(child => (
@@ -231,7 +241,7 @@ const StandardHeader = (props) => {
   return (
     <div className="relative">
       <UtilityBelt />
-      <header className={headerBg}>
+      <header className={`${headerBg} overflow-visible`}>
         <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
           {/* Logo and Name */}
           <Link href={withSiteParam('/') || '/'} className="flex items-center gap-4 group">
@@ -251,26 +261,18 @@ const StandardHeader = (props) => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-12">
-            {activeNavItems.map((item) => {
-              const itemChildren = buildChildrenMap(navigation)[item.id] || [];
-              const firstChildUrl = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
-              const isActive = router.asPath === firstChildUrl;
-
-              return (
-                <Link
-                  key={item.id}
-                  href={withSiteParam(firstChildUrl)}
-                  className={`transition-all duration-700 font-sans text-[10px] font-bold tracking-[0.25em] uppercase relative group ${
-                    isActive
-                      ? (isDark ? 'text-white' : 'text-[var(--color-secondary)]')
-                      : (isDark ? 'text-white/50 hover:text-white' : 'text-[var(--color-secondary)]/40 hover:text-[var(--color-secondary)]')
-                  }`}
-                >
-                  {item.label}
-                  <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-[1px] bg-[var(--color-primary)] transition-all duration-700 group-hover:w-full ${isActive ? 'w-full' : 'w-0'}`} />
-                </Link>
-              );
-            })}
+            {activeNavItems.map((item) => (
+              <NavItem
+                key={item.id}
+                item={item}
+                children={buildChildrenMap(navigation)[item.id] || []}
+                headerTextColor={isDark ? 'rgba(255,255,255,0.5)' : 'var(--color-secondary)'}
+                router={router}
+                withSiteParam={withSiteParam}
+                isDark={isDark}
+                isD3={true}
+              />
+            ))}
 
             {/* Book a Table Button */}
             {showBookButton && (
@@ -787,24 +789,19 @@ const StickyHeader = ({ mobileMenuOpen, setMobileMenuOpen, scrolled, displayLogo
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-8">
-            {activeNavItems.map((item) => {
-              const itemChildren = buildChildrenMap(navigation)[item.id] || [];
-              const firstChildUrl = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
-              const isActive = router.asPath === firstChildUrl;
-
-              return (
-                <Link
-                  key={item.id}
-                  href={withSiteParam(firstChildUrl)}
-                  className={`transition-all duration-700 font-sans text-[10px] font-bold tracking-[0.25em] uppercase relative group ${
-                    isActive ? (scrolled ? 'text-[var(--color-secondary)]' : 'text-white') : (scrolled ? 'text-[var(--color-secondary)]/50 hover:text-[var(--color-secondary)]' : 'text-white/70 hover:text-white')
-                  }`}
-                >
-                  {item.label}
-                  <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-[1px] bg-[var(--color-primary)] transition-all duration-700 group-hover:w-full ${isActive ? 'w-full' : 'w-0'}`} />
-                </Link>
-              );
-            })}
+            {activeNavItems.map((item) => (
+              <NavItem
+                key={item.id}
+                item={item}
+                children={buildChildrenMap(navigation)[item.id] || []}
+                headerTextColor={scrolled ? (isDark ? '#ffffff' : 'var(--color-secondary)') : '#ffffff'}
+                router={router}
+                withSiteParam={withSiteParam}
+                isDark={isDark}
+                isD3={true}
+                scrolled={scrolled}
+              />
+            ))}
 
             {/* Book a Table Button */}
             {showBookButton && (
