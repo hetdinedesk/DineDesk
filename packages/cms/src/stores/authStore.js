@@ -26,8 +26,10 @@ export const useAuthStore = create((set) => ({
       const res = await api.get('/auth/me')
       set({ user: res.data })
     } catch (e) {
-      localStorage.removeItem('dd_token')
-      set({ user: null, token: null })
+      if (e.response?.status === 401) {
+        localStorage.removeItem('dd_token')
+        set({ user: null, token: null })
+      }
     }
   }
 }))
