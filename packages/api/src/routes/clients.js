@@ -83,6 +83,14 @@ const isR2Configured = () => {
 
 // Initialize R2 client only if configured
 let r2 = null
+console.log('[R2 INIT] Checking env vars:', {
+  ENDPOINT:   !!process.env.CLOUDFLARE_R2_ENDPOINT,
+  ACCESS_KEY: !!process.env.CLOUDFLARE_R2_ACCESS_KEY,
+  SECRET_KEY: !!process.env.CLOUDFLARE_R2_SECRET_KEY,
+  BUCKET:     process.env.CLOUDFLARE_R2_BUCKET || '(not set)',
+  PUBLIC_URL: process.env.CLOUDFLARE_R2_PUBLIC_URL || '(not set)',
+  isConfigured: isR2Configured()
+})
 if (isR2Configured()) {
   r2 = new S3Client({
     region: 'auto',
@@ -92,6 +100,9 @@ if (isR2Configured()) {
       secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY
     }
   })
+  console.log('[R2 INIT] ✓ R2 client initialized — endpoint:', process.env.CLOUDFLARE_R2_ENDPOINT)
+} else {
+  console.warn('[R2 INIT] ✗ R2 NOT configured — uploads will use local storage (ephemeral on Railway!)')
 }
 
 // Ensure local uploads directory exists
@@ -2564,7 +2575,10 @@ router.patch('/:id/config/ordering', authenticateToken, async (req, res) => {
   }
 })
 
-// ── Image Upload to R2 (with local fallback) ──────────────────
+// Log R2 configuration status at startup
+console.log(`[images] R2 configured: ${isR2Configured()}, PUBLIC_URL: ${process.env.CLOUDFLARE_R2_PUBLIC_URL || '(not set)'}`)
+
+// ── Image Upload to R2 (with local fallback for dev only) ──────────────────
 router.post('/:clientId/images', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -2578,49 +2592,81 @@ router.post('/:clientId/images', upload.single('file'), async (req, res) => {
 
     const key = `${req.params.clientId}/${Date.now()}.webp`
 
-    // Try R2 first, fall back to local storage
+    // Use R2 if configured — DO NOT silently fall back to local in production
     if (isR2Configured() && r2) {
-      try {
-        await r2.send(new PutObjectCommand({
-          Bucket:      process.env.CLOUDFLARE_R2_BUCKET,
-          Key:         key,
-          Body:        optimized,
-          ContentType: 'image/webp'
-        }))
+      await r2.send(new PutObjectCommand({
+        Bucket:       process.env.CLOUDFLARE_R2_BUCKET,
+        Key:          key,
+        Body:         optimized,
+        ContentType:  'image/webp',
+        CacheControl: 'public, max-age=31536000, immutable'
+      }))
 
-        const url = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`
-        return res.json({ url, storage: 'r2' })
-      } catch (r2Error) {
-        console.error('R2 upload failed, falling back to local:', r2Error.message)
-        // Fall through to local storage
-      }
+      const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/+$/, '')
+      const url = `${publicUrl}/${key}`
+      console.log(`[images] Uploaded to R2: ${url} (${(optimized.length / 1024).toFixed(1)} KB)`)
+      return res.json({ url, storage: 'r2' })
     }
 
-    // Local storage fallback
+    // Local storage fallback — ONLY for local development
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[images] R2 not configured in production! Images will be lost on redeploy.')
+      return res.status(500).json({
+        error: 'Image storage not configured',
+        details: 'Cloudflare R2 is not configured. Set CLOUDFLARE_R2_ENDPOINT, CLOUDFLARE_R2_ACCESS_KEY, CLOUDFLARE_R2_SECRET_KEY, CLOUDFLARE_R2_BUCKET, and CLOUDFLARE_R2_PUBLIC_URL environment variables.',
+      })
+    }
+
     const clientDir = path.join(uploadsDir, req.params.clientId)
     if (!fs.existsSync(clientDir)) {
       fs.mkdirSync(clientDir, { recursive: true })
     }
 
-    // Use the same key for local storage
     const localPath = path.join(uploadsDir, key)
     fs.writeFileSync(localPath, optimized)
 
-    // Return URL using PUBLIC_API_URL for consistency across environments
-    const publicUrl = process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`
-    const url = `${publicUrl}/uploads/${key}`
-    res.json({ url, storage: 'local' })
+    const apiUrl = process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`
+    const url = `${apiUrl}/uploads/${key}`
+    console.log(`[images] Saved locally: ${url} (dev only — will not persist on deploy)`)
+    res.json({ url, storage: 'local', warning: 'Using local storage — images will not persist on deploy' })
 
   } catch (err) {
-    console.error('Upload error:', err.message, err.stack)
+    console.error('[images] Upload error:', err.message, err.stack)
     res.status(500).json({ 
       error: 'Upload failed',
       details: err.message,
       hint: isR2Configured() 
-        ? 'Check R2 credentials and bucket permissions' 
-        : 'R2 not configured — using local storage'
+        ? 'R2 is configured but the upload failed. Check credentials, bucket name, and permissions.' 
+        : 'R2 not configured. Set CLOUDFLARE_R2_* env vars for persistent image storage.'
     })
   }
+})
+
+// ── Image Storage Diagnostics ──────────────────────────────────
+router.get('/image-storage/status', authenticateToken, async (req, res) => {
+  const status = {
+    r2Configured: isR2Configured(),
+    r2Endpoint: process.env.CLOUDFLARE_R2_ENDPOINT ? '✓ set' : '✗ missing',
+    r2AccessKey: process.env.CLOUDFLARE_R2_ACCESS_KEY ? '✓ set' : '✗ missing',
+    r2SecretKey: process.env.CLOUDFLARE_R2_SECRET_KEY ? '✓ set' : '✗ missing',
+    r2Bucket: process.env.CLOUDFLARE_R2_BUCKET || '✗ missing',
+    r2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL || '✗ missing',
+    nodeEnv: process.env.NODE_ENV || 'development',
+    sharpAvailable: !!sharp,
+  }
+
+  // Test R2 connectivity if configured
+  if (isR2Configured() && r2) {
+    try {
+      const { HeadBucketCommand } = require('@aws-sdk/client-s3')
+      await r2.send(new HeadBucketCommand({ Bucket: process.env.CLOUDFLARE_R2_BUCKET }))
+      status.r2Connection = '✓ connected'
+    } catch (err) {
+      status.r2Connection = `✗ error: ${err.message}`
+    }
+  }
+
+  res.json(status)
 })
 
 // ── Netlify / Deploy ──────────────────────────────────────────

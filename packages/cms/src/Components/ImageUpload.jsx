@@ -43,11 +43,11 @@ export default function ImageUpload({
         body: formData
       })
       
-      if (!res.ok) throw new Error('Upload failed')
-      
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || data.details || 'Upload failed')
       onChange(data.url)
       setPreview(URL.createObjectURL(file))
+      if (data.warning) setError(`⚠ ${data.warning}`)
     } catch (err) {
       setError(err.message)
     } finally {
