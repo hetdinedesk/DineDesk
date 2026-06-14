@@ -248,14 +248,15 @@ function SADashboard() {
       apiFetch('/users'),
       apiFetch('/groups'),
       apiFetch('/activity'),
-    ]).then(([clients, users, groups, logs]) => {
+    ]).then(([clients, users, groups, activityRes]) => {
       setStats({
         sites:   Array.isArray(clients) ? clients.length : 0,
         live:    Array.isArray(clients) ? clients.filter(c=>c.status==='live').length : 0,
         users:   Array.isArray(users)   ? users.length   : 0,
         groups:  Array.isArray(groups)  ? groups.length  : 0,
       })
-      setActivity(Array.isArray(logs) ? logs.slice(0,8) : [])
+      const logs = Array.isArray(activityRes) ? activityRes : (activityRes?.logs || [])
+      setActivity(logs.slice(0,8))
     })
   }, [])
 
@@ -1037,7 +1038,7 @@ function SAActivity() {
   const [filter,  setFilter]  = useState('ALL')
 
   useEffect(() => {
-    apiFetch('/activity').then(d => { setLogs(Array.isArray(d)?d:[]); setLoading(false) })
+    apiFetch('/activity').then(d => { setLogs(Array.isArray(d) ? d : (d?.logs || [])); setLoading(false) })
   }, [])
 
   const categories = ['ALL','LOGIN','DEPLOY','CREATED','DELETED','EDITED','SAVED']
