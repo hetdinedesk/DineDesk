@@ -102,9 +102,17 @@ export default function OperationsSection({ data={}, clientId }) {
   }
 
   const getTableNumber = (order) => {
-    if (order.orderType === 'dine_in' && order.tableId) {
-      const table = tables.find(t => t.id === order.tableId)
-      return table ? `Table ${table.tableNumber}` : 'Unknown Table'
+    if (order.orderType === 'dine_in') {
+      // Use tableNumber if available directly on order
+      if (order.tableNumber) {
+        return `Table ${order.tableNumber}`
+      }
+      // Fall back to table lookup by tableId
+      if (order.tableId) {
+        const table = tables.find(t => t.id === order.tableId)
+        return table ? `Table ${table.tableNumber}` : 'Unknown Table'
+      }
+      return 'Unknown Table'
     }
     return order.orderType === 'pickup' ? 'Pick-up' : 'Delivery'
   }

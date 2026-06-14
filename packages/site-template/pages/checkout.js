@@ -31,6 +31,7 @@ import { ShoppingCart, CreditCard, DollarSign, Clock, User, Phone, Mail, Calenda
 import { loadStripe } from '@stripe/stripe-js'
 import { PaymentElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js'
 import { isRestaurantOpen } from '../lib/operatingHours'
+import { getCurrentTableInfo, shouldUseDineInOrdering, getOrderType, formatTableDisplay } from '../lib/tableDetection'
 
 export async function getServerSideProps({ query }) {
   const rawSite = query.site
@@ -359,16 +360,29 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   // Pickup info
   const [pickupType, setPickupType] = useState('asap') // asap | scheduled
   const [scheduledTime, setScheduledTime] = useState('')
-  // Pre-populate orderType and tableId from QR code query params (set by CartDrawer)
-  const qrTableId = router.query.tableId || null
-  const qrTableNumber = router.query.tableNumber || null
-  const qrOrderType = router.query.orderType || null
-  const [orderType, setOrderType] = useState(qrOrderType || 'pickup') // pickup | delivery | dine_in
+  const [tableInfo, setTableInfo] = useState(null)
+  
+  // Detect table info from QR code params (client, location, table)
+  useEffect(() => {
+    const loadTableInfo = async () => {
+      const info = await getCurrentTableInfo(router.query)
+      if (info && info.isValid) {
+        setTableInfo(info)
+        // Auto-select the location from QR code
+        setSelectedLocation(info.locationId)
+        // Auto-set order type to dine-in
+        setOrderType('dine_in')
+      }
+    }
+    loadTableInfo()
+  }, [router.query])
+  
+  const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine_in
   const [selectedLocation, setSelectedLocation] = useState('')
 
-  // Check if restaurant is currently open
-  const primaryLocation = data?.locations?.find(loc => loc.isPrimary) || data?.locations?.[0]
-  const isRestaurantCurrentlyOpen = isRestaurantOpen(primaryLocation?.hours, primaryLocation?.timezone)
+  // Check if selected location is currently open
+  const selectedLocationData = data?.locations?.find(loc => loc.id === selectedLocation)
+  const isRestaurantCurrentlyOpen = isRestaurantOpen(selectedLocationData?.hours, selectedLocationData?.timezone)
 
   // Auto-select first location if only one active location exists
   useEffect(() => {
@@ -378,12 +392,14 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     }
   }, [data?.locations])
 
-  // If restaurant is closed, default to scheduled pickup
+  // If selected location is closed, default to scheduled pickup
   useEffect(() => {
-    if (!isRestaurantCurrentlyOpen) {
+    if (selectedLocation && !isRestaurantCurrentlyOpen) {
       setPickupType('scheduled')
+    } else if (selectedLocation && isRestaurantCurrentlyOpen) {
+      setPickupType('asap')
     }
-  }, [isRestaurantCurrentlyOpen])
+  }, [isRestaurantCurrentlyOpen, selectedLocation])
 
   // Validate scheduled time when it changes
   useEffect(() => {
@@ -402,7 +418,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const getMinScheduledTime = () => {
     const now = new Date()
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' })
-    const todayHours = primaryLocation?.hours?.[currentDay]
+    const todayHours = selectedLocationData?.hours?.[currentDay]
     
     if (!todayHours || todayHours.closed || !todayHours.open) {
       // If closed today, return tomorrow's opening time + 15 min
@@ -448,7 +464,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     const scheduledDay = scheduledDate.toLocaleDateString('en-US', { weekday: 'long' })
     const scheduledMinutes = scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
     
-    const dayHours = primaryLocation?.hours?.[scheduledDay]
+    const dayHours = selectedLocationData?.hours?.[scheduledDay]
     if (!dayHours || dayHours.closed || !dayHours.open || !dayHours.close) {
       return false
     }
@@ -531,7 +547,8 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         note: customerInfo.note,
         deliveryFee: orderType === 'delivery' ? (ordering?.deliveryFee || 0) : 0,
         locationId: selectedLocation || null,
-        tableId: qrTableId || null,
+        tableId: tableInfo?.tableId || null,
+        tableNumber: tableInfo?.tableNumber || null,
         loyaltyCustomerId,
         pointsUsed: redeemedReward ? redeemedReward.pointsRequired : 0,
         rewardUsed: redeemedReward ? { id: redeemedReward.id, name: redeemedReward.name, discountValue: redeemedReward.discountValue } : null,
@@ -1068,6 +1085,18 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
               {step === 2 && (
                 <div className="space-y-6">
+                  {/* Table indicator for QR code orders */}
+                  {tableInfo && tableInfo.isValid && (
+                    <div className="p-4 bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 rounded-full">
+                      <div className="flex items-center gap-3">
+                        <UtensilsCrossed width={18} height={18} strokeWidth={2} className="text-[var(--color-primary)]" />
+                        <span className="text-sm font-bold text-[var(--color-primary)]">
+                          Ordering for {formatTableDisplay(tableInfo)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Order Type</label>
                     <div className="flex gap-4">
@@ -1077,17 +1106,21 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                           <button
                             key={type}
                             onClick={() => setOrderType(type)}
+                            disabled={tableInfo && tableInfo.isValid && type !== 'dine_in'}
                             className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all ${
                               orderType === type 
                                 ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
                                 : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
-                            }`}
+                            } ${tableInfo && tableInfo.isValid && type !== 'dine_in' ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             {typeLabel}
                           </button>
                         )
                       })}
                     </div>
+                    {tableInfo && tableInfo.isValid && (
+                      <p className="text-xs text-gray-500 mt-2">Order type is locked to dine-in for table orders</p>
+                    )}
                   </div>
 
                   <div>

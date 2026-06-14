@@ -567,6 +567,7 @@ model Order {
   rewardUsed            Json?
   locationId            String?
   tableId               String?
+  tableNumber           String?
   paymentPreference     String   @default("upfront")
   discountAmount        Float           @default(0)
   client                Client          @relation(fields: [clientId], references: [id])
