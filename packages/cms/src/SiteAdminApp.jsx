@@ -582,28 +582,43 @@ function SAUsers() {
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
                   <label style={{ fontSize:11, fontWeight:700, color:C.t3,
                     textTransform:'uppercase', letterSpacing:'0.06em' }}>
-                    Location Access {siteLocs.length === 0 ? '(All Locations)' : ''}
+                    Location Access
                   </label>
-                  <label style={{ display:'flex', alignItems:'center', gap:5,
-                    cursor:'pointer', fontSize:11, color:C.t2 }}>
+                  {clientLocations.length > 1 && (
+                    <label style={{ display:'flex', alignItems:'center', gap:5,
+                      cursor:'pointer', fontSize:11, color:C.t2 }}>
+                      <input type="checkbox"
+                        checked={siteLocs.length === 0}
+                        onChange={() => {
+                          const currentTabs = getAccessTabs(access, cl.id)
+                          const newLocs = siteLocs.length === 0 ? clientLocations.map(l => l.id) : []
+                          setAccessEntry(access, setAccess, cl.id, currentTabs, newLocs)
+                        }}
+                        style={{ accentColor:C.cyan, width:13, height:13 }}/>
+                      All Locations
+                    </label>
+                  )}
+                </div>
+                {clientLocations.length === 1 ? (
+                  <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
                     <input type="checkbox"
-                      checked={siteLocs.length === 0}
+                      checked={siteLocs.includes(clientLocations[0].id)}
                       onChange={() => {
                         const currentTabs = getAccessTabs(access, cl.id)
-                        // If currently "all" (empty array), switch to all specific IDs so user can deselect individually
-                        // If currently restricted, switch back to all (empty array)
-                        const newLocs = siteLocs.length === 0
-                          ? clientLocations.map(l => l.id)
-                          : []
+                        const newLocs = siteLocs.includes(clientLocations[0].id) ? [] : [clientLocations[0].id]
                         setAccessEntry(access, setAccess, cl.id, currentTabs, newLocs)
                       }}
-                      style={{ accentColor:C.cyan, width:13, height:13 }}/>
-                    All Locations
+                      style={{ accentColor:C.cyan, width:14, height:14 }}/>
+                    <span style={{ fontSize:12, color: siteLocs.includes(clientLocations[0].id) ? C.cyan : C.t2, fontWeight: siteLocs.includes(clientLocations[0].id) ? 700 : 400 }}>
+                      Restrict to: {clientLocations[0].name || 'Main Location'}
+                    </span>
+                    <span style={{ fontSize:11, color:C.t3 }}>
+                      {siteLocs.includes(clientLocations[0].id) ? '(location locked)' : '(all orders visible)'}
+                    </span>
                   </label>
-                </div>
-                {siteLocs.length === 0 ? (
+                ) : siteLocs.length === 0 ? (
                   <div style={{ fontSize:12, color:C.t3, fontStyle:'italic' }}>
-                    User can access all locations. Uncheck "All Locations" to restrict.
+                    User can access all locations. Uncheck "All Locations" to restrict to specific ones.
                   </div>
                 ) : (
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>

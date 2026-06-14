@@ -451,7 +451,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
           </h1>
           
           {/* Location Selector */}
-          {locations.length > 0 && (
+          {locations.length > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <MapPin size={16} color={C.t2} />
               <select
@@ -473,6 +473,12 @@ export default function OperationsSection({ clientId, user: userProp }) {
                   <option key={loc.id} value={loc.id}>{loc.name}</option>
                 ))}
               </select>
+            </div>
+          )}
+          {locations.length === 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <MapPin size={14} color={C.t2} />
+              <span style={{ fontSize: 13, color: C.t2 }}>{locations[0].name}</span>
             </div>
           )}
         </div>
