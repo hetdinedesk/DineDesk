@@ -136,11 +136,12 @@ export default function OperationsSection({ clientId, user: userProp }) {
     }
   }, [config])
 
-  // Fetch locations
+  // Fetch locations — keyed by user so each user gets their own cache
   const { data: allLocations = [], isLoading: locationsLoading } = useQuery({
-    queryKey: ['locations', clientId],
+    queryKey: ['locations', clientId, user?.id],
     queryFn: () => getLocations(clientId),
-    staleTime: 1000 * 60 * 5
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user?.id
   })
 
   // Filter locations based on user access
@@ -165,11 +166,8 @@ export default function OperationsSection({ clientId, user: userProp }) {
   // Fetch live orders (new, accepted, preparing, ready)
   const { data: liveOrders = [], isLoading: liveLoading } = useQuery({
     queryKey: ['orders', clientId, selectedLocation, 'live'],
-    queryFn: () => getOrders(clientId, null).then(orders =>
-      orders.filter(o =>
-        (!selectedLocation || o.locationId === selectedLocation) &&
-        ['new', 'accepted', 'preparing', 'ready'].includes(o.status)
-      )
+    queryFn: () => getOrders(clientId, null, selectedLocation).then(orders =>
+      orders.filter(o => ['new', 'accepted', 'preparing', 'ready'].includes(o.status))
     ),
     refetchInterval: 5000, // Poll every 5 seconds for faster updates
     enabled: !!selectedLocation,
@@ -331,11 +329,8 @@ export default function OperationsSection({ clientId, user: userProp }) {
   // Fetch history orders (completed, cancelled)
   const { data: historyOrders = [], isLoading: historyLoading } = useQuery({
     queryKey: ['orders', clientId, selectedLocation, 'history'],
-    queryFn: () => getOrders(clientId, null).then(orders =>
-      orders.filter(o =>
-        (!selectedLocation || o.locationId === selectedLocation) &&
-        ['completed', 'cancelled'].includes(o.status)
-      )
+    queryFn: () => getOrders(clientId, null, selectedLocation).then(orders =>
+      orders.filter(o => ['completed', 'cancelled'].includes(o.status))
     ),
     enabled: !!selectedLocation,
     staleTime: 60 * 1000, // 1 minute for history
