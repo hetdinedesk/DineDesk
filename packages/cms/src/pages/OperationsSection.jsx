@@ -821,15 +821,6 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           <Phone size={14} color={C.t2} />
           <span style={{ fontSize: 13, color: C.t2 }}>{order.customerPhone}</span>
         </div>
-        {/* Table Number for QR/Table Orders */}
-        {order.tableNumber && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <Table size={14} color={C.acc} />
-            <span style={{ fontSize: 13, color: C.acc, fontWeight: 600 }}>
-              Table {order.tableNumber}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Order Progress */}
@@ -876,14 +867,31 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
 
       {/* Items Preview */}
       <div style={{ marginBottom: 12 }}>
-        {order.items?.slice(0, 2).map((item, i) => (
-          <div key={i} style={{ fontSize: 12, color: C.t1, marginBottom: 4 }}>
-            {item.quantity}x {item.name}
+        {order.items?.slice(0, 3).map((item, i) => (
+          <div key={i} style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 13, color: C.t0, fontWeight: 600 }}>
+              {item.quantity}x {item.name}
+            </div>
+            {item.selectedSize && (
+              <div style={{ fontSize: 11, color: C.t3, marginLeft: 12 }}>
+                Size: {item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` +$${parseFloat(item.selectedSize.priceAdjustment).toFixed(2)}` : ''}
+              </div>
+            )}
+            {item.selectedAddons && item.selectedAddons.length > 0 && (
+              <div style={{ fontSize: 11, color: C.t3, marginLeft: 12 }}>
+                {item.selectedAddons.map(a => `${a.name}${a.price > 0 ? ` +$${parseFloat(a.price).toFixed(2)}` : ''}`).join(' · ')}
+              </div>
+            )}
+            {item.specialInstructions && (
+              <div style={{ fontSize: 11, color: C.acc, marginLeft: 12, fontStyle: 'italic' }}>
+                Note: {item.specialInstructions}
+              </div>
+            )}
           </div>
         ))}
-        {order.items?.length > 2 && (
-          <div style={{ fontSize: 12, color: C.t3 }}>
-            +{order.items.length - 2} more items
+        {order.items?.length > 3 && (
+          <div style={{ fontSize: 11, color: C.t3 }}>
+            +{order.items.length - 3} more items
           </div>
         )}
       </div>
@@ -903,7 +911,11 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {!order.tableId && (
+          {order.tableNumber ? (
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.acc, background: `${C.acc}18`, padding: '3px 10px', borderRadius: 20 }}>
+              Table {order.tableNumber}
+            </span>
+          ) : (
             <>
               <MapPin size={12} color={C.t2} />
               <span style={{ fontSize: 11, color: C.t2 }}>
