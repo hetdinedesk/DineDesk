@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { C } from '../theme'
 import { API } from '../api/utils'
+import OnboardingImport from './OnboardingImport'
 
-export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {}, show = true }) {
+export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {}, show = true, onClientCreated }) {
   const [clients, setClients] = useState([])
   const [name, setName] = useState(() => sessionStorage.getItem('dd_new_site_name') || '')
   const [domain, setDomain] = useState(() => sessionStorage.getItem('dd_new_site_domain') || '')
@@ -85,6 +86,10 @@ export default function SitesList({ onOpenSite, isSuperAdmin, clientAccess = {},
           </button>
         )}
       </div>
+
+      {isSuperAdmin && (
+        <OnboardingImport onClientCreated={(client) => { reload(); if (onClientCreated) onClientCreated(client) }} />
+      )}
 
       {adding && isSuperAdmin && (
         <div style={{

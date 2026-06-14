@@ -61,29 +61,15 @@ export default function MenuPage({ data, page, banner }) {
   };
 
   const handleAddItem = (item) => {
-    // Debug: Log item data to help diagnose variant detection
-    console.log('handleAddItem called for item:', item.name, {
-      hasVariants: item.hasVariants,
-      sizes: item.sizes,
-      addons: item.addons,
-      sizesLength: item.sizes?.length || 0,
-      addonsLength: item.addons?.length || 0
-    });
-
-    // Check if item has sizes or addons (more robust detection)
     const hasSizes = item.sizes && Array.isArray(item.sizes) && item.sizes.length > 0;
     const hasAddons = item.addons && Array.isArray(item.addons) && item.addons.length > 0;
     const hasVariantsFlag = item.hasVariants === true;
 
-    // If item has sizes or addons, open customization modal
     if (hasVariantsFlag || hasSizes || hasAddons) {
-      console.log('Opening customization modal for:', item.name);
       setCustomizingItem(item);
       return;
     }
 
-    // Otherwise add directly to cart
-    console.log('Adding directly to cart (no variants):', item.name);
     addItem({
       id: item.id,
       name: replaceShortcodes(item.name || '', shortcodes),

@@ -1046,7 +1046,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                         : 'bg-[var(--color-primary)] text-[var(--color-accent)] hover:bg-[var(--color-secondary)]'
                     }`}
                   >
-                    CONTINUE TO PICKUP
+                    {orderType === 'dine_in' ? 'CONTINUE TO DETAILS' : orderType === 'delivery' ? 'CONTINUE TO DELIVERY' : 'CONTINUE TO PICKUP'}
                   </button>
                 </div>
               )}
@@ -1062,7 +1062,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step >= 2 ? (normalizedTemplate === 'theme-d1' ? 'bg-[var(--color-secondary)] text-white' : normalizedTemplate === 'theme-d2' ? 'bg-teal-500 text-white' : 'bg-[var(--color-primary)] text-[var(--color-accent)]') : (normalizedTemplate === 'theme-d1' ? 'bg-gray-200 text-gray-500' : normalizedTemplate === 'theme-d2' ? 'bg-gray-200 text-gray-500' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]/60')}`}>
                   {step > 2 ? <Check width={20} height={20} strokeWidth={2} /> : '2'}
                 </div>
-                <h2 className={`font-serif text-2xl italic ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>Pickup Information</h2>
+                <h2 className={`font-serif text-2xl italic ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>{orderType === 'dine_in' ? 'Dine-in Details' : orderType === 'delivery' ? 'Delivery Details' : 'Pickup Details'}</h2>
               </button>
 
               {step === 2 && (
@@ -1070,24 +1070,27 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                   <div>
                     <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Order Type</label>
                     <div className="flex gap-4">
-                      {(ordering?.orderTypes || ['pickup']).map(type => (
-                        <button
-                          key={type}
-                          onClick={() => setOrderType(type)}
-                          className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all ${
-                            orderType === type 
-                              ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
-                              : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
-                          }`}
-                        >
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </button>
-                      ))}
+                      {(ordering?.orderTypes || ['pickup']).map(type => {
+                        const typeLabel = type === 'dine_in' ? 'Dine-in' : type === 'pickup' ? 'Pick-up' : type.charAt(0).toUpperCase() + type.slice(1)
+                        return (
+                          <button
+                            key={type}
+                            onClick={() => setOrderType(type)}
+                            className={`flex-1 px-6 py-4 border rounded-full font-sans font-bold text-sm transition-all ${
+                              orderType === type 
+                                ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-500' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]') 
+                                : (normalizedTemplate === 'theme-d1' ? 'border-gray-300 bg-white text-gray-700 hover:border-[var(--color-secondary)]/50' : normalizedTemplate === 'theme-d2' ? 'border-gray-300 bg-white text-gray-700 hover:border-teal-500/50' : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50')
+                            }`}
+                          >
+                            {typeLabel}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 
                   <div>
-                    <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Pickup Time</label>
+                    <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>{orderType === 'dine_in' ? 'When' : 'Pickup Time'}</label>
                     
                     {!isRestaurantCurrentlyOpen && (
                       <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-full">
@@ -1110,7 +1113,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                           }`}
                         >
                           <Clock width={18} height={18} strokeWidth={2} />
-                          ASAP
+                          {orderType === 'dine_in' ? 'Now' : 'ASAP'}
                         </button>
                       )}
                       <button
@@ -1334,8 +1337,9 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     <div className="flex-1">
                       <div className={`font-serif text-lg italic ${normalizedTemplate === 'theme-d1' ? 'text-gray-900' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>{item.name}</div>
                       <div className={`text-xs font-sans font-bold tracking-widest uppercase ${normalizedTemplate === 'theme-d1' ? 'text-gray-500' : normalizedTemplate === 'theme-d2' ? 'text-gray-500' : 'text-[var(--color-secondary)]/60'}`}>Qty: {item.quantity}</div>
-                      {item.selectedSize && <div className={`text-xs ${normalizedTemplate === 'theme-d2' ? 'text-gray-400' : 'text-[var(--color-secondary)]/50'}`}>{item.selectedSize.name}</div>}
-                      {item.selectedAddons && item.selectedAddons.length > 0 && <div className={`text-xs ${normalizedTemplate === 'theme-d2' ? 'text-gray-400' : 'text-[var(--color-secondary)]/50'}`}>{item.selectedAddons.map(a => a.name).join(', ')}</div>}
+                      {item.selectedSize && <div className={`text-xs ${normalizedTemplate === 'theme-d2' ? 'text-gray-400' : 'text-[var(--color-secondary)]/50'}`}>{item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` +$${item.selectedSize.priceAdjustment.toFixed(2)}` : ''}</div>}
+                      {item.selectedAddons && item.selectedAddons.length > 0 && <div className={`text-xs ${normalizedTemplate === 'theme-d2' ? 'text-gray-400' : 'text-[var(--color-secondary)]/50'}`}>{item.selectedAddons.map(a => `${a.name}${a.price > 0 ? ` +$${a.price.toFixed(2)}` : ''}`).join(' \u00b7 ')}</div>}
+                      {item.specialInstructions && <div className={`text-xs italic ${normalizedTemplate === 'theme-d2' ? 'text-gray-400' : 'text-[var(--color-secondary)]/40'}`}>{item.specialInstructions}</div>}
                     </div>
                     <div className={`font-sans font-bold ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>${(item.price * item.quantity).toFixed(2)}</div>
                   </div>

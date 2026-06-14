@@ -1,6 +1,6 @@
 [build]
-builder = "dockerfile"
-dockerfilePath = "packages/api/Dockerfile"
+builder = "nixpacks"
+buildCommand = "cd packages/api && npm install && npx prisma generate"
 
 [deploy]
-startCommand = "cd packages/api && echo 'Running migrations...' && npx prisma migrate deploy && echo 'Migrations complete' && node src/scripts/ensureTimezoneColumn.js && node src/index.js"
+startCommand = "cd packages/api && npx prisma db push --accept-data-loss --skip-generate && node src/index.js"

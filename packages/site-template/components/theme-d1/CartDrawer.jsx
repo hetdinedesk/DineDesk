@@ -1,16 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, X, Plus, Minus, Trash2, MapPin, Clock, UtensilsCrossed } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, Trash2, MapPin, Clock } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { formatTableDisplay } from '../../lib/tableDetection';
-import { API_BASE } from '../../lib/tables';
 
 export default function CartDrawer() {
   const router = useRouter()
-  const [availableTables, setAvailableTables] = useState([])
-  const [selectedTable, setSelectedTable] = useState(null)
-  const [showTableSelector, setShowTableSelector] = useState(false)
   
   const {
     items, isOpen, closeCart, totalItems,
@@ -18,22 +14,6 @@ export default function CartDrawer() {
     updateQuantity, removeItem, ordering,
     tableInfo, isTableOrdering, orderType, paymentPreference
   } = useCart();
-
-  // Fetch available tables when in dine-in mode
-  useEffect(() => {
-    if (isTableOrdering && tableInfo?.locationId) {
-      const fetchTables = async () => {
-        try {
-          const response = await fetch(`${API_BASE}/locations/${tableInfo.locationId}/tables`)
-          const data = await response.json()
-          setAvailableTables(data)
-        } catch (error) {
-          console.error('Failed to fetch tables:', error)
-        }
-      }
-      fetchTables()
-    }
-  }, [isTableOrdering, tableInfo?.locationId])
 
   const handleCheckout = () => {
     closeCart()
@@ -126,55 +106,6 @@ export default function CartDrawer() {
               </div>
             )}
 
-            {/* Table Selector for Dine-In */}
-            {isTableOrdering && (
-              <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-blue-900">Select Your Table</h3>
-                  <button
-                    onClick={() => setShowTableSelector(!showTableSelector)}
-                    className="text-blue-600 hover:text-blue-800 text-sm"
-                  >
-                    {showTableSelector ? 'Cancel' : 'Change Table'}
-                  </button>
-                </div>
-                {showTableSelector && (
-                  <div className="grid grid-cols-1 gap-3">
-                    {availableTables.map(table => (
-                      <div
-                        key={table.id}
-                        onClick={() => {
-                          setSelectedTable(table)
-                          updateTableInfo(table)
-                          setShowTableSelector(false)
-                        }}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedTable?.id === table.id
-                            ? 'bg-blue-100 border-blue-500 text-blue-900'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-gray-900">Table {table.tableNumber}</div>
-                            <div className="text-sm text-gray-500">{table.capacity} seats</div>
-                          </div>
-                          {table.isActive ? (
-                            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                              Available
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
-                              Unavailable
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Cart Items */}
             <div className="flex-1 overflow-y-auto">
@@ -187,50 +118,40 @@ export default function CartDrawer() {
               ) : (
                 <div className="p-6 space-y-4">
                   {items.map((item) => (
-                    <div key={item._cartKey || item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div key={item._cartKey || item.id} className="flex gap-3 p-4 bg-gray-50 rounded-xl">
                       {/* Item Image */}
                       {item.image && (
                         <img
                           src={item.image}
                           alt={item.name}
-                          className="w-16 h-16 object-cover rounded-lg"
+                          className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                         />
                       )}
                       
                       {/* Item Details */}
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{item.name}</h4>
-                        {item.selectedSize && <p className="text-xs text-gray-500">{item.selectedSize.name}</p>}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                          <h4 className="font-semibold text-gray-900 text-sm leading-tight">{item.name}</h4>
+                          <span className="text-sm font-bold text-gray-900 flex-shrink-0">${(item.price * item.quantity).toFixed(2)}</span>
+                        </div>
+                        {item.selectedSize && <p className="text-xs text-gray-500 mt-0.5">{item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` +$${item.selectedSize.priceAdjustment.toFixed(2)}` : ''}</p>}
                         {item.selectedAddons && item.selectedAddons.length > 0 && (
-                          <p className="text-xs text-gray-500">{item.selectedAddons.map(a => a.name).join(', ')}</p>
+                          <p className="text-xs text-gray-500">{item.selectedAddons.map(a => `${a.name}${a.price > 0 ? ` +$${a.price.toFixed(2)}` : ''}`).join(' · ')}</p>
                         )}
-                        <p className="text-sm text-gray-600">${item.price.toFixed(2)}</p>
+                        {item.specialInstructions && <p className="text-xs text-gray-400 italic mt-0.5">{item.specialInstructions}</p>}
+                        <div className="flex items-center gap-2 mt-2">
+                          <button onClick={() => updateQuantity(item._cartKey || item.id, item.quantity - 1)} className="w-6 h-6 flex items-center justify-center bg-white border border-gray-200 rounded-full hover:bg-gray-100 transition-colors">
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                          <button onClick={() => updateQuantity(item._cartKey || item.id, item.quantity + 1)} className="w-6 h-6 flex items-center justify-center bg-white border border-gray-200 rounded-full hover:bg-gray-100 transition-colors">
+                            <Plus className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => removeItem(item._cartKey || item.id)} className="ml-auto p-1 hover:bg-red-50 text-red-400 hover:text-red-500 rounded transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => updateQuantity(item._cartKey || item.id, item.quantity - 1)}
-                          className="p-1 hover:bg-gray-200 rounded transition-colors"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item._cartKey || item.id, item.quantity + 1)}
-                          className="p-1 hover:bg-gray-200 rounded transition-colors"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Remove Button */}
-                      <button
-                        onClick={() => removeItem(item._cartKey || item.id)}
-                        className="p-2 hover:bg-red-50 text-red-500 rounded transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
                   ))}
                 </div>

@@ -10,8 +10,6 @@ RUN npm install --omit=dev
 
 COPY . .
 RUN npx prisma generate
+RUN npx prisma db push --accept-data-loss
 
-# Note: Migrations run at container start (not build) to ensure DATABASE_URL is available
-# The railway.toml startCommand should handle this, but we also include it here as fallback
-
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/scripts/ensureTimezoneColumn.js && node src/index.js"]
+CMD ["node", "src/index.js"]

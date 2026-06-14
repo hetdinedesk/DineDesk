@@ -96,9 +96,10 @@ export default function CartDrawer() {
                         {/* Details */}
                         <div className="flex-1 min-w-0 space-y-2">
                           <h4 className="font-serif text-xl italic text-[var(--color-secondary)]">{item.name}</h4>
-                          {item.selectedSize && <p className="text-xs text-[var(--color-secondary)]/60">{item.selectedSize.name}</p>}
-                          {item.selectedAddons && item.selectedAddons.length > 0 && <p className="text-xs text-[var(--color-secondary)]/60">{item.selectedAddons.map(a => a.name).join(', ')}</p>}
-                          <p className="text-sm font-sans font-bold text-[var(--color-primary)]">${item.price.toFixed(2)}</p>
+                          {item.selectedSize && <p className="text-xs font-sans text-[var(--color-secondary)]/60">{item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` +$${item.selectedSize.priceAdjustment.toFixed(2)}` : ''}</p>}
+                          {item.selectedAddons && item.selectedAddons.length > 0 && <p className="text-xs font-sans text-[var(--color-secondary)]/60">{item.selectedAddons.map(a => `${a.name}${a.price > 0 ? ` +$${a.price.toFixed(2)}` : ''}`).join(' · ')}</p>}
+                          {item.specialInstructions && <p className="text-xs font-sans text-[var(--color-secondary)]/40 italic">{item.specialInstructions}</p>}
+                          <p className="text-sm font-sans font-bold text-[var(--color-primary)]">${item.price.toFixed(2)} each</p>
 
                           <div className="flex items-center gap-4 mt-3">
                             {/* Quantity Controls */}

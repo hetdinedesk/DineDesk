@@ -149,6 +149,7 @@ export default function ItemCustomizationModal({ item, isOpen, onClose, onAddToC
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{item.name}</h2>
+                <p className="text-sm font-semibold text-[var(--color-primary)] mt-1">From ${(item.price || 0).toFixed(2)}</p>
                 {item.description && (
                   <p className="text-sm text-gray-500 mt-1">{item.description}</p>
                 )}
@@ -191,14 +192,9 @@ export default function ItemCustomizationModal({ item, isOpen, onClose, onAddToC
                             )}
                           </div>
                           <span className="font-medium text-gray-900">{size.name}</span>
-                          {size.isDefault && (
-                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                              Default
-                            </span>
-                          )}
                         </div>
                         <span className="font-semibold text-gray-900">
-                          +${(size.priceAdjustment || 0).toFixed(2)}
+                          ${((item?.price || 0) + (size.priceAdjustment || 0)).toFixed(2)}
                         </span>
                       </button>
                     ))}

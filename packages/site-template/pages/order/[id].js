@@ -128,8 +128,8 @@ function PrintableReceipt({ order, data }) {
       {/* Order Type */}
       <div style={{ marginBottom: '16px', fontSize: '14px' }}>
         <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>ORDER TYPE:</div>
-        <div style={{ textTransform: 'capitalize' }}>{order.orderType}</div>
-        <div>Pickup: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>
+        <div>{order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}</div>
+        {order.orderType !== 'dine_in' && <div>Time: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>}
       </div>
 
       {/* Items */}
@@ -661,7 +661,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
             <div className="bg-white rounded-2xl border border-[var(--color-secondary)]/10 p-8">
               <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8 flex items-center gap-3">
                 <Calendar width={24} height={24} strokeWidth={2} />
-                Pickup Information
+                Order Information
               </h3>
 
               <div className="flex flex-col gap-6">
@@ -671,7 +671,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
                   </div>
                   <div>
                     <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">Order Type</div>
-                    <div className="font-body font-bold text-[var(--color-secondary)] capitalize">{order.orderType}</div>
+                    <div className="font-body font-bold text-[var(--color-secondary)]">{order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}</div>
                   </div>
                 </div>
 
@@ -680,11 +680,9 @@ export default function OrderStatusPage({ data, orderId, template }) {
                     <Clock width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
-                    <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">Pickup Time</div>
+                    <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">{order.orderType === 'dine_in' ? 'Seated' : 'Pickup Time'}</div>
                     <div className="font-body font-bold text-[var(--color-secondary)]">
-                      {order.pickupTime
-                        ? new Date(order.pickupTime).toLocaleString()
-                        : 'ASAP'}
+                      {order.orderType === 'dine_in' ? 'Now' : order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}
                     </div>
                   </div>
                 </div>
@@ -781,8 +779,8 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
                 <div className="mb-6 text-sm">
                   <div className="font-bold mb-2 text-base">ORDER TYPE:</div>
-                  <div className="capitalize">{order.orderType}</div>
-                  <div>Pickup: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>
+                  <div>{order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}</div>
+                  {order.orderType !== 'dine_in' && <div>Time: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>}
                 </div>
 
                 <div className="mb-6">

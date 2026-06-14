@@ -84,17 +84,10 @@ app.use('/api/clients', require('./routes/clients'))
 app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories
 app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
 app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
-app.use('/api/clients', require('./routes/payments')) // Handles /api/clients/:clientId/payments
 app.use('/api/clients', require('./routes/tables')) // Handles /api/clients/:clientId/locations/:locationId/tables
 app.use('/api/clients/:clientId/pos', require('./routes/pos')) // POS Integration
 app.use('/api/loyalty', require('./routes/loyalty'))
 app.use('/api/enquiries', require('./routes/enquiries'))
-
-// Global Stripe webhook endpoint (doesn't require clientId)
-app.use('/api/stripe', (req, res, next) => {
-  console.log('🔔 Request to /api/stripe:', req.method, req.url)
-  next()
-}, require('./routes/payments'))
 
 // GROUPS ROUTE - for organizing sites
 app.use('/api/groups', require('./routes/groups'))
@@ -104,6 +97,9 @@ app.use('/api/activity', require('./routes/activityLog'))
 
 // PLATFORM SETTINGS ROUTE
 app.use('/api/platform', require('./routes/platform'))
+
+// ONBOARDING PDF PARSE ROUTE
+app.use('/api/onboarding', require('./routes/onboarding'))
 
 // CATCH 404 BEFORE WILD CARDS
 app.use((req, res) => res.status(404).json({ error: 'Endpoint not found' }))

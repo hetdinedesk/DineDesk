@@ -24,26 +24,52 @@ const tabs = [
 
 function MenuImagesPreview() {
   const dishes = [
-    { name: 'Truffle Linguine', price: '$28', tag: 'Chef\'s Pick', color: 'from-amber-900 to-stone-800', tagColor: 'bg-amber-500' },
-    { name: 'Barramundi Fillet', price: '$34', tag: 'New', color: 'from-blue-900 to-slate-800', tagColor: 'bg-blue-400' },
-    { name: 'Wagyu Burger', price: '$22', tag: 'Best Seller', color: 'from-orange-900 to-red-900', tagColor: 'bg-orange-500' },
-    { name: 'Tiramisu', price: '$14', tag: 'Popular', color: 'from-stone-800 to-zinc-900', tagColor: 'bg-rose-500' },
+    {
+      name: 'Truffle Linguine',
+      price: '$28',
+      tag: "Chef's Pick",
+      tagColor: 'bg-amber-500',
+      img: 'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?w=400&q=80',
+    },
+    {
+      name: 'Barramundi Fillet',
+      price: '$34',
+      tag: 'New',
+      tagColor: 'bg-blue-400',
+      img: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=400&q=80',
+    },
+    {
+      name: 'Wagyu Burger',
+      price: '$22',
+      tag: 'Best Seller',
+      tagColor: 'bg-orange-500',
+      img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80',
+    },
+    {
+      name: 'Tiramisu',
+      price: '$14',
+      tag: 'Popular',
+      tagColor: 'bg-rose-500',
+      img: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400&q=80',
+    },
   ]
   return (
     <div className="space-y-3">
       <p className="text-xs text-white/40 uppercase tracking-widest font-semibold">Auto-generated dish cards</p>
       <div className="grid grid-cols-2 gap-3">
         {dishes.map((dish) => (
-          <div key={dish.name} className={`bg-gradient-to-br ${dish.color} rounded-xl overflow-hidden`}>
-            <div className="h-20 flex items-center justify-center relative">
-              <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
-                <ImageIcon className="w-5 h-5 text-white/30" />
-              </div>
+          <div key={dish.name} className="rounded-xl overflow-hidden bg-white/5">
+            <div className="h-24 relative overflow-hidden">
+              <img
+                src={dish.img}
+                alt={dish.name}
+                className="w-full h-full object-cover"
+              />
               <span className={`absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${dish.tagColor}`}>
                 {dish.tag}
               </span>
             </div>
-            <div className="px-3 pb-3 pt-1">
+            <div className="px-3 pb-3 pt-2">
               <p className="text-white text-xs font-semibold leading-tight">{dish.name}</p>
               <p className="text-dine-orange text-xs font-bold mt-0.5">{dish.price}</p>
             </div>

@@ -49,12 +49,12 @@ export default function BookingButton({ booking, locations = [], className = '',
 
       {showForm && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-start sm:items-center justify-center z-[10000] p-4 sm:p-6 overflow-y-auto"
+          className="fixed inset-0 bg-black/60 flex items-start justify-center z-[10000] p-4 sm:p-6 overflow-y-auto"
           onClick={() => setShowForm(false)}
           style={{ backdropFilter: 'blur(4px)' }}
         >
           <div
-            className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh] my-auto"
+            className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh] mt-8 sm:mt-12"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with close button */}

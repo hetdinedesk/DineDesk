@@ -906,8 +906,8 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           {!order.tableId && (
             <>
               <MapPin size={12} color={C.t2} />
-              <span style={{ fontSize: 11, color: C.t2, textTransform: 'capitalize' }}>
-                {order.orderType}
+              <span style={{ fontSize: 11, color: C.t2 }}>
+                {order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}
               </span>
             </>
           )}
@@ -1883,6 +1883,21 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
               {order.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
             </span>
           </div>
+        </div>
+
+        {/* Order Type / Table Info */}
+        <div style={{ marginBottom: 16, padding: '10px 14px', background: `${C.acc}10`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: 'uppercase' }}>
+            {order.tableId ? `Table ${order.tableNumber || order.tableId}` : (order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1))}
+          </span>
+          {!order.tableId && order.orderType !== 'dine_in' && (
+            <span style={{ fontSize: 12, color: C.t3 }}>
+              · {order.pickupTime ? new Date(order.pickupTime).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'ASAP'}
+            </span>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: C.t3 }}>
+            {order.paymentMethod === 'cash' ? 'Cash' : order.paymentMethod === 'stripe' ? 'Card' : order.paymentMethod}
+          </span>
         </div>
 
         {/* Customer Info */}

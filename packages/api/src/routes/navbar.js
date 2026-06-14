@@ -142,7 +142,7 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
       }
     }
 
-    creates.push({ ...data, clientId, _tempId: h.id })
+    creates.push({ ...data, clientId })
     keptIds.add(h.id) // Will be replaced with real ID after create
     return h.id
   }
@@ -183,87 +183,34 @@ async function upsertHeaderSections (tx, clientId, headerSections, pageById) {
     return c.id
   }
 
-  // Collect root-level operations first (no children yet)
-  const rootTempIdToRealId = new Map()
-  for (let hi = 0; hi < headerSections.length; hi++) {
-    upsertRoot(headerSections[hi], hi)
-  }
-
-  // Execute root updates
-  if (updates.length > 0) {
-    await Promise.all(updates.map(u =>
-      tx.navigationItem.update({ where: { id: u.id }, data: u.data })
-    ))
-  }
-
-  // Execute root creates and capture real IDs
-  for (const rootCreate of creates) {
-    const tempId = rootCreate._tempId
-    delete rootCreate._tempId
-    const created = await tx.navigationItem.create({ data: rootCreate })
-    keptIds.add(created.id)
-    if (tempId) rootTempIdToRealId.set(tempId, created.id)
-  }
-
-  // Now process children with resolved real parentIds
-  const childUpdates = []
-  const childCreates = []
-
+  // Process all items first to collect operations
   for (let hi = 0; hi < headerSections.length; hi++) {
     const h = headerSections[hi]
+    const rootId = upsertRoot(h, hi)
     const children = Array.isArray(h.children) ? h.children : []
-    if (children.length === 0) continue
-
-    // Resolve real parentId: if root was newly created, use mapped real ID
-    const realParentId = isTempId(h.id)
-      ? rootTempIdToRealId.get(h.id)
-      : (existingMap.has(h.id) ? h.id : rootTempIdToRealId.get(h.id))
-
-    if (!realParentId) continue // root creation failed, skip
-
     for (let ci = 0; ci < children.length; ci++) {
-      const c = children[ci]
-      const pg = c.pageId && !isTempId(c.pageId) ? pageById.get(c.pageId) : null
-      const label = String(c.label || '').trim() || (pg ? pg.title : 'Page')
-      const cUrl = c.url != null && c.url !== '' ? c.url : navUrlFor(c.pageId, '')
-      const pageId = c.pageId && !isTempId(c.pageId) ? c.pageId : null
-      const data = {
-        label,
-        url: cUrl || '',
-        isActive: c.isActive !== false,
-        sortOrder: ci,
-        pageId,
-        parentId: realParentId
-      }
-
-      if (!isTempId(c.id) && existingMap.has(c.id)) {
-        const existingItem = existingMap.get(c.id)
-        if (existingItem.clientId === clientId) {
-          const changed = existingItem.label !== data.label ||
-            existingItem.url !== data.url ||
-            existingItem.isActive !== data.isActive ||
-            existingItem.sortOrder !== data.sortOrder ||
-            existingItem.pageId !== data.pageId ||
-            existingItem.parentId !== data.parentId
-          if (changed) childUpdates.push({ id: c.id, data })
-          keptIds.add(c.id)
-          continue
-        }
-      }
-      childCreates.push({ ...data, clientId })
-      keptIds.add(c.id)
+      upsertChild(children[ci], rootId, ci)
     }
   }
 
-  if (childUpdates.length > 0) {
-    await Promise.all(childUpdates.map(u =>
+  // Execute updates in batch
+  if (updates.length > 0) {
+    await Promise.all(updates.map(u => 
       tx.navigationItem.update({ where: { id: u.id }, data: u.data })
     ))
   }
-  if (childCreates.length > 0) {
-    await Promise.all(childCreates.map(c =>
+
+  // Execute creates in batch
+  if (creates.length > 0) {
+    const created = await Promise.all(creates.map(c => 
       tx.navigationItem.create({ data: c })
     ))
+    // Update keptIds with real IDs
+    const tempIdToRealId = new Map()
+    created.forEach((item, i) => {
+      const tempId = creates[i].id || creates[i].clientId // fallback
+      tempIdToRealId.set(tempId, item.id)
+    })
   }
 
   const toRemove = existing.filter((e) => !keptIds.has(e.id))
