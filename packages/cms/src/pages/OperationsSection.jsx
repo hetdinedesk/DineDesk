@@ -148,12 +148,19 @@ export default function OperationsSection({ clientId, user: userProp }) {
     ? allLocations.filter(loc => userLocationIds.includes(loc.id))
     : allLocations
 
-  // Set default location on load
+  // Set default location on load, and correct it when user restrictions are applied
   useEffect(() => {
-    if (locations.length > 0 && !selectedLocation) {
+    if (locations.length === 0) return
+    // If no location selected yet, pick first allowed
+    if (!selectedLocation) {
+      setSelectedLocation(locations[0].id)
+      return
+    }
+    // If current selectedLocation is not in the allowed list, reset to first allowed
+    if (!locations.find(l => l.id === selectedLocation)) {
       setSelectedLocation(locations[0].id)
     }
-  }, [locations, selectedLocation])
+  }, [locations])
 
   // Fetch live orders (new, accepted, preparing, ready)
   const { data: liveOrders = [], isLoading: liveLoading } = useQuery({
