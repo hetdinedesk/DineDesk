@@ -1898,16 +1898,22 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
         </div>
 
         {/* Order Type / Table Info */}
-        <div style={{ marginBottom: 16, padding: '10px 14px', background: `${C.acc}10`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: 'uppercase' }}>
-            {order.tableId ? `Table ${order.tableNumber || order.tableId}` : (order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1))}
-          </span>
-          {!order.tableId && order.orderType !== 'dine_in' && (
-            <span style={{ fontSize: 12, color: C.t3 }}>
+        <div style={{ marginBottom: 16, padding: '10px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+          {order.tableNumber ? (
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.acc }}>
+              Table {order.tableNumber}
+            </span>
+          ) : (
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.t1, textTransform: 'uppercase' }}>
+              {order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}
+            </span>
+          )}
+          {!order.tableNumber && order.orderType !== 'dine_in' && (
+            <span style={{ fontSize: 12, color: C.t2 }}>
               · {order.pickupTime ? new Date(order.pickupTime).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'ASAP'}
             </span>
           )}
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: C.t3 }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: C.t2 }}>
             {order.paymentMethod === 'cash' ? 'Cash' : order.paymentMethod === 'stripe' ? 'Card' : order.paymentMethod}
           </span>
         </div>
