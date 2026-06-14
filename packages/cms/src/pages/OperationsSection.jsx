@@ -164,9 +164,9 @@ export default function OperationsSection({ clientId, user: userProp }) {
         ['new', 'accepted', 'preparing', 'ready'].includes(o.status)
       )
     ),
-    refetchInterval: 3000, // Poll every 3 seconds for faster updates
+    refetchInterval: 5000, // Poll every 5 seconds for faster updates
     enabled: !!selectedLocation,
-    staleTime: 0, // Always consider data stale for immediate updates
+    staleTime: 10 * 1000, // 10 seconds for live orders
     gcTime: 5 * 60 * 1000 // Keep for 5 minutes
   })
 
@@ -1911,10 +1911,20 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
                 <div style={{ fontSize: 14, color: C.t0 }}>
                   {item.quantity}x {item.name}
                 </div>
-                {item.modifiers && item.modifiers.length > 0 && (
+                {item.selectedSize && (
                   <div style={{ fontSize: 12, color: C.t3, marginTop: 2 }}>
-                    {item.modifiers.join(', ')}
+                    Size: {item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` (+$${parseFloat(item.selectedSize.priceAdjustment).toFixed(2)})` : ''}
                   </div>
+                )}
+                {item.selectedAddons && item.selectedAddons.length > 0 && (
+                  <div style={{ fontSize: 12, color: C.t3, marginTop: 2 }}>
+                    {item.selectedAddons.map((a, j) => (
+                      <div key={j}>+ {a.name}{a.price > 0 ? ` (+$${parseFloat(a.price).toFixed(2)})` : ''}</div>
+                    ))}
+                  </div>
+                )}
+                {item.specialInstructions && (
+                  <div style={{ fontSize: 11, color: C.t3, marginTop: 2, fontStyle: 'italic' }}>Note: {item.specialInstructions}</div>
                 )}
               </div>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.t0 }}>

@@ -1330,10 +1330,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
               <div className="flex flex-col gap-4 mb-8 max-h-[300px] overflow-y-auto">
                 {items.map(item => (
-                  <div key={item.id} className="flex justify-between items-start gap-4">
+                  <div key={item._cartKey || item.id} className="flex justify-between items-start gap-4">
                     <div className="flex-1">
                       <div className={`font-serif text-lg italic ${normalizedTemplate === 'theme-d1' ? 'text-gray-900' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>{item.name}</div>
                       <div className={`text-xs font-sans font-bold tracking-widest uppercase ${normalizedTemplate === 'theme-d1' ? 'text-gray-500' : normalizedTemplate === 'theme-d2' ? 'text-gray-500' : 'text-[var(--color-secondary)]/60'}`}>Qty: {item.quantity}</div>
+                      {item.selectedSize && <div className={`text-xs ${normalizedTemplate === 'theme-d2' ? 'text-gray-400' : 'text-[var(--color-secondary)]/50'}`}>{item.selectedSize.name}</div>}
+                      {item.selectedAddons && item.selectedAddons.length > 0 && <div className={`text-xs ${normalizedTemplate === 'theme-d2' ? 'text-gray-400' : 'text-[var(--color-secondary)]/50'}`}>{item.selectedAddons.map(a => a.name).join(', ')}</div>}
                     </div>
                     <div className={`font-sans font-bold ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>${(item.price * item.quantity).toFixed(2)}</div>
                   </div>

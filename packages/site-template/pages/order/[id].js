@@ -141,10 +141,18 @@ function PrintableReceipt({ order, data }) {
               <span>{item.quantity}x {item.name}</span>
               <span>${(item.price * item.quantity).toFixed(2)}</span>
             </div>
-            {item.options && item.options.length > 0 && (
+            {item.selectedSize && (
               <div style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
-                {item.options.map((opt, i) => <div key={i}>+ {opt}</div>)}
+                Size: {item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` (+$${item.selectedSize.priceAdjustment.toFixed(2)})` : ''}
               </div>
+            )}
+            {item.selectedAddons && item.selectedAddons.length > 0 && (
+              <div style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
+                {item.selectedAddons.map((a, i) => <div key={i}>+ {a.name}{a.price > 0 ? ` (+$${a.price.toFixed(2)})` : ''}</div>)}
+              </div>
+            )}
+            {item.specialInstructions && (
+              <div style={{ fontSize: '12px', color: '#888', marginLeft: '8px', fontStyle: 'italic' }}>Note: {item.specialInstructions}</div>
             )}
           </div>
         ))}
@@ -558,12 +566,20 @@ export default function OrderStatusPage({ data, orderId, template }) {
                   <div className="flex-1">
                     <div className="font-heading text-lg italic text-[var(--color-secondary)]">{item.name}</div>
                     {item.quantity > 1 && <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">Qty: {item.quantity}</div>}
-                    {item.options && item.options.length > 0 && (
-                      <div className="text-xs text-[var(--color-secondary)]/60 mt-2">
-                        {item.options.map((opt, i) => (
-                          <div key={i}>+ {opt}</div>
+                    {item.selectedSize && (
+                      <div className="text-xs text-[var(--color-secondary)]/60 mt-1">
+                        Size: {item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` (+$${item.selectedSize.priceAdjustment.toFixed(2)})` : ''}
+                      </div>
+                    )}
+                    {item.selectedAddons && item.selectedAddons.length > 0 && (
+                      <div className="text-xs text-[var(--color-secondary)]/60 mt-1">
+                        {item.selectedAddons.map((a, i) => (
+                          <div key={i}>+ {a.name}{a.price > 0 ? ` (+$${a.price.toFixed(2)})` : ''}</div>
                         ))}
                       </div>
+                    )}
+                    {item.specialInstructions && (
+                      <div className="text-xs text-[var(--color-secondary)]/40 mt-1 italic">Note: {item.specialInstructions}</div>
                     )}
                   </div>
                   <div className="font-body font-bold text-[var(--color-secondary)]">${(item.price * item.quantity).toFixed(2)}</div>
@@ -777,10 +793,18 @@ export default function OrderStatusPage({ data, orderId, template }) {
                         <span>{item.quantity}x {item.name}</span>
                         <span>${(item.price * item.quantity).toFixed(2)}</span>
                       </div>
-                      {item.options && item.options.length > 0 && (
+                      {item.selectedSize && (
                         <div className="text-xs text-[var(--color-secondary)]/60 ml-2">
-                          {item.options.map((opt, i) => <div key={i}>+ {opt}</div>)}
+                          Size: {item.selectedSize.name}{item.selectedSize.priceAdjustment > 0 ? ` (+$${item.selectedSize.priceAdjustment.toFixed(2)})` : ''}
                         </div>
+                      )}
+                      {item.selectedAddons && item.selectedAddons.length > 0 && (
+                        <div className="text-xs text-[var(--color-secondary)]/60 ml-2">
+                          {item.selectedAddons.map((a, i) => <div key={i}>+ {a.name}{a.price > 0 ? ` (+$${a.price.toFixed(2)})` : ''}</div>)}
+                        </div>
+                      )}
+                      {item.specialInstructions && (
+                        <div className="text-xs text-[var(--color-secondary)]/40 ml-2 italic">Note: {item.specialInstructions}</div>
                       )}
                     </div>
                   ))}

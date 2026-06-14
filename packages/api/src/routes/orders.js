@@ -110,11 +110,16 @@ router.post('/', async (req, res) => {
 
     let verifiedSubtotal = 0
     const verifiedItems = items.map(item => {
-      const realPrice = priceMap[item.id]
+      const basePrice = priceMap[item.id]
       const qty = parseInt(item.quantity) || 1
-      if (realPrice !== undefined) {
+      if (basePrice !== undefined) {
+        // Add size price adjustment
+        const sizeAdj = parseFloat(item.selectedSize?.priceAdjustment) || 0
+        // Add all addon prices
+        const addonsAdj = (item.selectedAddons || []).reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0)
+        const realPrice = Math.round((basePrice + sizeAdj + addonsAdj) * 100) / 100
         verifiedSubtotal += realPrice * qty
-        return { ...item, price: realPrice }
+        return { ...item, price: realPrice, basePrice }
       }
       // Item not found in either table — use submitted price
       verifiedSubtotal += (parseFloat(item.price) || 0) * qty

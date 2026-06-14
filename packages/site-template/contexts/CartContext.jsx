@@ -88,24 +88,30 @@ export const CartProvider = ({ children, ordering = {}, query = {}, siteId = '' 
   }, [items]);
 
   const addItem = useCallback((item) => {
+    // Use totalPrice as the canonical price; fall back to price if already set
+    const canonicalPrice = item.totalPrice ?? item.price ?? 0;
+    // Build a unique cart key that includes size and addons so different customisations are separate lines
+    const sizeKey = item.selectedSize?.name || '';
+    const addonsKey = (item.selectedAddons || []).map(a => a.name).sort().join(',');
+    const cartKey = `${item.id}__${sizeKey}__${addonsKey}`;
     setItems(prev => {
-      const existing = prev.find(i => i.id === item.id);
+      const existing = prev.find(i => i._cartKey === cartKey);
       if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => i._cartKey === cartKey ? { ...i, quantity: i.quantity + 1 } : i);
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, price: canonicalPrice, _cartKey: cartKey, quantity: 1 }];
     });
   }, []);
 
-  const removeItem = useCallback((itemId) => {
-    setItems(prev => prev.filter(i => i.id !== itemId));
+  const removeItem = useCallback((cartKey) => {
+    setItems(prev => prev.filter(i => (i._cartKey || i.id) !== cartKey));
   }, []);
 
-  const updateQuantity = useCallback((itemId, quantity) => {
+  const updateQuantity = useCallback((cartKey, quantity) => {
     if (quantity <= 0) {
-      setItems(prev => prev.filter(i => i.id !== itemId));
+      setItems(prev => prev.filter(i => (i._cartKey || i.id) !== cartKey));
     } else {
-      setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
+      setItems(prev => prev.map(i => (i._cartKey || i.id) === cartKey ? { ...i, quantity } : i));
     }
   }, []);
 

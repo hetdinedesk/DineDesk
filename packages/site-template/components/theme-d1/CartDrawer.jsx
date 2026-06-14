@@ -187,7 +187,7 @@ export default function CartDrawer() {
               ) : (
                 <div className="p-6 space-y-4">
                   {items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div key={item._cartKey || item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
                       {/* Item Image */}
                       {item.image && (
                         <img
@@ -200,20 +200,24 @@ export default function CartDrawer() {
                       {/* Item Details */}
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900">{item.name}</h4>
+                        {item.selectedSize && <p className="text-xs text-gray-500">{item.selectedSize.name}</p>}
+                        {item.selectedAddons && item.selectedAddons.length > 0 && (
+                          <p className="text-xs text-gray-500">{item.selectedAddons.map(a => a.name).join(', ')}</p>
+                        )}
                         <p className="text-sm text-gray-600">${item.price.toFixed(2)}</p>
                       </div>
 
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item._cartKey || item.id, item.quantity - 1)}
                           className="p-1 hover:bg-gray-200 rounded transition-colors"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
                         <span className="w-8 text-center font-medium">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item._cartKey || item.id, item.quantity + 1)}
                           className="p-1 hover:bg-gray-200 rounded transition-colors"
                         >
                           <Plus className="w-4 h-4" />
@@ -222,7 +226,7 @@ export default function CartDrawer() {
 
                       {/* Remove Button */}
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(item._cartKey || item.id)}
                         className="p-2 hover:bg-red-50 text-red-500 rounded transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
