@@ -590,7 +590,12 @@ function SAUsers() {
                       checked={siteLocs.length === 0}
                       onChange={() => {
                         const currentTabs = getAccessTabs(access, cl.id)
-                        setAccessEntry(access, setAccess, cl.id, currentTabs, [])
+                        // If currently "all" (empty array), switch to all specific IDs so user can deselect individually
+                        // If currently restricted, switch back to all (empty array)
+                        const newLocs = siteLocs.length === 0
+                          ? clientLocations.map(l => l.id)
+                          : []
+                        setAccessEntry(access, setAccess, cl.id, currentTabs, newLocs)
                       }}
                       style={{ accentColor:C.cyan, width:13, height:13 }}/>
                     All Locations
