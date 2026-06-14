@@ -822,11 +822,11 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           <span style={{ fontSize: 13, color: C.t2 }}>{order.customerPhone}</span>
         </div>
         {/* Table Number for QR/Table Orders */}
-        {order.tableId && (
+        {order.tableNumber && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
             <Table size={14} color={C.acc} />
             <span style={{ fontSize: 13, color: C.acc, fontWeight: 600 }}>
-              Table {order.tableNumber || order.tableId}
+              Table {order.tableNumber}
             </span>
           </div>
         )}
