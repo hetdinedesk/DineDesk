@@ -105,7 +105,8 @@ router.post('/:clientId/locations/:locationId/tables', authenticateToken, async 
     // Generate QR code URL if requested
     let qrCodeUrl = null
     if (autoGenerateQR) {
-      qrCodeUrl = generateTableQRCode(clientId, locationId, finalTableNumber)
+      const result = await generateTableQRCode(clientId, locationId, finalTableNumber)
+      qrCodeUrl = typeof result === 'string' ? result : null
     }
     
     const table = await prisma.restaurantTable.create({
@@ -286,7 +287,7 @@ router.post('/:clientId/locations/:locationId/tables/:tableId/qrcode', authentic
     }
     
     // Generate new QR code URL
-    const qrCodeUrl = generateTableQRCode(clientId, locationId, table.tableNumber)
+    const qrCodeUrl = await generateTableQRCode(clientId, locationId, table.tableNumber)
     
     // Update table with new QR code
     const updatedTable = await prisma.restaurantTable.update({

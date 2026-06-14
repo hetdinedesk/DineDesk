@@ -6,24 +6,28 @@ const { prisma } = require('./prisma')
  * Priority: client.domain → netlify previewUrl → env fallback
  */
 async function resolveClientBaseUrl(clientId) {
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    select: { domain: true, siteConfig: { select: { netlify: true } } }
-  })
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { domain: true, siteConfig: { select: { netlify: true } } }
+    })
 
-  // 1. Custom domain (strip trailing slash, ensure https)
-  if (client?.domain && !client.domain.includes('localhost') && !client.domain.endsWith('.local')) {
-    const d = client.domain.replace(/\/+$/, '')
-    return d.startsWith('http') ? d : `https://${d}`
+    // 1. Custom domain (strip trailing slash, ensure https)
+    if (client?.domain && !client.domain.includes('localhost') && !client.domain.endsWith('.local')) {
+      const d = client.domain.replace(/\/+$/, '')
+      return d.startsWith('http') ? d : `https://${d}`
+    }
+
+    // 2. Netlify preview URL from site config
+    const netlify = client?.siteConfig?.netlify
+    if (netlify?.previewUrl) {
+      return netlify.previewUrl.replace(/\/+$/, '')
+    }
+  } catch (err) {
+    console.warn('[qrCode] resolveClientBaseUrl error:', err.message)
   }
 
-  // 2. Netlify preview URL from site config
-  const netlify = client?.siteConfig?.netlify
-  if (netlify?.previewUrl) {
-    return netlify.previewUrl.replace(/\/+$/, '')
-  }
-
-  // 3. Env fallback (only for local dev)
+  // 3. Env fallback
   return process.env.NEXT_PUBLIC_APP_URL || process.env.BASE_URL || 'http://localhost:3000'
 }
 

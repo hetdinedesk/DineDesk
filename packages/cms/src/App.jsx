@@ -324,7 +324,16 @@ function MainApp() {
   }, [siteNav, activeSite])
 
   const openSite = async (client) => {
-    setSiteNav('dashboard')
+    // Default to first allowed tab for this user, not always 'dashboard'
+    if (!canManageAll) {
+      const entry = user?.clientAccess?.[client.id]
+      const allowed = Array.isArray(entry) ? entry : (entry?.tabs || [])
+      const tabOrder = ['dashboard', 'items', 'operations', 'cms', 'config']
+      const firstAllowed = tabOrder.find(t => allowed.includes(t)) || 'dashboard'
+      setSiteNav(firstAllowed)
+    } else {
+      setSiteNav('dashboard')
+    }
     try {
       const token = localStorage.getItem('dd_token')
       const cfg = await fetch(
@@ -343,8 +352,14 @@ function MainApp() {
       sessionStorage.removeItem('dd_items_subsection')
       sessionStorage.removeItem('dd_cms_subsection')
       sessionStorage.removeItem('dd_config_subsection')
-      // Navigate to site dashboard
-      navigate(`/site/${client.id}/dashboard`)
+      // Navigate to first allowed tab
+      const navTarget = !canManageAll ? (() => {
+        const entry = user?.clientAccess?.[client.id]
+        const allowed = Array.isArray(entry) ? entry : (entry?.tabs || [])
+        const tabOrder = ['dashboard', 'items', 'operations', 'cms', 'config']
+        return tabOrder.find(t => allowed.includes(t)) || 'dashboard'
+      })() : 'dashboard'
+      navigate(`/site/${client.id}/${navTarget}`)
     } catch {
       setActiveSite({ ...client, indexing: 'blocked' })
       sessionStorage.setItem('dd_active_site', JSON.stringify({ ...client, indexing: 'blocked' }))

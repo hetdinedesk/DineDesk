@@ -196,17 +196,6 @@ export default function LoginPage() {
 
 // ── Forgot Password Modal ───────────────────────────────────────
 function ForgotModal({ onClose }) {
-  const [email,   setEmail]   = useState('')
-  const [sent,    setSent]    = useState(false)
-  const [loading, setLoading] = useState(false)
-
-  const send = async () => {
-    if (!email) return
-    setLoading(true)
-    await new Promise(r => setTimeout(r, 1200))
-    setSent(true); setLoading(false)
-  }
-
   return (
     <div style={{ position:'fixed', inset:0, zIndex:999,
       background:'rgba(0,0,0,0.75)', display:'flex',
@@ -215,63 +204,27 @@ function ForgotModal({ onClose }) {
         border:`1px solid ${C.border}`, borderRadius:16, overflow:'hidden',
         boxShadow:'0 32px 80px rgba(0,0,0,0.8)' }}>
         <div style={{ height:3, background:`linear-gradient(90deg,${C.acc},${C.cyan})` }}/>
-        <div style={{ padding:'28px 28px 24px' }}>
-          {!sent ? (
-            <>
-              <h3 style={{ margin:'0 0 6px', fontSize:18, fontWeight:800, color:C.t0 }}>
-                Reset your password
-              </h3>
-              <p style={{ margin:'0 0 20px', fontSize:13, color:C.t2 }}>
-                Enter your email and we'll send a reset link.
-              </p>
-              <input type="email" value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key==='Enter' && send()}
-                placeholder="you@dinedesk.io" autoFocus
-                style={{ width:'100%', padding:'11px 14px', fontSize:14,
-                  background:C.input, border:`1px solid ${C.border}`,
-                  borderRadius:9, color:C.t0, fontFamily:'inherit',
-                  outline:'none', boxSizing:'border-box', marginBottom:16 }}
-                onFocus={e => e.target.style.borderColor=C.acc}
-                onBlur={e  => e.target.style.borderColor=C.border}
-              />
-              <div style={{ display:'flex', gap:10 }}>
-                <button onClick={send} disabled={loading || !email}
-                  style={{ flex:1, padding:11, background:C.acc,
-                    border:'none', borderRadius:9, fontSize:14,
-                    fontWeight:700, color:'#fff',
-                    cursor:loading||!email?'not-allowed':'pointer',
-                    fontFamily:'inherit', opacity:!email?0.5:1 }}>
-                  {loading ? 'Sending…' : 'Send Reset Link'}
-                </button>
-                <button onClick={onClose}
-                  style={{ padding:'11px 18px', background:'transparent',
-                    border:`1px solid ${C.border}`, borderRadius:9,
-                    color:C.t2, cursor:'pointer', fontFamily:'inherit',
-                    fontSize:14 }}>
-                  Cancel
-                </button>
-              </div>
-            </>
-          ) : (
-            <div style={{ textAlign:'center', padding:'8px 0' }}>
-              <div style={{ fontSize:40, marginBottom:16 }}>📬</div>
-              <h3 style={{ margin:'0 0 8px', fontSize:18, fontWeight:800, color:C.t0 }}>
-                Check your inbox
-              </h3>
-              <p style={{ margin:'0 0 20px', fontSize:13, color:C.t2, lineHeight:1.6 }}>
-                If <strong style={{ color:C.t1 }}>{email}</strong> has an account,
-                a reset link has been sent.
-              </p>
-              <button onClick={onClose}
-                style={{ padding:'11px 28px', background:C.acc,
-                  border:'none', borderRadius:9, fontSize:14,
-                  fontWeight:700, color:'#fff', cursor:'pointer',
-                  fontFamily:'inherit' }}>
-                Back to Sign In
-              </button>
-            </div>
-          )}
+        <div style={{ padding:'28px 28px 24px', textAlign:'center' }}>
+          <div style={{ fontSize:40, marginBottom:16 }}>�</div>
+          <h3 style={{ margin:'0 0 8px', fontSize:18, fontWeight:800, color:C.t0 }}>
+            Forgot your password?
+          </h3>
+          <p style={{ margin:'0 0 20px', fontSize:13, color:C.t2, lineHeight:1.6 }}>
+            Please contact DineDesk support to reset your password.
+          </p>
+          <a href="mailto:dinedesk.support@gmail.com"
+            style={{ display:'block', marginBottom:16, padding:'11px 28px',
+              background:C.acc, border:'none', borderRadius:9, fontSize:14,
+              fontWeight:700, color:'#fff', cursor:'pointer',
+              fontFamily:'inherit', textDecoration:'none' }}>
+            Contact Support
+          </a>
+          <button onClick={onClose}
+            style={{ padding:'11px 28px', background:'transparent',
+              border:`1px solid ${C.border}`, borderRadius:9,
+              color:C.t2, cursor:'pointer', fontFamily:'inherit', fontSize:14 }}>
+            Back to Sign In
+          </button>
         </div>
       </div>
     </div>
