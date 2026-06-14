@@ -20,7 +20,8 @@ export default function CartDrawer() {
     const siteId = isProd ? '' : (router.query.site || '')
     let checkoutUrl = isProd ? '/checkout' : `/checkout?site=${siteId}`
     if (isTableOrdering && tableInfo) {
-      checkoutUrl += `&tableId=${tableInfo.tableId}&tableNumber=${encodeURIComponent(tableInfo.tableNumber)}&locationId=${tableInfo.locationId || ''}&orderType=${orderType}&paymentPreference=${paymentPreference}`
+      const sep = checkoutUrl.includes('?') ? '&' : '?'
+      checkoutUrl += `${sep}tableId=${tableInfo.tableId}&tableNumber=${encodeURIComponent(tableInfo.tableNumber)}&locationId=${tableInfo.locationId || ''}&orderType=${orderType}&paymentPreference=${paymentPreference}`
     }
     if (router.pathname !== '/checkout') {
       router.push(checkoutUrl)
