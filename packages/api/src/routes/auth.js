@@ -54,6 +54,17 @@ router.post('/login', loginLimit, async function(req, res) {
   }
 })
 
-router.get('/me', authenticateToken, function(req, res) { res.json(req.user) })
+router.get('/me', authenticateToken, async function(req, res) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, name: true, email: true, role: true, clientAccess: true }
+    })
+    if (!user) return res.status(401).json({ error: 'User not found' })
+    res.json(user)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 module.exports = router

@@ -145,7 +145,7 @@ export default function App({ Component, pageProps }) {
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
       <ErrorBoundary>
-        <CartProvider ordering={data.ordering} siteId={data.id}>
+        <CartProvider ordering={data.ordering} siteId={data.id} query={router.query}>
           <WishlistProvider>
             <ThemeLoader themeKey={themeKey}>
               {(CartDrawer, FloatingCartIcon) => (

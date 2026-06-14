@@ -113,14 +113,14 @@ export default function OperationsSection({ clientId, user: userProp }) {
   const audioRef = useRef(null)
   
   // Check if current user is a client
-  const user = userProp || JSON.parse(localStorage.getItem('dd_user') || '{}')
+  const user = userProp || {}
   const isClient = user.role === 'CLIENT'
   const isSuperAdmin = user.role === 'SUPER_ADMIN'
 
-  // Get user's allowed location IDs for this client
+  // Get user's allowed location IDs for this client (fresh from /auth/me via authStore)
   const userAccessEntry = user?.clientAccess?.[clientId]
   const userLocationIds = Array.isArray(userAccessEntry) ? [] : (userAccessEntry?.locationIds || [])
-  const hasLocationRestriction = !isSuperAdmin && userLocationIds.length > 0
+  const hasLocationRestriction = !isSuperAdmin && !isClient && userLocationIds.length > 0
 
   // Fetch config to get initial ordering state
   const { data: config } = useQuery({
