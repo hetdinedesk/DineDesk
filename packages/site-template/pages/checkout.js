@@ -1364,10 +1364,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                 <ShoppingCart width={24} height={24} strokeWidth={2} />
                 {normalizedTemplate === 'theme-d1' ? 'Order Summary' : normalizedTemplate === 'theme-d2' ? 'Your Order' : 'Your Harvest'}
               </h2>
-              {qrTableNumber && (
+              {tableInfo?.tableNumber && (
                 <div className={`flex items-center gap-3 mb-6 px-5 py-3 rounded-full text-sm font-bold ${normalizedTemplate === 'theme-d1' ? 'bg-amber-50 text-amber-800 border border-amber-200' : normalizedTemplate === 'theme-d2' ? 'bg-teal-50 text-teal-800 border border-teal-200' : 'bg-[var(--color-primary)]/10 text-[var(--color-secondary)] border border-[var(--color-primary)]/20'}`}>
                   <span>🪑</span>
-                  <span>Table {qrTableNumber}</span>
+                  <span>Table {tableInfo.tableNumber}</span>
                 </div>
               )}
 
