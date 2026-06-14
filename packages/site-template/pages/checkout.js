@@ -359,7 +359,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   // Pickup info
   const [pickupType, setPickupType] = useState('asap') // asap | scheduled
   const [scheduledTime, setScheduledTime] = useState('')
-  const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine-in
+  // Pre-populate orderType and tableId from QR code query params (set by CartDrawer)
+  const qrTableId = router.query.tableId || null
+  const qrOrderType = router.query.orderType || null
+  const [orderType, setOrderType] = useState(qrOrderType || 'pickup') // pickup | delivery | dine_in
   const [selectedLocation, setSelectedLocation] = useState('')
 
   // Check if restaurant is currently open
@@ -527,6 +530,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         note: customerInfo.note,
         deliveryFee: orderType === 'delivery' ? (ordering?.deliveryFee || 0) : 0,
         locationId: selectedLocation || null,
+        tableId: qrTableId || null,
         loyaltyCustomerId,
         pointsUsed: redeemedReward ? redeemedReward.pointsRequired : 0,
         rewardUsed: redeemedReward ? { id: redeemedReward.id, name: redeemedReward.name, discountValue: redeemedReward.discountValue } : null,

@@ -400,9 +400,17 @@ router.get('/', authenticateToken, async (req, res) => {
     const orders = await prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: parseInt(limit)
+      take: parseInt(limit),
+      include: {
+        table: { select: { id: true, tableNumber: true } }
+      }
     })
-    res.json(orders)
+    // Flatten tableNumber onto each order for easy frontend consumption
+    const result = orders.map(o => ({
+      ...o,
+      tableNumber: o.table?.tableNumber || null
+    }))
+    res.json(result)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
