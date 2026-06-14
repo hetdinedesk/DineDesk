@@ -85,6 +85,7 @@ app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:
 app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
 app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
 app.use('/api/clients', require('./routes/tables')) // Handles /api/clients/:clientId/locations/:locationId/tables
+app.use('/api', require('./routes/tables')) // Handles /api/qr/:clientId/:locationId/:tableNumber (public QR lookup)
 app.use('/api/clients/:clientId/pos', require('./routes/pos')) // POS Integration
 app.use('/api/loyalty', require('./routes/loyalty'))
 app.use('/api/enquiries', require('./routes/enquiries'))

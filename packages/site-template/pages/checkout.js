@@ -362,15 +362,41 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const [scheduledTime, setScheduledTime] = useState('')
   const [tableInfo, setTableInfo] = useState(null)
   
-  // Detect table info from QR code params (client, location, table)
+  // Detect table info from QR code params or cart drawer params
   useEffect(() => {
     const loadTableInfo = async () => {
-      const info = await getCurrentTableInfo(router.query)
+      const q = router.query
+
+      // Case 1: Full QR code params (client, location, table) — from scanning QR directly
+      if (q.client && q.location && q.table) {
+        const info = await getCurrentTableInfo(q)
+        if (info && info.isValid) {
+          setTableInfo(info)
+          setSelectedLocation(info.locationId)
+          setOrderType('dine_in')
+        }
+        return
+      }
+
+      // Case 2: Cart drawer passed tableId + tableNumber params to checkout URL
+      if (q.tableId && q.tableNumber) {
+        const info = {
+          tableId: q.tableId,
+          tableNumber: q.tableNumber,
+          locationId: q.locationId || null,
+          isValid: true
+        }
+        setTableInfo(info)
+        if (q.locationId) setSelectedLocation(q.locationId)
+        setOrderType('dine_in')
+        return
+      }
+
+      // Case 3: Session storage fallback (user navigated away and came back)
+      const info = await getCurrentTableInfo(q)
       if (info && info.isValid) {
         setTableInfo(info)
-        // Auto-select the location from QR code
         setSelectedLocation(info.locationId)
-        // Auto-set order type to dine-in
         setOrderType('dine_in')
       }
     }

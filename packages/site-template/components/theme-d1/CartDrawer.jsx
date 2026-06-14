@@ -24,7 +24,7 @@ export default function CartDrawer() {
     // Add table information to checkout URL if available
     let checkoutUrl = isProd ? '/checkout' : `/checkout?site=${siteId}`
     if (isTableOrdering && tableInfo) {
-      checkoutUrl += `&tableId=${tableInfo.tableId}&tableNumber=${encodeURIComponent(tableInfo.tableNumber)}&orderType=${orderType}&paymentPreference=${paymentPreference}`
+      checkoutUrl += `&tableId=${tableInfo.tableId}&tableNumber=${encodeURIComponent(tableInfo.tableNumber)}&locationId=${tableInfo.locationId || ''}&orderType=${orderType}&paymentPreference=${paymentPreference}`
     }
     
     // Only navigate if not already on checkout page
