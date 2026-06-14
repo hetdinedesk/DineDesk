@@ -129,6 +129,7 @@ function PrintableReceipt({ order, data }) {
       <div style={{ marginBottom: '16px', fontSize: '14px' }}>
         <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>ORDER TYPE:</div>
         <div>{order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}</div>
+        {order.tableNumber && <div style={{ fontWeight: 'bold' }}>Table {order.tableNumber}</div>}
         {order.orderType !== 'dine_in' && <div>Time: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>}
       </div>
 
@@ -465,6 +466,9 @@ export default function OrderStatusPage({ data, orderId, template }) {
             <div className="text-left">
               <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">Order #{order.orderNumber}</div>
               <div className="font-heading text-2xl italic" style={{ color: statusInfo.color }}>{statusInfo.label}</div>
+              {order.tableNumber && (
+                <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/80 uppercase mt-1">Table {order.tableNumber}</div>
+              )}
             </div>
           </div>
           <p className="font-body text-sm text-[var(--color-secondary)]/60 max-w-xl mx-auto leading-relaxed">{statusDescription}</p>
@@ -680,9 +684,9 @@ export default function OrderStatusPage({ data, orderId, template }) {
                     <Clock width={18} height={18} strokeWidth={2} className="text-[var(--color-secondary)]/60" />
                   </div>
                   <div>
-                    <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">{order.orderType === 'dine_in' ? 'Seated' : 'Pickup Time'}</div>
+                    <div className="text-xs font-body font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">{order.orderType === 'dine_in' ? (order.tableNumber ? 'Table' : 'Seated') : 'Pickup Time'}</div>
                     <div className="font-body font-bold text-[var(--color-secondary)]">
-                      {order.orderType === 'dine_in' ? 'Now' : order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}
+                      {order.orderType === 'dine_in' ? (order.tableNumber ? `Table ${order.tableNumber}` : 'Now') : order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}
                     </div>
                   </div>
                 </div>
@@ -780,6 +784,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
                 <div className="mb-6 text-sm">
                   <div className="font-bold mb-2 text-base">ORDER TYPE:</div>
                   <div>{order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}</div>
+                  {order.tableNumber && <div className="font-bold">Table {order.tableNumber}</div>}
                   {order.orderType !== 'dine_in' && <div>Time: {order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}</div>}
                 </div>
 

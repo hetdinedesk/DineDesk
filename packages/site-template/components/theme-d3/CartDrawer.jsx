@@ -9,7 +9,8 @@ export default function CartDrawer() {
   const {
     items, isOpen, closeCart, totalItems,
     subtotal, taxAmount, taxRate, taxLabel, total,
-    updateQuantity, removeItem, ordering
+    updateQuantity, removeItem, ordering,
+    tableInfo, isTableOrdering, orderType, paymentPreference
   } = useCart();
 
   const handleCheckout = () => {
@@ -17,8 +18,12 @@ export default function CartDrawer() {
     const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
     const isProd = !!envSiteId
     const siteId = isProd ? '' : (router.query.site || '')
+    let checkoutUrl = isProd ? '/checkout' : `/checkout?site=${siteId}`
+    if (isTableOrdering && tableInfo) {
+      checkoutUrl += `&tableId=${tableInfo.tableId}&tableNumber=${encodeURIComponent(tableInfo.tableNumber)}&orderType=${orderType}&paymentPreference=${paymentPreference}`
+    }
     if (router.pathname !== '/checkout') {
-      router.push(isProd ? '/checkout' : `/checkout?site=${siteId}`)
+      router.push(checkoutUrl)
     }
   }
 

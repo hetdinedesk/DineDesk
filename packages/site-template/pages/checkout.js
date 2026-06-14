@@ -361,6 +361,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const [scheduledTime, setScheduledTime] = useState('')
   // Pre-populate orderType and tableId from QR code query params (set by CartDrawer)
   const qrTableId = router.query.tableId || null
+  const qrTableNumber = router.query.tableNumber || null
   const qrOrderType = router.query.orderType || null
   const [orderType, setOrderType] = useState(qrOrderType || 'pickup') // pickup | delivery | dine_in
   const [selectedLocation, setSelectedLocation] = useState('')
@@ -1326,10 +1327,16 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
           {/* Right Column - Order Summary */}
           <div className="lg:col-span-1">
             <div className={`${normalizedTemplate === 'theme-d1' ? 'bg-white border-[var(--color-secondary)]/20' : normalizedTemplate === 'theme-d2' ? 'bg-white border-teal-200' : 'bg-white'} rounded-[48px] border p-8 sticky top-8`}>
-              <h2 className={`font-serif text-2xl italic mb-8 flex items-center gap-3 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>
+              <h2 className={`font-serif text-2xl italic mb-6 flex items-center gap-3 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>
                 <ShoppingCart width={24} height={24} strokeWidth={2} />
                 {normalizedTemplate === 'theme-d1' ? 'Order Summary' : normalizedTemplate === 'theme-d2' ? 'Your Order' : 'Your Harvest'}
               </h2>
+              {qrTableNumber && (
+                <div className={`flex items-center gap-3 mb-6 px-5 py-3 rounded-full text-sm font-bold ${normalizedTemplate === 'theme-d1' ? 'bg-amber-50 text-amber-800 border border-amber-200' : normalizedTemplate === 'theme-d2' ? 'bg-teal-50 text-teal-800 border border-teal-200' : 'bg-[var(--color-primary)]/10 text-[var(--color-secondary)] border border-[var(--color-primary)]/20'}`}>
+                  <span>🪑</span>
+                  <span>Table {qrTableNumber}</span>
+                </div>
+              )}
 
               <div className="flex flex-col gap-4 mb-8 max-h-[300px] overflow-y-auto">
                 {items.map(item => (

@@ -295,24 +295,8 @@ router.post('/', async (req, res) => {
       console.error('Failed to enqueue order push:', err)
     )
 
-    // If Stripe payment, create PaymentIntent (will be implemented in payments.js)
-    let stripeClientSecret = null
-    if (paymentMethod === 'stripe') {
-      // Return order ID so frontend can create PaymentIntent via separate endpoint
-      return res.json({
-        order,
-        requiresPayment: true,
-        orderId: order.id
-      })
-    }
-
-    // For cash orders, return immediately
-    const responseData = {
-      order,
-      requiresPayment: false
-    }
-
-    // Include table details if tableId exists
+    // Look up table details if tableId exists (needed for all payment paths)
+    let tableData = null
     if (order.tableId) {
       const table = await prisma.restaurantTable.findUnique({
         where: { id: order.tableId },
@@ -320,20 +304,28 @@ router.post('/', async (req, res) => {
           id: true,
           tableNumber: true,
           capacity: true,
-          location: {
-            select: {
-              id: true,
-              name: true
-            }
-          }
+          location: { select: { id: true, name: true } }
         }
       })
-      if (table) {
-        responseData.table = table
-      }
+      if (table) tableData = table
     }
 
-    res.json(responseData)
+    // If Stripe payment, return order + table info so frontend can proceed to payment
+    if (paymentMethod === 'stripe') {
+      return res.json({
+        order: { ...order, tableNumber: tableData?.tableNumber || null },
+        requiresPayment: true,
+        orderId: order.id,
+        table: tableData
+      })
+    }
+
+    // For cash orders, return immediately with table info
+    res.json({
+      order: { ...order, tableNumber: tableData?.tableNumber || null },
+      requiresPayment: false,
+      table: tableData
+    })
   } catch (err) {
     console.error('Create order error:', err)
     res.status(500).json({ error: err.message })
@@ -344,10 +336,13 @@ router.post('/', async (req, res) => {
 router.get('/:orderId', async (req, res) => {
   try {
     const order = await prisma.order.findUnique({
-      where: { id: req.params.orderId }
+      where: { id: req.params.orderId },
+      include: {
+        table: { select: { id: true, tableNumber: true } }
+      }
     })
     if (!order) return res.status(404).json({ error: 'Order not found' })
-    res.json(order)
+    res.json({ ...order, tableNumber: order.table?.tableNumber || null })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
