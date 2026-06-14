@@ -61,5 +61,9 @@ Thumbs.db
 # Railway specific
 railway.toml.local
 
+# Removed packages
+packages/onboarding/
+packages/marketing-website/
+
 # Prisma generated files
 prisma/migrations/
