@@ -26,3 +26,9 @@ export const getApplePayStatus = (clientId) =>
 
 export const enableApplePay = (clientId, domain) =>
   api.post(`/clients/${clientId}/connect/apple-pay`, domain ? { domain } : {}).then(r => r.data)
+
+export const getGooglePayStatus = (clientId) =>
+  api.get(`/clients/${clientId}/connect/google-pay`).then(r => r.data)
+
+export const setGooglePay = (clientId, enabled) =>
+  api.post(`/clients/${clientId}/connect/google-pay`, { enabled }).then(r => r.data)

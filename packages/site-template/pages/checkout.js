@@ -44,7 +44,7 @@ export async function getServerSideProps({ query }) {
 }
 
 // Stripe Checkout Form Component
-function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
+function StripeCheckoutForm({ clientSecret, onSuccess, onError, paymentGateway }) {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
@@ -115,7 +115,7 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError }) {
             layout: 'tabs',
             wallets: {
               applePay: 'auto',
-              googlePay: 'auto'
+              googlePay: paymentGateway?.googlePayEnabled !== false ? 'auto' : 'never'
             },
             paymentMethodOrder: ['card', 'applepay', 'googlepay']
           }}
@@ -1328,6 +1328,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                           clientSecret={clientSecret}
                           onSuccess={handlePaymentSuccess}
                           onError={handlePaymentError}
+                          paymentGateway={paymentGateway}
                         />
                       </Elements>
                     </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle, CheckCircle, ExternalLink, Unlink, RefreshCw } from 'lucide-react'
 import { getConfig, saveConfig } from '../api/config'
-import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe, getApplePayStatus, enableApplePay } from '../api/payments'
+import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe, getApplePayStatus, enableApplePay, getGooglePayStatus, setGooglePay } from '../api/payments'
 import { C } from '../theme'
 import POSIntegrationSection from './POSIntegrationSection'
 
@@ -782,12 +782,33 @@ function StripeConnectPanel({ clientId, paymentConfig, paymentForm, updatePaymen
   const [applePayLoading, setApplePayLoading] = useState(false)
   const [applePayError, setApplePayError] = useState(null)
   const [applePaySuccess, setApplePaySuccess] = useState(null)
+  const [googlePayLoading, setGooglePayLoading] = useState(false)
+  const [googlePayError, setGooglePayError] = useState(null)
 
   const { data: applePayStatus, refetch: refetchApplePay } = useQuery({
     queryKey: ['applePayStatus', clientId],
     queryFn: () => getApplePayStatus(clientId),
     enabled: !!clientId
   })
+
+  const { data: googlePayStatus, refetch: refetchGooglePay } = useQuery({
+    queryKey: ['googlePayStatus', clientId],
+    queryFn: () => getGooglePayStatus(clientId),
+    enabled: !!clientId
+  })
+
+  const handleToggleGooglePay = async () => {
+    setGooglePayLoading(true)
+    setGooglePayError(null)
+    try {
+      await setGooglePay(clientId, !googlePayStatus?.enabled)
+      refetchGooglePay()
+    } catch (err) {
+      setGooglePayError(err?.response?.data?.error || err.message || 'Failed to update Google Pay')
+    } finally {
+      setGooglePayLoading(false)
+    }
+  }
 
   const handleEnableApplePay = async () => {
     setApplePayLoading(true)
@@ -949,6 +970,39 @@ function StripeConnectPanel({ clientId, paymentConfig, paymentForm, updatePaymen
               </div>
               {applePayError && <div style={{ marginTop:10, padding:'8px 12px', background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:6, fontSize:12, color:'#fca5a5' }}>{applePayError}</div>}
               {applePaySuccess && <div style={{ marginTop:10, padding:'8px 12px', background:'#052e16', border:'1px solid #166534', borderRadius:6, fontSize:12, color:'#4ade80' }}>Domain registered successfully: {applePaySuccess.join(', ')}</div>}
+            </div>
+
+            {/* Google Pay toggle */}
+            <div style={{ marginTop:8, padding:'16px 18px', background:C.card, border:`1px solid ${C.border}`, borderRadius:10 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ width:36, height:36, borderRadius:8, background:C.page, border:`1px solid ${C.border2}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:C.t0 }}>Google Pay</span>
+                      {googlePayStatus?.enabled
+                        ? <span style={{ fontSize:11, background:'#052e16', color:'#4ade80', padding:'2px 8px', borderRadius:4, fontWeight:600, border:'1px solid #166534' }}>Enabled</span>
+                        : <span style={{ fontSize:11, background:C.page, color:C.t3, padding:'2px 8px', borderRadius:4, fontWeight:600, border:`1px solid ${C.border}` }}>Disabled</span>
+                      }
+                    </div>
+                    <div style={{ fontSize:12, color:C.t3, marginTop:2 }}>No domain verification needed — available automatically on Chrome and Android</div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleToggleGooglePay}
+                  disabled={googlePayLoading}
+                  style={{ padding:'7px 14px', background:'transparent', border:`1px solid ${C.border2}`, borderRadius:7, color:C.t1, fontWeight:600, fontSize:12, cursor: googlePayLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap', opacity: googlePayLoading ? 0.6 : 1 }}>
+                  {googlePayLoading ? 'Saving…' : googlePayStatus?.enabled ? 'Disable' : 'Enable'}
+                </button>
+              </div>
+              {googlePayError && <div style={{ marginTop:10, padding:'8px 12px', background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:6, fontSize:12, color:'#fca5a5' }}>{googlePayError}</div>}
             </div>
           </>
         ) : isPending ? (

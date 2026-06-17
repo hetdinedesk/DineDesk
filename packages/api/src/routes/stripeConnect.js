@@ -250,4 +250,33 @@ router.get('/apple-pay', authenticateToken, async (req, res) => {
   }
 })
 
+// GET /connect/google-pay - Get Google Pay status
+router.get('/google-pay', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+    const gateway = await prisma.paymentGateway.findUnique({ where: { clientId } })
+    const config = gateway?.config || {}
+    res.json({ enabled: config.googlePayEnabled !== false }) // default true
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /connect/google-pay - Enable or disable Google Pay
+router.post('/google-pay', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+    const enabled = req.body.enabled !== false // default true
+    const gateway = await prisma.paymentGateway.findUnique({ where: { clientId } })
+    if (!gateway) return res.status(404).json({ error: 'Payment gateway not configured' })
+    await prisma.paymentGateway.update({
+      where: { clientId },
+      data: { config: { ...(gateway.config || {}), googlePayEnabled: enabled } }
+    })
+    res.json({ success: true, enabled })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router
