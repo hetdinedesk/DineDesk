@@ -919,31 +919,36 @@ function StripeConnectPanel({ clientId, paymentConfig, paymentForm, updatePaymen
             </div>
 
             {/* Apple Pay domain registration */}
-            <div style={{ marginTop:16, padding:'14px 16px', background:C.page, border:`1px solid ${C.border}`, borderRadius:10 }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <span style={{ fontSize:18 }}>🍎</span>
-                    <span style={{ fontSize:13, fontWeight:700, color:C.t0 }}>Apple Pay Domain Verification</span>
-                    {applePayStatus?.enabled && (
-                      <span style={{ fontSize:10, background:'#166534', color:'#4ade80', padding:'2px 7px', borderRadius:20, fontWeight:700 }}>✓ Registered</span>
-                    )}
+            <div style={{ marginTop:16, padding:'16px 18px', background:C.card, border:`1px solid ${C.border}`, borderRadius:10 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ width:36, height:36, borderRadius:8, background:C.page, border:`1px solid ${C.border2}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color:C.t1 }}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                   </div>
-                  <div style={{ fontSize:12, color:C.t3, marginTop:3 }}>
-                    {applePayStatus?.enabled
-                      ? `Domains: ${(applePayStatus.domains || []).join(', ')}`
-                      : 'Automatically registers your site domain with Stripe so Apple Pay works for customers.'}
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:C.t0 }}>Apple Pay</span>
+                      {applePayStatus?.enabled
+                        ? <span style={{ fontSize:11, background:'#052e16', color:'#4ade80', padding:'2px 8px', borderRadius:4, fontWeight:600, border:'1px solid #166534' }}>Verified</span>
+                        : <span style={{ fontSize:11, background:C.page, color:C.t3, padding:'2px 8px', borderRadius:4, fontWeight:600, border:`1px solid ${C.border}` }}>Not configured</span>
+                      }
+                    </div>
+                    <div style={{ fontSize:12, color:C.t3, marginTop:2 }}>
+                      {applePayStatus?.enabled
+                        ? (applePayStatus.domains || []).join(' · ')
+                        : 'Register your site domain with Stripe to enable Apple Pay at checkout'}
+                    </div>
                   </div>
                 </div>
                 <button
                   onClick={handleEnableApplePay}
                   disabled={applePayLoading}
-                  style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', background: applePayStatus?.enabled ? C.card : '#000', border: applePayStatus?.enabled ? `1px solid ${C.border2}` : 'none', borderRadius:8, color: applePayStatus?.enabled ? C.t1 : '#fff', fontWeight:600, fontSize:12, cursor: applePayLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
-                  {applePayLoading ? 'Registering…' : applePayStatus?.enabled ? '↻ Re-register' : 'Enable Apple Pay'}
+                  style={{ padding:'7px 14px', background:'transparent', border:`1px solid ${C.border2}`, borderRadius:7, color:C.t1, fontWeight:600, fontSize:12, cursor: applePayLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap', opacity: applePayLoading ? 0.6 : 1 }}>
+                  {applePayLoading ? 'Registering…' : applePayStatus?.enabled ? 'Re-register Domain' : 'Register Domain'}
                 </button>
               </div>
-              {applePayError && <div style={{ marginTop:8, fontSize:12, color:'#fca5a5' }}>{applePayError}</div>}
-              {applePaySuccess && <div style={{ marginTop:8, fontSize:12, color:'#4ade80' }}>✓ Registered: {applePaySuccess.join(', ')}</div>}
+              {applePayError && <div style={{ marginTop:10, padding:'8px 12px', background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:6, fontSize:12, color:'#fca5a5' }}>{applePayError}</div>}
+              {applePaySuccess && <div style={{ marginTop:10, padding:'8px 12px', background:'#052e16', border:'1px solid #166534', borderRadius:6, fontSize:12, color:'#4ade80' }}>Domain registered successfully: {applePaySuccess.join(', ')}</div>}
             </div>
           </>
         ) : isPending ? (
