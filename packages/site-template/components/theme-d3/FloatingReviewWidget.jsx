@@ -17,16 +17,15 @@ export const FloatingReviewWidget = () => {
   const { siteConfig } = useCMS();
   const [isVisible, setIsVisible] = useState(true);
 
-  // Check if Google reviews are available
-  const googleReviews = siteConfig?.googleReviews;
-  if (!googleReviews?.placeId || !googleReviews?.averageRating) {
-    return null;
-  }
-
   // Check if widget should be shown
-  if (!siteConfig?.reviews?.enableFloating || !googleReviews?.showFloatingWidget) {
-    return null;
-  }
+  const googleReviews = siteConfig?.googleReviews;
+  if (!siteConfig?.reviews?.enableFloating) return null;
+
+  // Need at least a placeId to show the widget
+  if (!googleReviews?.placeId) return null;
+
+  const rating = googleReviews?.averageRating || siteConfig?.reviews?.averageRating || siteConfig?.reviews?.overallScore || 4.5;
+  const totalReviews = googleReviews?.totalReviews || siteConfig?.reviews?.totalReviews || 0;
 
   // Handle close button
   const handleClose = () => {
@@ -49,14 +48,14 @@ export const FloatingReviewWidget = () => {
       {/* Rating */}
       <div className="flex items-center space-x-1">
         <span className="font-bold text-sm text-gray-900">
-          {googleReviews.averageRating.toFixed(1)}
+          {rating.toFixed(1)}
         </span>
         <div className="flex items-center">
           {[...Array(5)].map((_, i) => (
             <Star
               key={i}
               size={12}
-              className={i < Math.floor(googleReviews.averageRating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}
+              className={i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}
             />
           ))}
         </div>
@@ -64,7 +63,7 @@ export const FloatingReviewWidget = () => {
       
       {/* Review Count */}
       <span className="text-xs text-gray-600">
-        ({googleReviews.totalReviews || 0})
+        ({totalReviews})
       </span>
       
       {/* Close Button */}
