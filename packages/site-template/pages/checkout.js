@@ -1288,36 +1288,34 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     </button>
                   )}
 
-                  {paymentGateway.isActive && paymentGateway.provider === 'stripe' && (
-                    <button
-                      onClick={() => setPaymentMethod('stripe')}
-                      className={`w-full p-6 border rounded-full font-sans font-bold text-sm transition-all flex items-center gap-4 ${
-                        paymentMethod === 'stripe'
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                          : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50'
-                      }`}
-                    >
-                      <div className="flex gap-2 items-center flex-shrink-0">
-                        <CreditCard width={24} height={24} strokeWidth={2} />
-                        <span className="text-2xl">💳</span>
+                  <button
+                    onClick={() => setPaymentMethod('stripe')}
+                    className={`w-full p-6 border rounded-full font-sans font-bold text-sm transition-all flex items-center gap-4 ${
+                      paymentMethod === 'stripe'
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        : 'border-[var(--color-secondary)]/20 bg-white text-[var(--color-secondary)] hover:border-[var(--color-primary)]/50'
+                    }`}
+                  >
+                    <div className="flex gap-2 items-center flex-shrink-0">
+                      <CreditCard width={24} height={24} strokeWidth={2} />
+                      <span className="text-2xl">💳</span>
+                    </div>
+                    <div className="text-left flex-1 min-w-0">
+                      <div>Card Payment</div>
+                      <div className="text-xs font-normal text-[var(--color-secondary)]/60 flex flex-wrap items-center gap-1">
+                        <span>Visa</span>
+                        <span>•</span>
+                        <span>Mastercard</span>
+                        <span>•</span>
+                        <span>Amex</span>
+                        <span>•</span>
+                        <span>Apple Pay</span>
+                        <span>•</span>
+                        <span>Google Pay</span>
                       </div>
-                      <div className="text-left flex-1 min-w-0">
-                        <div>Card Payment</div>
-                        <div className="text-xs font-normal text-[var(--color-secondary)]/60 flex flex-wrap items-center gap-1">
-                          <span>Visa</span>
-                          <span>•</span>
-                          <span>Mastercard</span>
-                          <span>•</span>
-                          <span>Amex</span>
-                          <span>•</span>
-                          <span>Apple Pay</span>
-                          <span>•</span>
-                          <span>Google Pay</span>
-                        </div>
-                      </div>
-                      {paymentMethod === 'stripe' && <Check width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)] flex-shrink-0" />}
-                    </button>
-                  )}
+                    </div>
+                    {paymentMethod === 'stripe' && <Check width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)] flex-shrink-0" />}
+                  </button>
 
                   {paymentMethod === 'stripe' && clientSecret && stripePromise && (
                     <div className="mt-6">
@@ -1351,15 +1349,32 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     </div>
                   )}
 
-                  {paymentMethod === 'stripe' && !clientSecret && (
-                    <button
-                      onClick={handlePlaceOrder}
-                      disabled={loading}
-                      className="w-full py-5 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mt-6"
-                    >
-                      {loading ? <Loader2 width={18} height={18} strokeWidth={2} className="animate-spin" /> : 'CONTINUE TO PAYMENT'}
-                    </button>
-                  )}
+                  {paymentMethod === 'stripe' && !clientSecret && (() => {
+                    const stripeReady = (paymentGateway.isActive && paymentGateway.provider === 'stripe') && (
+                      paymentGateway.stripeConnectStatus === 'connected' ||
+                      paymentGateway.livePublishableKey ||
+                      (paymentGateway.testMode && paymentGateway.testPublishableKey)
+                    )
+                    return stripeReady ? (
+                      <button
+                        onClick={handlePlaceOrder}
+                        disabled={loading}
+                        className="w-full py-5 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+                      >
+                        {loading ? <Loader2 width={18} height={18} strokeWidth={2} className="animate-spin" /> : 'CONTINUE TO PAYMENT'}
+                      </button>
+                    ) : (
+                      <div className="mt-4 p-4 border border-[var(--color-secondary)]/20 rounded-2xl bg-[var(--color-accent)] text-center">
+                        <p className="text-sm text-[var(--color-secondary)]/70 mb-3">Online card payments are not set up yet. You can still place your order and pay at the counter.</p>
+                        <button
+                          onClick={() => { setPaymentMethod('cash'); }}
+                          className="w-full py-5 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg flex items-center justify-center gap-3"
+                        >
+                          PAY AT COUNTER
+                        </button>
+                      </div>
+                    )
+                  })()}
 
                   <div className="flex gap-4">
                     <button

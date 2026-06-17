@@ -169,4 +169,85 @@ router.delete('/disconnect', authenticateToken, async (req, res) => {
   }
 })
 
+// POST /connect/apple-pay - Register site domain(s) with Stripe for Apple Pay
+router.post('/apple-pay', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+    const stripe = getPlatformStripe()
+
+    // Get site URLs from siteConfig
+    const siteConfig = await prisma.siteConfig.findUnique({ where: { clientId } })
+    const netlify = siteConfig?.netlify || {}
+
+    const domainsToRegister = []
+
+    // Add preview URL (always present after site creation)
+    if (netlify.previewUrl) {
+      const host = netlify.previewUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
+      domainsToRegister.push(host)
+    }
+
+    // Add custom/primary domain if set
+    const customDomain = netlify.primaryDomain || netlify.customDomain
+    if (customDomain) {
+      const host = customDomain.replace(/^https?:\/\//, '').replace(/\/$/, '')
+      if (!domainsToRegister.includes(host)) domainsToRegister.push(host)
+    }
+
+    // Also allow manually passed domain
+    if (req.body.domain) {
+      const host = req.body.domain.replace(/^https?:\/\//, '').replace(/\/$/, '')
+      if (!domainsToRegister.includes(host)) domainsToRegister.push(host)
+    }
+
+    if (domainsToRegister.length === 0) {
+      return res.status(400).json({ error: 'No site domain found. Please deploy your site first.' })
+    }
+
+    const results = []
+    for (const domain of domainsToRegister) {
+      try {
+        const result = await stripe.applePayDomains.create({ domain_name: domain })
+        results.push({ domain, success: true, id: result.id })
+      } catch (err) {
+        // Already registered is fine
+        if (err.message?.includes('already been registered')) {
+          results.push({ domain, success: true, alreadyRegistered: true })
+        } else {
+          results.push({ domain, success: false, error: err.message })
+        }
+      }
+    }
+
+    // Save apple pay enabled state
+    const gateway = await prisma.paymentGateway.findUnique({ where: { clientId } })
+    if (gateway) {
+      await prisma.paymentGateway.update({
+        where: { clientId },
+        data: { config: { ...(gateway.config || {}), applePayEnabled: true, applePayDomains: domainsToRegister } }
+      })
+    }
+
+    const allOk = results.every(r => r.success)
+    res.json({ success: allOk, results, domains: domainsToRegister })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /connect/apple-pay - Get Apple Pay registration status
+router.get('/apple-pay', authenticateToken, async (req, res) => {
+  try {
+    const clientId = req.params.clientId
+    const gateway = await prisma.paymentGateway.findUnique({ where: { clientId } })
+    const config = gateway?.config || {}
+    res.json({
+      enabled: config.applePayEnabled === true,
+      domains: config.applePayDomains || []
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router

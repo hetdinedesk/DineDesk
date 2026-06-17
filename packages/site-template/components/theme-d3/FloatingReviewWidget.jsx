@@ -69,8 +69,8 @@ export const FloatingReviewWidget = () => {
       
       {/* Close Button */}
       <button
-        onClick={handleClose}
-        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+        onClick={(e) => { e.stopPropagation(); handleClose(); }}
+        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors relative z-10"
         aria-label="Close review widget"
       >
         <X size={14} />
@@ -81,7 +81,7 @@ export const FloatingReviewWidget = () => {
         href={getReviewUrl()}
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute inset-0 rounded-full"
+        className="absolute inset-0 rounded-full z-0"
         aria-label="Write a review"
       />
     </div>

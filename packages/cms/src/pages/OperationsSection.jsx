@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle, Table, Calendar } from 'lucide-react'
+import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle, Table, Calendar, RotateCcw } from 'lucide-react'
 import { getOrders, updateOrderStatus } from '../api/orders'
+import { refundOrder } from '../api/payments'
 import { getLocations } from '../api/locations'
 import { toggleOrdering, getConfig } from '../api/config'
 import { getTables, updateTableBookingStatus } from '../api/tables'
@@ -108,6 +109,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
   const [orderingEnabled, setOrderingEnabled] = useState(true)
   const [activeTab, setActiveTab] = useState('live')
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [refundOrder, setRefundOrder] = useState(null)
   const [previousOrderIds, setPreviousOrderIds] = useState(new Set())
   const queryClient = useQueryClient()
   const audioRef = useRef(null)
@@ -672,6 +674,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
                     order={order}
                     onClick={() => setSelectedOrder(order)}
                     onStatusChange={handleStatusChange}
+                    onRefund={setRefundOrder}
                   />
                 ))}
               </div>
@@ -685,6 +688,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
             historyOrders={historyOrders}
             onOrderClick={setSelectedOrder}
             onStatusChange={handleStatusChange}
+            onRefund={setRefundOrder}
           />
         )}
 
@@ -720,6 +724,20 @@ export default function OperationsSection({ clientId, user: userProp }) {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusChange={handleStatusChange}
+          onRefund={(order) => { setSelectedOrder(null); setRefundOrder(order) }}
+        />
+      )}
+
+      {refundOrder && (
+        <RefundModal
+          order={refundOrder}
+          clientId={clientId}
+          onClose={() => setRefundOrder(null)}
+          onSuccess={() => {
+            setRefundOrder(null)
+            queryClient.invalidateQueries(['orders', clientId, selectedLocation, 'live'])
+            queryClient.invalidateQueries(['orders', clientId, selectedLocation, 'history'])
+          }}
         />
       )}
     </div>
@@ -727,7 +745,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
 }
 
 // Order Card Component
-function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
+function OrderCard({ order, onClick, onStatusChange, onRefund, isHistory = false }) {
   const statusColor = STATUS_COLORS[order.status]
   const statusLabel = STATUS_LABELS[order.status]
 
@@ -933,6 +951,37 @@ function OrderCard({ order, onClick, onStatusChange, isHistory = false }) {
           )}
         </div>
       </div>
+
+      {/* Refund button for paid orders */}
+      {order.paymentStatus === 'paid' && order.stripePaymentIntentId && (order.status === 'completed' || order.status === 'cancelled') && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}20` }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onRefund && onRefund(order)
+            }}
+            style={{
+              width: '100%',
+              padding: '9px',
+              background: 'transparent',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              color: '#f59e0b',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            <RotateCcw size={13} />
+            Issue Refund
+          </button>
+        </div>
+      )}
 
       {/* Accept/Decline buttons for new orders */}
       {order.status === 'new' && (
@@ -1682,7 +1731,7 @@ function CustomersSection({ historyOrders, clientId }) {
 }
 
 // Order History Component
-function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange }) {
+function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange, onRefund }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
@@ -1790,6 +1839,7 @@ function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange }) {
             order={order}
             onClick={() => onOrderClick(order)}
             onStatusChange={onStatusChange}
+            onRefund={onRefund}
             isHistory
           />
         ))}
@@ -1798,8 +1848,114 @@ function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange }) {
   )
 }
 
+// RefundModal Component
+function RefundModal({ order, clientId, onClose, onSuccess }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [refundType, setRefundType] = useState('full')
+  const [customAmount, setCustomAmount] = useState('')
+
+  const handleRefund = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const amount = refundType === 'partial' ? parseFloat(customAmount) : undefined
+      if (refundType === 'partial' && (!amount || amount <= 0 || amount > order.total)) {
+        setError(`Enter a valid amount between $0.01 and $${order.total.toFixed(2)}`)
+        setLoading(false)
+        return
+      }
+      await refundOrder(clientId, order.id, amount)
+      onSuccess()
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message || 'Refund failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1100, padding: 20
+    }} onClick={onClose}>
+      <div style={{
+        background: C.panel, border: `1px solid ${C.border}`,
+        borderRadius: 12, maxWidth: 420, width: '100%', padding: 28
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: C.t0 }}>Issue Refund</h3>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: C.t3 }}>Order #{order.orderNumber} · ${(order.total || 0).toFixed(2)}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.t3, cursor: 'pointer', padding: 4 }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
+            <input type='radio' value='full' checked={refundType === 'full'} onChange={() => setRefundType('full')} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.t0 }}>Full Refund</div>
+              <div style={{ fontSize: 12, color: C.t3 }}>Refund the full ${(order.total || 0).toFixed(2)}</div>
+            </div>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input type='radio' value='partial' checked={refundType === 'partial'} onChange={() => setRefundType('partial')} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.t0 }}>Partial Refund</div>
+              <div style={{ fontSize: 12, color: C.t3 }}>Enter a custom amount</div>
+            </div>
+          </label>
+        </div>
+
+        {refundType === 'partial' && (
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: C.t3, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Refund Amount ($)</label>
+            <input
+              type='number'
+              min='0.01'
+              max={order.total}
+              step='0.01'
+              value={customAmount}
+              onChange={e => setCustomAmount(e.target.value)}
+              placeholder={`Max $${(order.total || 0).toFixed(2)}`}
+              style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, fontFamily: 'inherit', background: C.input, color: C.t0, boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
+
+        {error && (
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: '#450a0a', border: '1px solid #ef4444', borderRadius: 8, fontSize: 13, color: '#fca5a5' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={handleRefund} disabled={loading} style={{
+            flex: 1, padding: '12px', background: '#f59e0b', border: 'none', borderRadius: 8,
+            color: '#000', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+            fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            opacity: loading ? 0.7 : 1
+          }}>
+            <RotateCcw size={15} />
+            {loading ? 'Processing…' : 'Confirm Refund'}
+          </button>
+          <button onClick={onClose} style={{
+            padding: '12px 20px', background: 'transparent', border: `1px solid ${C.border2}`,
+            borderRadius: 8, color: C.t2, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit'
+          }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Order Detail Modal
-function OrderDetailModal({ order, onClose, onStatusChange }) {
+function OrderDetailModal({ order, onClose, onStatusChange, onRefund }) {
   const statusColor = STATUS_COLORS[order.status]
   const statusLabel = STATUS_LABELS[order.status]
   const nextStatuses = STATUS_FLOW[order.status] || []
@@ -2017,7 +2173,7 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
 
         {/* Status Actions */}
         {nextStatuses.length > 0 && (
-          <div>
+          <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', marginBottom: 8 }}>
               Update Status
             </div>
@@ -2051,6 +2207,32 @@ function OrderDetailModal({ order, onClose, onStatusChange }) {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Refund Action */}
+        {order.paymentStatus === 'paid' && order.stripePaymentIntentId && onRefund && (
+          <div style={{ paddingTop: 12, borderTop: `1px solid ${C.border}20` }}>
+            <button
+              onClick={() => onRefund(order)}
+              style={{
+                padding: '10px 20px',
+                border: '1px solid #f59e0b',
+                background: '#f59e0b20',
+                color: '#f59e0b',
+                fontSize: 13,
+                fontWeight: 600,
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <RotateCcw size={14} />
+              Issue Refund
+            </button>
           </div>
         )}
       </div>

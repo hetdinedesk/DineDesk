@@ -190,6 +190,56 @@ router.post('/confirm-payment', async (req, res) => {
   }
 })
 
+// POST /refund - Issue a full or partial refund for a paid order
+router.post('/refund', authenticateToken, async (req, res) => {
+  try {
+    const clientId = getClientId(req)
+    const { orderId, amount } = req.body
+
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required' })
+    }
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    if (order.paymentStatus !== 'paid') return res.status(400).json({ error: 'Order is not paid' })
+    if (!order.stripePaymentIntentId) return res.status(400).json({ error: 'No Stripe payment found for this order' })
+
+    const paymentGateway = await prisma.paymentGateway.findUnique({ where: { clientId } })
+
+    let stripe
+    if (paymentGateway?.stripeAccountId && paymentGateway?.stripeConnectStatus === 'connected') {
+      stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+    } else {
+      const config = paymentGateway?.config || {}
+      const stripeSecretKey = paymentGateway?.testMode ? config.testSecretKey : config.liveSecretKey
+      if (!stripeSecretKey) return res.status(400).json({ error: 'Stripe not configured' })
+      stripe = new Stripe(stripeSecretKey)
+    }
+
+    const refundAmount = amount ? Math.round(amount * 100) : undefined
+
+    const refund = await stripe.refunds.create({
+      payment_intent: order.stripePaymentIntentId,
+      ...(refundAmount ? { amount: refundAmount } : {})
+    })
+
+    const isFullRefund = !refundAmount || refundAmount >= Math.round((order.total || 0) * 100)
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: isFullRefund ? 'refunded' : 'partial_refund',
+        status: isFullRefund ? 'cancelled' : order.status
+      }
+    })
+
+    res.json({ success: true, refundId: refund.id, status: refund.status })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // POST /webhook - Stripe webhook to handle payment events
 router.post('/webhook', async (req, res) => {
   try {

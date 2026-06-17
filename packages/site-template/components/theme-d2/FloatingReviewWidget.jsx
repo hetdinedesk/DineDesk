@@ -42,7 +42,7 @@ export const FloatingReviewWidget = () => {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg border border-gray-200 p-3 flex items-center space-x-2 hover:shadow-xl transition-shadow duration-300">
+    <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg border border-gray-200 p-3 flex items-center space-x-2 hover:shadow-xl transition-shadow duration-300 relative">
       {/* Google Icon */}
       <Google size={20} className="text-blue-600" />
       
@@ -69,8 +69,8 @@ export const FloatingReviewWidget = () => {
       
       {/* Close Button */}
       <button
-        onClick={handleClose}
-        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+        onClick={(e) => { e.stopPropagation(); handleClose(); }}
+        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors relative z-10"
         aria-label="Close review widget"
       >
         <X size={14} />
@@ -81,7 +81,7 @@ export const FloatingReviewWidget = () => {
         href={getReviewUrl()}
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute inset-0 rounded-full"
+        className="absolute inset-0 rounded-full z-0"
         aria-label="Write a review"
       />
     </div>

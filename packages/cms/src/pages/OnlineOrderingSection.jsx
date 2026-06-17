@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle, CheckCircle, ExternalLink, Unlink, RefreshCw } from 'lucide-react'
 import { getConfig, saveConfig } from '../api/config'
-import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe } from '../api/payments'
+import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe, getApplePayStatus, enableApplePay } from '../api/payments'
 import { C } from '../theme'
 import POSIntegrationSection from './POSIntegrationSection'
 
@@ -779,6 +779,30 @@ function StripeConnectPanel({ clientId, paymentConfig, paymentForm, updatePaymen
   const [loginLoading, setLoginLoading] = useState(false)
   const [disconnectLoading, setDisconnectLoading] = useState(false)
   const [connectError, setConnectError] = useState(null)
+  const [applePayLoading, setApplePayLoading] = useState(false)
+  const [applePayError, setApplePayError] = useState(null)
+  const [applePaySuccess, setApplePaySuccess] = useState(null)
+
+  const { data: applePayStatus, refetch: refetchApplePay } = useQuery({
+    queryKey: ['applePayStatus', clientId],
+    queryFn: () => getApplePayStatus(clientId),
+    enabled: !!clientId
+  })
+
+  const handleEnableApplePay = async () => {
+    setApplePayLoading(true)
+    setApplePayError(null)
+    setApplePaySuccess(null)
+    try {
+      const result = await enableApplePay(clientId)
+      setApplePaySuccess(result.domains)
+      refetchApplePay()
+    } catch (err) {
+      setApplePayError(err?.response?.data?.error || err.message || 'Failed to register domain')
+    } finally {
+      setApplePayLoading(false)
+    }
+  }
 
   const { data: connectStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
     queryKey: ['stripeConnect', clientId],
@@ -892,6 +916,34 @@ function StripeConnectPanel({ clientId, paymentConfig, paymentForm, updatePaymen
                 <Unlink size={14} />
                 {disconnectLoading ? 'Disconnecting…' : 'Disconnect'}
               </button>
+            </div>
+
+            {/* Apple Pay domain registration */}
+            <div style={{ marginTop:16, padding:'14px 16px', background:C.page, border:`1px solid ${C.border}`, borderRadius:10 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ fontSize:18 }}>🍎</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:C.t0 }}>Apple Pay Domain Verification</span>
+                    {applePayStatus?.enabled && (
+                      <span style={{ fontSize:10, background:'#166534', color:'#4ade80', padding:'2px 7px', borderRadius:20, fontWeight:700 }}>✓ Registered</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize:12, color:C.t3, marginTop:3 }}>
+                    {applePayStatus?.enabled
+                      ? `Domains: ${(applePayStatus.domains || []).join(', ')}`
+                      : 'Automatically registers your site domain with Stripe so Apple Pay works for customers.'}
+                  </div>
+                </div>
+                <button
+                  onClick={handleEnableApplePay}
+                  disabled={applePayLoading}
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', background: applePayStatus?.enabled ? C.card : '#000', border: applePayStatus?.enabled ? `1px solid ${C.border2}` : 'none', borderRadius:8, color: applePayStatus?.enabled ? C.t1 : '#fff', fontWeight:600, fontSize:12, cursor: applePayLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+                  {applePayLoading ? 'Registering…' : applePayStatus?.enabled ? '↻ Re-register' : 'Enable Apple Pay'}
+                </button>
+              </div>
+              {applePayError && <div style={{ marginTop:8, fontSize:12, color:'#fca5a5' }}>{applePayError}</div>}
+              {applePaySuccess && <div style={{ marginTop:8, fontSize:12, color:'#4ade80' }}>✓ Registered: {applePaySuccess.join(', ')}</div>}
             </div>
           </>
         ) : isPending ? (

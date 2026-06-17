@@ -86,7 +86,7 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: 'Stripe payment is not configured' })
       }
     } else if (paymentMethod === 'cash') {
-      if (!paymentGateway?.cashEnabled) {
+      if (paymentGateway && paymentGateway.cashEnabled === false) {
         return res.status(400).json({ error: 'Cash payment is not enabled' })
       }
     }

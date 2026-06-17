@@ -17,3 +17,12 @@ export const createStripeLoginLink = (clientId) =>
 
 export const disconnectStripe = (clientId) =>
   api.delete(`/clients/${clientId}/connect/disconnect`).then(r => r.data)
+
+export const refundOrder = (clientId, orderId, amount) =>
+  api.post(`/clients/${clientId}/payments/refund`, { orderId, ...(amount ? { amount } : {}) }).then(r => r.data)
+
+export const getApplePayStatus = (clientId) =>
+  api.get(`/clients/${clientId}/connect/apple-pay`).then(r => r.data)
+
+export const enableApplePay = (clientId, domain) =>
+  api.post(`/clients/${clientId}/connect/apple-pay`, domain ? { domain } : {}).then(r => r.data)
