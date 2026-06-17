@@ -1319,7 +1319,11 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
                   {paymentMethod === 'stripe' && clientSecret && stripePromise && (
                     <div className="mt-6">
-                      <Elements stripe={stripePromise} options={{ clientSecret }}>
+                      <Elements stripe={stripePromise} options={{
+                        clientSecret,
+                        appearance: { theme: 'stripe' },
+                        wallets: { applePay: 'auto', googlePay: 'auto' }
+                      }}>
                         <StripeCheckoutForm 
                           clientSecret={clientSecret}
                           onSuccess={handlePaymentSuccess}
