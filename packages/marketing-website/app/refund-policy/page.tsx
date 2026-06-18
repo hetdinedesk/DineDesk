@@ -29,7 +29,10 @@ export default function RefundPolicy() {
           <section className="mb-12">
             <h2 className="text-2xl font-display font-bold text-white mb-4">Setup Fee Refund Policy</h2>
             <p className="text-white/70 leading-relaxed mb-4">
-              The one-time setup fee of AUD 249 is non-refundable once work has commenced on your website and platform setup. This includes:
+              The $249 setup fee is <strong>non-negotiable and paid upfront</strong>. This signals we are a real service, not a free trial. It ensures clients are genuinely interested before work begins — no tyre-kickers. At $249 you are still a fraction of any web agency ($2k–5k minimum).
+            </p>
+            <p className="text-white/70 leading-relaxed mb-4">
+              The setup fee is non-refundable once work has commenced on your website and platform setup. This includes:
             </p>
             <ul className="list-disc list-inside text-white/70 space-y-2 mb-6">
               <li>Initial consultation and requirements gathering</li>

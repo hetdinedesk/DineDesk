@@ -68,7 +68,7 @@ export default function TermsAndConditions() {
               Monthly subscription fees are charged based on the selected plan:
             </p>
             <ul className="list-disc list-inside text-white/70 space-y-2 mb-6">
-              <li><strong>Starter:</strong> AUD 79 per month</li>
+              <li><strong>Essential:</strong> AUD 79 per month</li>
               <li><strong>Growth:</strong> AUD 149 per month</li>
               <li><strong>Pro:</strong> AUD 249 per month</li>
             </ul>

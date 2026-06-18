@@ -6,7 +6,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Pricing — DineDesk',
-  description: 'Transparent pricing for every restaurant. No setup fees, no long-term contracts. We build and launch your site — you pay monthly.',
+  description: 'Transparent pricing for every restaurant. One-time $249 setup fee, then monthly subscription. No long-term contracts. We build and launch your site — you pay monthly.',
 }
 
 export default function PricingPage() {

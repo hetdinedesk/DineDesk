@@ -12,7 +12,7 @@ const faqs = [
   },
   {
     question: 'What\'s included in the one-time setup fee?',
-    answer: 'The AUD 249 setup fee includes complete platform setup: website configuration, menu import, Stripe payment integration, QR code generation for tables, domain connection, loyalty program setup, and full onboarding. You get a fully functional site ready to take orders.',
+    answer: 'The $249 setup fee is non-negotiable and paid upfront. It covers onboarding, menu import, domain connection, design setup, and launch. At $249 you\'re still a fraction of any web agency ($2k–5k minimum). This signals we\'re a real service, not a free trial — meaning clients need to be genuinely interested before they start. No tyre-kickers.',
   },
   {
     question: 'Do I own my data?',

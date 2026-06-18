@@ -1139,6 +1139,40 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
     all: 'All Time'
   }
 
+  // Calculate daily revenue for the current week (Mon-Sun)
+  const getDailyRevenue = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const dayOfWeek = today.getDay()
+    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+    const weekStart = new Date(today)
+    weekStart.setDate(diff)
+
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const dailyRevenue = days.map((dayLabel, index) => {
+      const dayStart = new Date(weekStart)
+      dayStart.setDate(weekStart.getDate() + index)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayStart.getDate() + 1)
+
+      const dayOrders = [...liveOrders, ...historyOrders].filter(order => {
+        if (!order.createdAt || order.status === 'new') return false
+        const orderDate = new Date(order.createdAt)
+        return orderDate >= dayStart && orderDate < dayEnd
+      })
+
+      const revenue = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0)
+      const isToday = index === (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+
+      return { day: dayLabel, revenue, isToday }
+    })
+
+    return dailyRevenue
+  }
+
+  const dailyRevenue = getDailyRevenue()
+  const maxRevenue = Math.max(...dailyRevenue.map(d => d.revenue), 1)
+
   return (
     <div>
       <div style={{ 
@@ -1242,6 +1276,123 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
         </div>
       </div>
       
+      {/* Daily Revenue Bar Chart */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: 12 
+        }}>
+          <h4 style={{ 
+            fontSize: '16px', 
+            fontWeight: 'bold', 
+            color: C.t0,
+            margin: 0,
+            textTransform: 'uppercase',
+            letterSpacing: '0.07em'
+          }}>
+            Daily Revenue
+          </h4>
+          <span style={{ fontSize: 12, color: C.t2 }}>This Week</span>
+        </div>
+        
+        <div style={{ 
+          background: C.card, 
+          borderRadius: '12px', 
+          padding: '20px'
+        }}>
+          {/* Chart container */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'flex-end', 
+            justifyContent: 'space-between',
+            height: '180px',
+            gap: '8px',
+            paddingBottom: '8px'
+          }}>
+            {dailyRevenue.map((day, index) => {
+              const barHeight = maxRevenue > 0 ? (day.revenue / maxRevenue) * 140 : 0
+              const hasRevenue = day.revenue > 0
+              
+              return (
+                <div key={index} style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  flex: 1,
+                  gap: '8px'
+                }}>
+                  {/* Revenue label */}
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '600',
+                    color: hasRevenue ? C.acc : C.t3,
+                    opacity: hasRevenue ? 1 : 0.5
+                  }}>
+                    {hasRevenue ? `$${Math.round(day.revenue)}` : ''}
+                  </span>
+                  
+                  {/* Bar */}
+                  <div style={{
+                    width: '100%',
+                    maxWidth: '40px',
+                    height: `${Math.max(barHeight, 4)}px`,
+                    minHeight: hasRevenue ? '4px' : '4px',
+                    background: day.isToday 
+                      ? 'linear-gradient(180deg, #FF8C42 0%, #FF6B35 100%)'
+                      : hasRevenue 
+                        ? 'linear-gradient(180deg, #FF8C42 0%, #FF6B35 100%)'
+                        : C.border,
+                    borderRadius: '4px 4px 0 0',
+                    opacity: hasRevenue ? (day.isToday ? 1 : 0.8) : 0.3,
+                    transition: 'all 0.3s ease'
+                  }} />
+                  
+                  {/* Day label */}
+                  <span style={{ 
+                    fontSize: '12px', 
+                    fontWeight: day.isToday ? '600' : '400',
+                    color: day.isToday ? C.t0 : C.t2
+                  }}>
+                    {day.day}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          
+          {/* Legend */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '16px',
+            marginTop: '16px',
+            paddingTop: '12px',
+            borderTop: `1px solid ${C.border}30`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ 
+                width: '12px', 
+                height: '12px', 
+                background: 'linear-gradient(180deg, #FF8C42 0%, #FF6B35 100%)',
+                borderRadius: '2px'
+              }} />
+              <span style={{ fontSize: '12px', color: C.t2 }}>Revenue (USD)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ 
+                width: '12px', 
+                height: '12px', 
+                background: C.border,
+                borderRadius: '2px'
+              }} />
+              <span style={{ fontSize: '12px', color: C.t2 }}>No sales</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Top Selling Items */}
       <div style={{ marginBottom: 16 }}>
         <h4 style={{ 

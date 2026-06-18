@@ -8,63 +8,65 @@ import Link from 'next/link'
 
 const plans = [
   {
-    name: 'Starter',
+    name: 'Essential',
     icon: Truck,
-    description: 'For small cafés, takeaway shops, and fish & chips stores.',
+    description: 'For cafés, takeaways, and small independents just getting online.',
     price: 'AUD 79',
     period: '/mo',
     features: [
-      'Restaurant website',
+      'Professional restaurant website',
       'Menu and category management',
       'Specials and promotions',
-      'Custom pages',
-      'Theme colours and fonts',
-      'Navigation, header, and footer',
-      'Preview and live deployment',
+      'Custom pages (About, Contact, etc.)',
+      'Theme colours, fonts, branding',
+      'Navigation, header, footer',
       'Custom domain connection',
-      'Basic SEO / meta data',
-      'Basic support',
+      'Preview and live deployment',
+      'Basic SEO and meta data',
+      'Mobile optimised',
+      'Standard support (48hr response)',
     ],
+    pitch: 'Places that just need to exist online properly — better than a Facebook page, better than nothing, better than a $30 Wix DIY site they\'ll never update.',
     cta: 'Get Started',
     popular: false,
   },
   {
     name: 'Growth',
     icon: Store,
-    description: 'For busy independents that want more control and better presentation.',
+    description: 'For busy independents that want their website to actually bring in customers.',
     price: 'AUD 149',
     period: '/mo',
     features: [
-      'Everything in Starter, plus:',
-      'Reviews carousel',
-      'Better homepage sections and banners',
-      'More design customisation',
-      'Team members section',
-      'QR table generation',
-      'Priority support',
-      'Extra content flexibility',
-      'Stronger branding options',
+      'Everything in Essential, plus:',
+      'Online reservations / table bookings',
+      'Reviews carousel (Google stars front and centre)',
+      'Homepage banners and promotional sections',
+      'QR code menu for tables',
+      'Team / staff section',
+      'Stronger branding and design customisation',
+      'Priority support (24hr response)',
     ],
+    pitch: 'Two extra bookings a month pays for it. Moving bookings online saves time on the phone and captures customers who won\'t call. This is where 80% of your clients should land — it\'s the sweet spot.',
     cta: 'Get Started',
     popular: true,
   },
   {
     name: 'Pro',
     icon: Building2,
-    description: 'For restaurants that want revenue features and multi-location readiness.',
+    description: 'For restaurants ready to take orders and build a loyal customer base.',
     price: 'AUD 249',
     period: '/mo',
     features: [
       'Everything in Growth, plus:',
-      'Online ordering',
+      'Online ordering (direct, commission-free)',
       'Loyalty program',
-      'Booking & table reservations',
       'Multi-location support',
       'Advanced roles and permissions',
+      'Square POS integration',
       'Premium customisation',
-      'Higher-priority support',
-      'Square POS integration for in-store sync',
+      'Highest-priority support (same-day response)',
     ],
+    pitch: 'You\'re currently paying Menulog/DoorDash 25–35% commission on every order. One month of direct online orders likely covers this plan entirely.',
     cta: 'Get Started',
     popular: false,
   },
@@ -118,22 +120,25 @@ export function Pricing() {
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.25 }}
-          className="glass border border-dine-orange/30 rounded-2xl p-6 mb-10 flex flex-col sm:flex-row items-center justify-between gap-4"
+          className="glass border border-dine-orange/30 rounded-2xl p-6 mb-10"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-dine-orange to-dine-coral flex items-center justify-center flex-shrink-0">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
-            <div>
-              <p className="text-white font-display font-bold text-lg">One-Time Setup Fee — AUD 249</p>
-              <p className="text-white/55 text-sm">Includes onboarding, menu import, domain connection, and launch setup.</p>
+            <div className="flex-1">
+              <p className="text-white font-display font-bold text-lg">Setup Fee: $249 — One-time</p>
+              <p className="text-white/55 text-sm">Non-negotiable and paid upfront. At $249 you're still a fraction of any web agency ($2k–5k minimum).</p>
+            </div>
+            <div className="flex-shrink-0">
+              <span className="px-4 py-2 rounded-full bg-dine-orange/15 text-dine-orange text-sm font-medium border border-dine-orange/30">
+                Paid once at start
+              </span>
             </div>
           </div>
-          <div className="flex-shrink-0">
-            <span className="px-4 py-2 rounded-full bg-dine-orange/15 text-dine-orange text-sm font-medium border border-dine-orange/30">
-              Paid once at start
-            </span>
-          </div>
+          <p className="text-white/50 text-sm pl-0 sm:pl-16 leading-relaxed">
+            Covers onboarding, menu import, domain connection, design setup, and launch. This signals you're a real service, not a free trial. It also means a client needs to be genuinely interested before they start — no tyre-kickers.
+          </p>
         </motion.div>
 
         {/* Pricing Cards */}
@@ -170,7 +175,8 @@ export function Pricing() {
 
               {/* Plan name + description */}
               <h3 className="text-2xl font-display font-bold text-white mb-1">{plan.name}</h3>
-              <p className="text-white/50 text-sm mb-5 leading-relaxed">{plan.description}</p>
+              <p className="text-white/50 text-sm mb-2 leading-relaxed">{plan.description}</p>
+              <p className="text-white/40 text-xs mb-5 leading-relaxed italic border-l-2 border-dine-orange/30 pl-3">{plan.pitch}</p>
 
               {/* Price */}
               <div className="mb-6 pb-6 border-b border-white/10">
