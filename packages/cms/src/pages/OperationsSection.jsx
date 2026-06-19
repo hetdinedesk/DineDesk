@@ -824,15 +824,15 @@ function OrderCard({ order, onClick, onStatusChange, onRefund, isHistory = false
             {statusLabel}
           </span>
           <span style={{
-            background: order.paymentStatus === 'paid' ? `${C.green}20` : `${C.red}20`,
-            color: order.paymentStatus === 'paid' ? C.green : C.red,
+            background: order.paymentStatus === 'paid' ? `${C.green}20` : order.paymentStatus === 'refunded' ? '#7c3aed20' : order.paymentStatus === 'partial_refund' ? '#f59e0b20' : `${C.red}20`,
+            color: order.paymentStatus === 'paid' ? C.green : order.paymentStatus === 'refunded' ? '#a78bfa' : order.paymentStatus === 'partial_refund' ? '#f59e0b' : C.red,
             padding: '3px 8px',
             borderRadius: 4,
             fontSize: 10,
             fontWeight: 600,
             textTransform: 'capitalize'
           }}>
-            {order.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+            {order.paymentStatus === 'paid' ? 'Paid' : order.paymentStatus === 'refunded' ? 'Refunded' : order.paymentStatus === 'partial_refund' ? 'Part. Refunded' : 'Unpaid'}
           </span>
         </div>
       </div>
@@ -953,7 +953,7 @@ function OrderCard({ order, onClick, onStatusChange, onRefund, isHistory = false
       </div>
 
       {/* Refund button for paid orders */}
-      {order.paymentStatus === 'paid' && order.stripePaymentIntentId && (order.status === 'completed' || order.status === 'cancelled') && (
+      {order.paymentStatus === 'paid' && order.stripePaymentIntentId && (order.status === 'completed' || order.status === 'cancelled') && order.paymentStatus !== 'refunded' && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}20` }}>
           <button
             onClick={(e) => {
@@ -2199,15 +2199,15 @@ function OrderDetailModal({ order, onClose, onStatusChange, onRefund }) {
               {statusLabel}
             </span>
             <span style={{
-              background: order.paymentStatus === 'paid' ? `${C.green}20` : `${C.red}20`,
-              color: order.paymentStatus === 'paid' ? C.green : C.red,
+              background: order.paymentStatus === 'paid' ? `${C.green}20` : order.paymentStatus === 'refunded' ? '#7c3aed20' : order.paymentStatus === 'partial_refund' ? '#f59e0b20' : `${C.red}20`,
+              color: order.paymentStatus === 'paid' ? C.green : order.paymentStatus === 'refunded' ? '#a78bfa' : order.paymentStatus === 'partial_refund' ? '#f59e0b' : C.red,
               padding: '4px 10px',
               borderRadius: 6,
               fontSize: 11,
               fontWeight: 600,
               textTransform: 'capitalize'
             }}>
-              {order.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+              {order.paymentStatus === 'paid' ? 'Paid' : order.paymentStatus === 'refunded' ? 'Refunded' : order.paymentStatus === 'partial_refund' ? 'Partially Refunded' : 'Unpaid'}
             </span>
           </div>
         </div>
@@ -2362,7 +2362,7 @@ function OrderDetailModal({ order, onClose, onStatusChange, onRefund }) {
         )}
 
         {/* Refund Action */}
-        {order.paymentStatus === 'paid' && order.stripePaymentIntentId && onRefund && (
+        {order.paymentStatus === 'paid' && order.stripePaymentIntentId && onRefund && order.paymentStatus !== 'refunded' && (
           <div style={{ paddingTop: 12, borderTop: `1px solid ${C.border}20` }}>
             <button
               onClick={() => onRefund(order)}
