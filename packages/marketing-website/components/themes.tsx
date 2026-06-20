@@ -146,9 +146,8 @@ export function Themes() {
               transition={{ delay: 0.2 }}
             >
               <p className="text-lg text-white/55 leading-relaxed mb-6">
-                All three themes run live on{' '}
-                <span className="text-white font-medium">Harbour Brew Cafe, Sydney</span> — a real
-                DineDesk demo restaurant. Same menu, same content. Pick a layout that fits your brand.
+                All three themes are live on a real demo restaurant — same menu, same content,
+                three completely different layouts. Pick the one that fits your brand.
               </p>
               <div className="flex flex-wrap gap-3">
                 {themes.map((t) => (

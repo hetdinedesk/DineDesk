@@ -18,11 +18,11 @@ const themes = [
     features: ['Specials announcement banner', 'Loyalty, Order & Book CTAs', 'Current specials section', 'Customer reviews section', 'Multi-location support', 'Meet the team page'],
     demoUrl: 'https://harbour-brew-cafe-theme-d1.netlify.app/',
     preview: {
-      name: 'Harbour Brew Cafe',
-      tagline: 'Coffee & Café · Sydney',
+      name: 'Your Restaurant',
+      tagline: 'Coffee & Café · Your City',
       nav: ['Menu', 'Specials', 'Locations', 'Contact'],
       heroText: 'Experience the Art of Coffee',
-      subText: 'Fresh coffee, harbour views, and good vibes — order online or book a table',
+      subText: 'Fresh coffee, great food, and good vibes — order online or book a table',
       cta: 'Order Online',
     },
   },
@@ -37,8 +37,8 @@ const themes = [
     features: ['Full hero with brand story', 'Order Online hero CTA', 'Specials & promotions tiles', 'Customer reviews section', 'Multi-location support', 'Meet the team page'],
     demoUrl: 'https://harbour-brew-cafe-theme-d2.netlify.app/',
     preview: {
-      name: 'Harbour Brew Cafe',
-      tagline: 'Coffee & Café · Circular Quay',
+      name: 'Your Restaurant',
+      tagline: 'Coffee & Café · Your City',
       nav: ['Menu', 'Specials', 'Locations', 'Contact'],
       heroText: 'Experience the Art of Coffee',
       subText: 'We source the finest beans from sustainable farms — crafted with passion, every cup',
@@ -56,8 +56,8 @@ const themes = [
     features: ['Seasonal announcement bar', 'Loyalty program hero widget', 'Earn & redeem points display', 'Current specials section', 'Multi-location support', 'Meet the team page'],
     demoUrl: 'https://harbour-brew-cafe-theme-d3.netlify.app/',
     preview: {
-      name: 'Harbour Brew Cafe',
-      tagline: 'Coffee & Café · Sydney Harbour',
+      name: 'Your Restaurant',
+      tagline: 'Coffee & Café · Your City',
       nav: ['Menu', 'Specials', 'Locations', 'Contact'],
       heroText: 'Experience the Art of Coffee',
       subText: 'Try our new seasonal drinks and pastries — earn rewards with every order',
@@ -112,7 +112,7 @@ function ThemeMockup({ theme }: { theme: typeof themes[0] }) {
         <div className="flex flex-wrap gap-3 mb-5">
           {[
             { icon: Clock, text: 'Mon–Sun 6am–5pm' },
-            { icon: MapPin, text: '123 George St, Sydney' },
+            { icon: MapPin, text: '123 Main St, Your City' },
             { icon: Phone, text: '+61 2 9123 4567' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-1.5 text-xs text-white/40">
@@ -162,8 +162,8 @@ export function HomeThemesPreview() {
             transition={{ delay: 0.1 }}
             className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-5"
           >
-            Three Themes, One{' '}
-            <span className="gradient-text">Real Demo Restaurant</span>
+            Three Themes,{' '}
+            <span className="gradient-text">One Platform</span>
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -171,9 +171,9 @@ export function HomeThemesPreview() {
             transition={{ delay: 0.2 }}
             className="text-lg text-white/60 max-w-2xl mx-auto"
           >
-            See all three themes live on a real café — Harbour Brew Cafe, Sydney. Each theme
-            uses the same content but delivers a completely different look and feel. We build
-            and configure your theme — you just approve and go live.
+            Three layout styles, one platform. Each theme uses the same content but delivers
+            a completely different look and feel. We build and configure your theme — you just
+            approve and go live.
           </motion.p>
         </div>
 
