@@ -143,6 +143,8 @@ Post these in order for maximum impact — launch announcement first, then build
 | 30 | Behind the Scenes — Why We Built DineDesk | 🧑‍💻 Brand Story | Week 4 |
 | 31 | Before & After — Restaurant Transformation | 📸 Social Proof | Week 5 |
 | 32 | How It Works in 4 Steps (Reel / Carousel) | 🎬 How-To | Week 3 |
+| 33 | We're Not a Website Builder | 🔥 Positioning | Week 2 |
+| 34 | No Menu Photos? We've Got You | 📸 Objection Killer | Week 3 |
 
 ---
 
@@ -1909,6 +1911,150 @@ Then from AUD 79/month — no lock-in, cancel anytime.
 
 ---
 
+## Post 33: Positioning - "We're Not a Website Builder"
+
+### Creative Brief
+**Format:** 1080×1080px square
+**Mood:** Bold positioning statement — like a Notion or Linear "we're different" brand post. Confident, direct, typographically heavy. No screenshots of a website. This post is about the system, not the aesthetics.
+
+**Background:** `#0F0F1A` solid — darker than usual, more serious.
+
+**Layout — full-canvas typographic grid, centred, heavy vertical rhythm:**
+
+- Top label (80px from top): `LET'S BE CLEAR` — Inter Medium 11px `#FF6B35`, all caps, 4px tracking, centred.
+- Spacer: 28px
+- Line 1: `We're not a` — Plus Jakarta Sans Regular 48px `#6B7280`, centred.
+- Line 2: `website builder.` — Plus Jakarta Sans ExtraBold 54px white, centred. (tight leading, sits directly under line 1)
+- Spacer: 40px
+- Thin 1px `#FF6B35` rule, 120px wide, centred.
+- Spacer: 40px
+- 5 feature lines, each centred, 20px gap between. Format: small `→` in `#FF6B35` followed by text in Inter SemiBold 17px white:
+  - `→  Online ordering & payments`
+  - `→  Reservations & table management`
+  - `→  QR table ordering`
+  - `→  Loyalty program & customer data`
+  - `→  Analytics, staff access & POS sync`
+- Spacer: 36px
+- Closing line: `One platform. Built for restaurants.` — Plus Jakarta Sans Bold 22px `#FF6B35`, centred.
+
+**Bottom bar (`#16213E`, 72px):** `DineDesk — The Complete Restaurant Platform` — Inter Medium 13px `#9CA3AF`, centred.
+
+**Do not use:** any website mockup, browser frame, or UI screenshot. This post is pure type and brand.
+
+### Caption
+```
+We need to clear something up. 📢
+
+DineDesk is not a website builder.
+
+Yes, you get a beautiful, fully branded restaurant website. But that's just the start.
+
+Here's what's actually included:
+
+🌐 **Professional Website**
+Custom domain, mobile-first, 3 themes, CMS-managed. Live menu, specials, team page, locations page, Google reviews — all built in.
+
+🛒 **Online Ordering — 0% commission**
+Pickup, delivery, dine-in. Stripe payments. Orders go straight to your kitchen. No middleman taking 30%.
+
+📱 **QR Table Ordering**
+Customers scan, browse, and order from their phone at the table. No app. No waiting.
+
+📅 **Reservations & Table Management**
+24/7 booking widget. Auto table assignment. Calendar view for your staff.
+
+🎁 **Loyalty Program**
+Points per order. Rewards. Customer database that's yours — not a third-party app's.
+
+📊 **Analytics & Operations Dashboard**
+Revenue, orders, peak hours, top dishes. See what's actually driving your business.
+
+🔗 **POS Integration**
+Square, Clover, Toast, Lightspeed — online orders sync directly to your in-store system.
+
+👥 **Staff Access Control**
+Different logins for manager, chef, front of house. Everyone sees only what they need.
+
+📧 **Email Notifications**
+Order confirmations, booking reminders, specials announcements — automated.
+
+This is a full restaurant management system.
+The website is just what your customers see.
+
+From AUD 79/month. Setup handled for you. No lock-in.
+
+👇 3 live demos in bio — see the whole platform in action.
+
+#DineDesk #RestaurantManagement #NotJustAWebsite #RestaurantTech #HospitalityTech #OnlineOrdering #RestaurantPlatform #AustralianRestaurants #RestaurantOwners #FullStack
+```
+
+---
+
+## Post 34: Feature - "No Menu Photos? We've Got You."
+
+### Creative Brief
+**Format:** 1080×1350px portrait
+**Mood:** Reassurance + wow factor — like an "before you ask, yes we handle that too" moment. The post should feel like a relief to a restaurant owner who's been avoiding getting a website because they don't have professional food photos.
+
+**Background:** `#1A1A2E` solid.
+
+**Layout — stacked, top to bottom:**
+
+**Top section (320px):** Centred text block, 80px from top:
+- Label: `NO PHOTOS? NO PROBLEM.` — Inter Medium 11px `#FF6B35`, all caps, 3px tracking.
+- Spacer: 16px
+- Headline: `We make your menu look like this.` — Plus Jakarta Sans ExtraBold 40px white, centred, max 800px wide.
+
+**Middle section — 2×2 image grid (560px tall, 40px inset each side, 12px gap):**
+- 4 flat `#1F2937` cards (12px rounded), each representing a generated menu item visual:
+  - Each card has a realistic food image placeholder (use actual AI-generated or real dish photo) with the dish name in Inter SemiBold 14px white at the bottom on a `#00000080` gradient overlay.
+  - Example dishes: `Truffle Mushroom Pasta` / `Grilled Atlantic Salmon` / `Classic Wagyu Burger` / `Matcha Tiramisu`
+- No browser frame — just the 4 cards raw on the background.
+
+**Below grid (24px gap):** 3 small pill badges in a row, centred, 8px gap:
+- `MENU ITEM IMAGES` — `#1F2937` bg, Inter Medium 11px white
+- `SPECIALS BANNERS` — `#1F2937` bg
+- `PROMOTIONAL GRAPHICS` — `#1F2937` bg
+
+**Bottom bar (`#16213E`, 80px):** `Generated for your restaurant. Updated every month.` — Inter Medium 14px `#FF6B35`, centred.
+
+**Do not use:** stock photo collages or generic "food photography" mood boards. The 4 cards should look like actual dish cards from a DineDesk menu page.
+
+### Caption
+```
+"I don't have professional photos of my dishes."
+
+We hear this every week. And every week, our answer is the same:
+
+Don't worry. We've got you. 📸
+
+When you join DineDesk, we don't just build your site and hand you a login. We generate the visuals too.
+
+Here's what we create for your restaurant:
+
+🍽️ **Menu item images**
+Don't have a photo of your pasta dish? We generate a high-quality visual based on the dish name and description. Every item on your menu gets an image that makes customers want to order it.
+
+🏷️ **Specials banners**
+Running a Tuesday night deal? A long weekend brunch? We design the promotional banner — sized for your website homepage, ready to go live.
+
+🎨 **Seasonal promotional graphics**
+Summer menu launch. Easter special. Public holiday hours. We create the visual assets every time, so your site always looks current and on-brand.
+
+📊 **Order & revenue charts**
+Your analytics dashboard gets visual reporting built in — so you can see what's selling and what's not.
+
+None of this is extra. It's part of what we do every month.
+
+You run the kitchen. We handle how it looks online.
+
+👇 See the result — 3 live demo sites in bio.
+
+#RestaurantPhotography #MenuDesign #FoodPhotography #DineDesk #RestaurantMarketing #HospitalityTech #RestaurantOwners #MenuImages #WeGotYou #AustralianRestaurants
+```
+
+---
+
 ## Visual Asset Specifications
 
 ### Image Dimensions
@@ -2016,3 +2162,299 @@ Then from AUD 79/month — no lock-in, cancel anytime.
 
 **Trending Hashtags (monitor and use when relevant):**
 #SmallBusiness #HospitalityIndustry #RestaurantLife #FoodTech
+
+---
+
+---
+
+# 🎬 REEL CONTENT PACKAGE
+
+Two reels fully scripted, storyboarded and laid out for CapCut / Canva.
+
+---
+
+## REEL 1 — SaaS Brand Intro
+### "Your restaurant. Online in 7 days."
+
+**Format:** 30–45 seconds | 9:16 portrait | Instagram / TikTok / YouTube Shorts
+
+---
+
+### Script + Voiceover
+
+> **[0:00–0:04]**
+> VO: *"If you're still sending customers to Uber Eats or DoorDash…"*
+> ON SCREEN: `You're giving away 30% of every order.`
+
+> **[0:04–0:08]**
+> VO: *"…you're handing over thousands every month — for customers who are already yours."*
+> ON SCREEN: `$300/day × 30% = $2,700/mo gone.`
+
+> **[0:08–0:13]**
+> VO: *"DineDesk gives your restaurant a complete digital system."*
+> ON SCREEN: `DineDesk` + logo flash
+
+> **[0:13–0:18]**
+> VO: *"A professional website. Online ordering with zero commission. Reservations, loyalty, QR table menus — all in one."*
+> ON SCREEN: Fast-cut icons — Website → Cart → Calendar → QR → Gift
+
+> **[0:18–0:24]**
+> VO: *"We build it, we configure it, we launch it. You just approve it."*
+> ON SCREEN: `Setup: 7 days. You approve. You go live.`
+
+> **[0:24–0:30]**
+> VO: *"From AUD 79 a month. No commissions. No lock-in."*
+> ON SCREEN: `From $79/mo` → `0% commission` → `Cancel anytime`
+
+> **[0:30–0:35]**
+> VO: *"DineDesk. Built for Australian restaurants."*
+> ON SCREEN: `dinedesk.com.au` + CTA: `Link in bio → see live demos`
+
+---
+
+### Storyboard — Scene by Scene
+
+| # | Duration | Visual | On-Screen Text | Transition |
+|---|----------|--------|----------------|------------|
+| 1 | 0–2s | Black screen, single line appears | `You're giving away 30% of every order.` | Fade in |
+| 2 | 2–5s | Red number counter: `$2,700/mo` | `Every. Single. Month.` | Hard cut |
+| 3 | 5–8s | DineDesk logo centred, white on dark | `DineDesk` | Zoom in subtle |
+| 4 | 8–12s | 5 icons appear one by one (website, cart, calendar, QR, gift) | Label under each icon | Slide up stagger |
+| 5 | 12–17s | Text only: clean white lines building | `We build it.` → `We configure it.` → `We launch it.` | Typewriter or reveal |
+| 6 | 17–22s | 3 pills appearing left to right | `$79/mo` · `0% commission` · `Cancel anytime` | Fade in stagger |
+| 7 | 22–28s | Branding outro — logo + tagline | `Built for Australian restaurants` | Fade |
+| 8 | 28–35s | CTA card | `dinedesk.com.au — Link in bio` | Hold |
+
+**Music mood:** Upbeat minimal electronic — confident, not hype. Think Artlist "Tech Corporate Light" or CapCut "Focus Flow" category.
+
+---
+
+### CapCut / Canva Build Brief
+
+```
+SLIDE 1 — 2.5s
+Background: #0F0F1A
+Text: "You're giving away"  — Inter Regular 32px #9CA3AF centred
+Text: "30% of every order." — Plus Jakarta Sans ExtraBold 48px #EF4444 centred
+Animation: Fade in 0.3s
+
+SLIDE 2 — 2.5s
+Background: #0F0F1A
+Text: "$2,700/mo" — Plus Jakarta Sans ExtraBold 72px #EF4444 centred
+Text: "gone to third-party apps" — Inter Regular 20px #6B7280 centred
+Animation: Counter up effect on number
+
+SLIDE 3 — 2s
+Background: #0F0F1A
+Logo: DineDesk logo centred
+Text: "The complete restaurant platform" — Inter Light 18px #9CA3AF
+Animation: Zoom in from 90% → 100%
+
+SLIDE 4 — 4s (icon stagger)
+Background: #111827
+5 icons in a horizontal row, each appearing 0.4s apart:
+  🌐 Website  🛒 Ordering  📅 Reservations  📱 QR Menu  🎁 Loyalty
+Labels below each in Inter Medium 13px white
+Animation: Slide up + fade in per icon
+
+SLIDE 5 — 3s
+Background: #0F0F1A
+3 lines reveal one by one (0.5s each):
+  "We build it."       — Inter SemiBold 26px white
+  "We configure it."   — Inter SemiBold 26px white
+  "We launch it."      — Inter SemiBold 26px #FF6B35
+Animation: Typewriter or wipe left
+
+SLIDE 6 — 3s
+Background: #0F0F1A
+3 pill badges centred, stagger in:
+  "$79/mo"           — #FF6B35 border + text
+  "0% commission"    — #10B981 border + text
+  "Cancel anytime"   — #6B7280 border + text
+
+SLIDE 7 — 3s
+Background: #0F0F1A
+Text: "Built for Australian restaurants" — Inter Medium 18px #9CA3AF
+Logo small below
+Text: "dinedesk.com.au" — Inter Bold 22px white
+
+SLIDE 8 — 2s
+Background: #FF6B35 gradient → #EF4444
+Text: "Link in bio → See live demos" — Plus Jakarta Sans ExtraBold 28px white centred
+```
+
+---
+
+---
+
+## REEL 2 — How It Works
+### "From signup to live in 4 steps."
+
+**Format:** 45–60 seconds | 9:16 portrait | Instagram / TikTok / YouTube Shorts
+
+---
+
+### Script + Voiceover
+
+> **[0:00–0:05]**
+> VO: *"Most restaurant owners spend months trying to set up a website, ordering system, and loyalty program — separately."*
+> ON SCREEN: `Wix. Square. Mailchimp. Uber Eats. All separate. All expensive.`
+
+> **[0:05–0:10]**
+> VO: *"DineDesk does all of it. In four steps."*
+> ON SCREEN: `4 steps. 7 days. Done.`
+
+> **[0:10–0:20]**
+> VO: *"Step one: you tell us about your restaurant. Menu, photos, branding — we take it from there."*
+> ON SCREEN: `Step 1 — Tell us about your restaurant.`
+> Sub: `Menu · Photos · Branding · Domain`
+
+> **[0:20–0:30]**
+> VO: *"Step two: we build everything. Website, ordering, loyalty, reservations — all configured for your brand."*
+> ON SCREEN: `Step 2 — We build everything.`
+> Sub: `Website · Ordering · Loyalty · Reservations`
+
+> **[0:30–0:40]**
+> VO: *"Step three: you review a live staging preview and approve. If anything needs changing, we fix it."*
+> ON SCREEN: `Step 3 — You review and approve.`
+> Sub: `Staging preview → You approve → We adjust`
+
+> **[0:40–0:50]**
+> VO: *"Step four: we connect your domain, flip the switch, and you're live."*
+> ON SCREEN: `Step 4 — You go live.`
+> Sub: `Domain connected · SSL · Launch day`
+
+> **[0:50–0:58]**
+> VO: *"AUD 249 setup. Then from $79 a month. We handle everything. You just run your restaurant."*
+> ON SCREEN: `$249 setup. $79/mo. You run the kitchen. We handle the rest.`
+
+> **[0:58–1:05]**
+> ON SCREEN: `dinedesk.com.au` + `Link in bio`
+
+---
+
+### Storyboard — Scene by Scene
+
+| # | Duration | Visual | On-Screen Text | Transition |
+|---|----------|--------|----------------|------------|
+| 1 | 0–4s | App logos crossed out (Wix, Uber Eats, Mailchimp) | `All separate. All expensive.` | Fade in, X marks appear |
+| 2 | 4–7s | DineDesk logo, bold number `4` | `4 steps. 7 days. Done.` | Hard cut |
+| 3 | 7–17s | Step card — icon + number + label | `Step 1 — Tell us about your restaurant` | Slide in from right |
+| 4 | 17–27s | Step card | `Step 2 — We build everything` | Slide in from right |
+| 5 | 27–37s | Step card | `Step 3 — You review and approve` | Slide in from right |
+| 6 | 37–47s | Step card | `Step 4 — You go live` | Slide in from right |
+| 7 | 47–55s | Pricing callout, clean | `$249 setup · $79/mo · 0% commission` | Fade |
+| 8 | 55–62s | Outro — logo + domain | `dinedesk.com.au` | Hold + fade out |
+
+**Music mood:** Clean, slightly warm minimal beat. Steady rhythm to match the 4-step pace. CapCut "Calm Corporate" or Artlist "Explainer" category.
+
+---
+
+### CapCut / Canva Build Brief
+
+```
+SLIDE 1 — 3.5s
+Background: #0F0F1A
+3 app name pills appear, each with a red X crossing them out (stagger 0.4s):
+  "Wix"  "Uber Eats"  "Mailchimp"
+Below: "All separate. All expensive." — Inter Regular 20px #9CA3AF
+Animation: Slide in + X mark overlay
+
+SLIDE 2 — 2.5s
+Background: #0F0F1A
+Big number: "4" — Plus Jakarta Sans ExtraBold 120px #FF6B35 centred
+Below: "steps to go live" — Inter Medium 22px white
+Below: "Average setup time: 7 days" — Inter Regular 14px #6B7280
+Animation: Number pops in (scale 0→1)
+
+SLIDE 3 — STEP 1 — 3s
+Background: #111827
+Top-left label: "STEP 01" — Inter Medium 11px #FF6B35 caps tracked
+Large text: "Tell us about" — Inter Regular 36px #9CA3AF
+Large text: "your restaurant." — Plus Jakarta Sans ExtraBold 40px white
+Below row of pills: "Menu" · "Photos" · "Branding" · "Domain"
+Animation: Slide in from right
+
+SLIDE 4 — STEP 2 — 3s
+Background: #111827
+Top-left label: "STEP 02"
+Large text: "We build"
+Large text: "everything."
+Below pills: "Website" · "Ordering" · "Loyalty" · "Reservations"
+Animation: Slide in from right
+
+SLIDE 5 — STEP 3 — 3s
+Background: #111827
+Top-left label: "STEP 03"
+Large text: "You review"
+Large text: "and approve."
+Below: "Staging preview → feedback → final sign-off"
+Animation: Slide in from right
+
+SLIDE 6 — STEP 4 — 3s
+Background: #111827
+Top-left label: "STEP 04"
+Large text: "You go"
+Large text: "live." — #FF6B35
+Below pills: "Domain connected" · "SSL" · "Launch day"
+Animation: Slide in from right + confetti pop (optional)
+
+SLIDE 7 — 3.5s
+Background: #0F0F1A
+3 rows centred:
+  "$249" — ExtraBold 52px white + "one-time setup" Regular 16px #6B7280
+  "$79/mo" — ExtraBold 52px #FF6B35 + "then monthly" Regular 16px #6B7280
+  "0% commission" — ExtraBold 28px #10B981
+Animation: Fade in stagger
+
+SLIDE 8 — 3s
+Background: #FF6B35 → #EF4444 gradient
+Text: "dinedesk.com.au" — Plus Jakarta Sans ExtraBold 32px white centred
+Text: "Link in bio" — Inter Medium 16px white/80
+Animation: Fade in, hold
+```
+
+---
+
+### Caption for Reel 1 (Brand Intro)
+```
+Every day without direct online ordering = money left on the table. 💸
+
+DineDesk gives your restaurant:
+✅ A professional website
+✅ Online ordering (0% commission)
+✅ Reservations & table bookings
+✅ QR table menus
+✅ Loyalty program
+✅ Analytics dashboard
+
+We build it. We configure it. We launch it.
+You just approve it.
+
+From AUD $79/month. Setup $249 once.
+
+👇 3 live demo sites in bio — see exactly what you get.
+
+#DineDesk #RestaurantTech #OnlineOrdering #AustralianRestaurants #HospitalityTech #RestaurantOwners #ZeroCommission #RestaurantWebsite
+```
+
+### Caption for Reel 2 (How It Works)
+```
+From "I need a website" to fully live in 4 steps 👇
+
+Step 1 — You send us your menu, photos, and branding
+Step 2 — We build your full restaurant platform
+Step 3 — You review the staging preview and approve
+Step 4 — We launch. You're live.
+
+One-time setup: AUD $249
+Then from $79/month — website, ordering, loyalty, reservations.
+
+No technical knowledge needed.
+No juggling 5 different tools.
+No 30% commission to third-party apps.
+
+👇 Link in bio — see the live demos and get started.
+
+#DineDesk #HowItWorks #RestaurantTech #RestaurantOwners #OnlineOrdering #AustralianRestaurants #HospitalityTech #RestaurantMarketing
+```
