@@ -424,7 +424,8 @@ function MainApp() {
 
     if (canManageAll || !site) return items
 
-    const rawAccess = user?.clientAccess
+    const currentUser = user || useAuthStore.getState().user
+    const rawAccess = currentUser?.clientAccess
     const access = (rawAccess && typeof rawAccess === 'object' && !Array.isArray(rawAccess)) ? rawAccess : {}
     const entry = access[site.id]
     const allowed = Array.isArray(entry) ? entry : (Array.isArray(entry?.tabs) ? entry.tabs : [])
@@ -491,28 +492,14 @@ function MainApp() {
             <div style={{ padding:40, color:C.t2 }}>Users management — coming soon.</div>
           )}
           {!activeSite && globalNav === 'operations' && (
-            <div style={{ padding:40, textAlign:'center', color:C.t2 }}>
-              <div style={{ fontSize:18, fontWeight:'bold', marginBottom:16, color:C.t0 }}>Operations</div>
-              <div style={{ maxWidth:400, margin:'0 auto', textAlign:'left' }}>
-                <p style={{ marginBottom:12, color:C.t1 }}>Access your restaurant operations dashboard to manage orders, view analytics, and manage customer loyalty programs.</p>
-                <div style={{ 
-                  background:C.panel, 
-                  border:`1px solid ${C.border}`, 
-                  borderRadius:8, 
-                  padding:16,
-                  marginBottom:12 
-                }}>
-                  <h4 style={{ margin:'0 0 8px 0', fontSize:14, fontWeight:600, color:C.t0 }}>Quick Access</h4>
-                  <ul style={{ margin:0, paddingLeft:16, color:C.t1 }}>
-                    <li style={{ marginBottom:8 }}>• <strong>Order Management:</strong> Live orders, status tracking, and history</li>
-                    <li style={{ marginBottom:8 }}>• <strong>Analytics:</strong> Daily revenue, top items, and performance metrics</li>
-                    <li style={{ marginBottom:8 }}>• <strong>Customer Loyalty:</strong> Points tracking and order history</li>
-                    <li style={{ marginBottom:8 }}>• <strong>Payment Tracking:</strong> Paid/unpaid order status</li>
-                  </ul>
-                </div>
-                <p style={{ fontSize:12, color:C.t2 }}>Select a site from the <strong>Sites</strong> tab to access the Operations dashboard.</p>
-              </div>
-            </div>
+            <SitesList
+              key={refreshKey}
+              onOpenSite={openSite}
+              isSuperAdmin={canManageAll}
+              clientAccess={user?.clientAccess || {}}
+              show={true}
+              defaultTab="operations"
+            />
           )}
           {!activeSite && (canManageAll ? globalNav === 'sites' : true) && (
             <SitesList
