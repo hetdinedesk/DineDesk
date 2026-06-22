@@ -79,7 +79,10 @@ export default function ConfigSection({ clientId, user }) {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const isManager = user?.role === 'MANAGER'
   const hasFullConfigAccess = isSuperAdmin || isManager
-  const userConfigAccess = user?.clientAccess?.[clientId] || []
+  const rawConfigAccess = user?.clientAccess
+  const configAccessMap = (rawConfigAccess && typeof rawConfigAccess === 'object' && !Array.isArray(rawConfigAccess)) ? rawConfigAccess : {}
+  const configEntry = configAccessMap[clientId]
+  const userConfigAccess = Array.isArray(configEntry) ? configEntry : (Array.isArray(configEntry?.tabs) ? configEntry.tabs : [])
   const hasConfigAccess = userConfigAccess.includes('config')
   
   // Filter sidebar based on access level

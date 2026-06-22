@@ -36,14 +36,15 @@ router.post('/login', loginLimit, async function(req, res) {
     }
     
     const tokenExpiry = user.role === 'EDITOR' ? '7d' : '24h'
+    const clientAccess = (typeof user.clientAccess === 'string' ? JSON.parse(user.clientAccess) : user.clientAccess) || {}
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name, clientAccess: user.clientAccess || [] },
+      { id: user.id, email: user.email, role: user.role, name: user.name, clientAccess },
       process.env.JWT_SECRET,
       { expiresIn: tokenExpiry }
     )
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, clientAccess: user.clientAccess || [] }
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, clientAccess }
     })
 
     log({ action:'USER_LOGIN', entity:'User', entityName:user.name,

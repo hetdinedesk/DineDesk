@@ -73,8 +73,8 @@ export function Hero() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-display font-bold leading-tight mb-6"
             >
-              Run Your Restaurant{' '}
-              <span className="gradient-text">Like a Pro</span>
+              Restaurant Website Builder{' '}
+              <span className="gradient-text">&amp; Online Ordering Platform</span>
             </motion.h1>
 
             {/* Subheadline */}
@@ -84,8 +84,8 @@ export function Hero() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg sm:text-xl text-white/70 mb-8 max-w-xl mx-auto lg:mx-0"
             >
-              Website builder, online ordering, reservations, QR table ordering, 
-              loyalty programs, and real-time analytics — all connected in one powerful platform.
+              Commission-free online ordering, table reservations, QR menus, 
+              loyalty programs, and real-time analytics — we build it all for you, you keep 100% of your revenue.
             </motion.p>
 
             {/* CTA Buttons */}

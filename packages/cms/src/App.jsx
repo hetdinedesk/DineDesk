@@ -326,8 +326,10 @@ function MainApp() {
   const openSite = async (client) => {
     // Default to first allowed tab for this user, not always 'dashboard'
     if (!canManageAll) {
-      const entry = user?.clientAccess?.[client.id]
-      const allowed = Array.isArray(entry) ? entry : (entry?.tabs || [])
+      const rawAccess = user?.clientAccess
+      const accessMap = (rawAccess && typeof rawAccess === 'object' && !Array.isArray(rawAccess)) ? rawAccess : {}
+      const entry = accessMap[client.id]
+      const allowed = Array.isArray(entry) ? entry : (Array.isArray(entry?.tabs) ? entry.tabs : [])
       const tabOrder = ['dashboard', 'items', 'operations', 'cms', 'config']
       const firstAllowed = tabOrder.find(t => allowed.includes(t)) || 'dashboard'
       setSiteNav(firstAllowed)
@@ -354,8 +356,10 @@ function MainApp() {
       sessionStorage.removeItem('dd_config_subsection')
       // Navigate to first allowed tab
       const navTarget = !canManageAll ? (() => {
-        const entry = user?.clientAccess?.[client.id]
-        const allowed = Array.isArray(entry) ? entry : (entry?.tabs || [])
+        const rawAccess = user?.clientAccess
+        const accessMap = (rawAccess && typeof rawAccess === 'object' && !Array.isArray(rawAccess)) ? rawAccess : {}
+        const entry = accessMap[client.id]
+        const allowed = Array.isArray(entry) ? entry : (Array.isArray(entry?.tabs) ? entry.tabs : [])
         const tabOrder = ['dashboard', 'items', 'operations', 'cms', 'config']
         return tabOrder.find(t => allowed.includes(t)) || 'dashboard'
       })() : 'dashboard'
@@ -414,14 +418,17 @@ function MainApp() {
       { key: 'dashboard', label: 'Home', Icon: LayoutDashboard },
       { key: 'items', label: 'Items', Icon: ClipboardList },
       { key: 'operations', label: 'Operations', Icon: ShoppingCart },
-      { key: 'cms', label: 'CMS', Icon: Pencil },
-      { key: 'config', label: 'Config', Icon: Settings2 },
+      { key: 'cms', label: 'Website Content', Icon: Pencil },
+      { key: 'config', label: 'Settings', Icon: Settings2 },
     ]
 
     if (canManageAll || !site) return items
 
-    const entry = user?.clientAccess?.[site.id]
-    const allowed = Array.isArray(entry) ? entry : (entry?.tabs || [])
+    const rawAccess = user?.clientAccess
+    const access = (rawAccess && typeof rawAccess === 'object' && !Array.isArray(rawAccess)) ? rawAccess : {}
+    const entry = access[site.id]
+    const allowed = Array.isArray(entry) ? entry : (Array.isArray(entry?.tabs) ? entry.tabs : [])
+    if (allowed.length === 0) return items.filter(t => t.key === 'dashboard')
     return items.filter(t => allowed.includes(t.key))
   }
 

@@ -60,7 +60,10 @@ export default function CmsSection({ clientId, user }) {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const isManager = user?.role === 'MANAGER'
   const hasFullCmsAccess = isSuperAdmin || isManager
-  const userCmsAccess = user?.clientAccess?.[clientId] || []
+  const rawCmsAccess = user?.clientAccess
+  const cmsAccessMap = (rawCmsAccess && typeof rawCmsAccess === 'object' && !Array.isArray(rawCmsAccess)) ? rawCmsAccess : {}
+  const cmsEntry = cmsAccessMap[clientId]
+  const userCmsAccess = Array.isArray(cmsEntry) ? cmsEntry : (Array.isArray(cmsEntry?.tabs) ? cmsEntry.tabs : [])
   const hasCmsAccess = userCmsAccess.includes('cms')
   
   // Filter navigation based on access level
