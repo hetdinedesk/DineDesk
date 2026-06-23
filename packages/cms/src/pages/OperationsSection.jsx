@@ -30,9 +30,9 @@ const STATUS_LABELS = {
 
 const STATUS_FLOW = {
   new: ['accepted', 'cancelled'],
-  accepted: ['preparing', 'cancelled'],
-  preparing: ['ready', 'cancelled'],
-  ready: ['completed'],
+  accepted: ['preparing', 'new', 'cancelled'],
+  preparing: ['new', 'ready', 'cancelled'],
+  ready: ['preparing', 'completed'],
   completed: [],
   cancelled: []
 }
@@ -58,52 +58,6 @@ const formatCurrency = (amount) => {
   return `$${(amount || 0).toFixed(2)}`
 }
 
-const getOrderProgressTime = (order) => {
-  if (!order.acceptedAt && !order.preparingAt && !order.readyAt) return null
-
-  const now = new Date()
-  let startTime = order.createdAt
-  let statusText = ''
-  let progressPercent = 0
-
-  // Check order.status first to determine current state, then use timestamps
-  if (order.status === 'completed' || order.completedAt) {
-    startTime = order.completedAt ? new Date(order.completedAt) : startTime
-    statusText = 'Completed'
-    progressPercent = 100
-  } else if (order.status === 'ready' || order.readyAt) {
-    startTime = order.readyAt ? new Date(order.readyAt) : startTime
-    statusText = 'Ready'
-    progressPercent = 75
-  } else if (order.status === 'preparing' || order.preparingAt) {
-    startTime = order.preparingAt ? new Date(order.preparingAt) : startTime
-    statusText = 'Preparing'
-    progressPercent = 50
-  } else if (order.status === 'accepted' || order.acceptedAt) {
-    startTime = order.acceptedAt ? new Date(order.acceptedAt) : startTime
-    statusText = 'Order Accepted'
-    progressPercent = 25
-  }
-
-  // Don't show time elapsed for completed orders
-  if (order.status === 'completed' || order.completedAt) {
-    return {
-      statusText,
-      progressPercent,
-      timeElapsed: null
-    }
-  }
-
-  const diffMs = now - startTime
-  const diffMins = Math.floor(diffMs / 60000)
-
-  return {
-    statusText,
-    progressPercent,
-    timeElapsed: diffMins < 1 ? 'Just now' : `${diffMins}m`
-  }
-}
-
 export default function OperationsSection({ clientId, user: userProp }) {
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [orderingEnabled, setOrderingEnabled] = useState(true)
@@ -113,6 +67,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
   const [previousOrderIds, setPreviousOrderIds] = useState(new Set())
   const queryClient = useQueryClient()
   const audioRef = useRef(null)
+  const soundIntervalRef = useRef(null)
   
   // Check if current user is a client
   const user = userProp || {}
@@ -203,26 +158,21 @@ export default function OperationsSection({ clientId, user: userProp }) {
     const unacceptedOrdersCount = liveOrders.filter(o => o.status === 'new').length
     
     if (unacceptedOrdersCount > 0) {
-      // Play sound every 5 seconds for unaccepted orders
-      const soundInterval = setInterval(() => {
+      // Play sound every 20 seconds for unaccepted orders
+      soundIntervalRef.current = setInterval(() => {
         playNotificationSound()
-      }, 5000)
-      
-      // Store interval ID for cleanup
-      window.currentSoundInterval = soundInterval
+      }, 20000)
     } else {
-      // Clear interval if no unaccepted orders
-      if (window.currentSoundInterval) {
-        clearInterval(window.currentSoundInterval)
-        window.currentSoundInterval = null
+      if (soundIntervalRef.current) {
+        clearInterval(soundIntervalRef.current)
+        soundIntervalRef.current = null
       }
     }
     
-    // Cleanup on unmount
     return () => {
-      if (window.currentSoundInterval) {
-        clearInterval(window.currentSoundInterval)
-        window.currentSoundInterval = null
+      if (soundIntervalRef.current) {
+        clearInterval(soundIntervalRef.current)
+        soundIntervalRef.current = null
       }
     }
   }, [liveOrders?.filter(o => o.status === 'new').length]) // Stable dependency
@@ -328,6 +278,51 @@ export default function OperationsSection({ clientId, user: userProp }) {
     }
   }, [])
 
+  // Scheduled order reminder: play sound when a scheduled accepted order is within 20 mins of pickup
+  const scheduledReminderRef = useRef(new Set()) // Track which orders we've already reminded about
+  useEffect(() => {
+    if (!liveOrders || liveOrders.length === 0) return
+
+    const checkScheduledReminders = () => {
+      const now = new Date()
+      const scheduledAccepted = liveOrders.filter(o =>
+        o.status === 'accepted' && o.pickupTime
+      )
+
+      scheduledAccepted.forEach(order => {
+        const minsLeft = Math.floor((new Date(order.pickupTime).getTime() - now.getTime()) / 60000)
+        // Remind at 20 mins before and if overdue
+        if (minsLeft <= 20 && !scheduledReminderRef.current.has(order.id)) {
+          scheduledReminderRef.current.add(order.id)
+          playNotificationSound()
+          // Browser notification
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification('Scheduled Order Due Soon', {
+              body: `Order #${order.orderNumber} is due at ${new Date(order.pickupTime).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })} — start preparing!`,
+              icon: '/favicon.ico',
+              tag: `scheduled-${order.id}`,
+              requireInteraction: true
+            })
+          }
+        }
+        // Reset reminder if order moves past 20 mins (e.g. time was changed)
+        if (minsLeft > 20) {
+          scheduledReminderRef.current.delete(order.id)
+        }
+      })
+
+      // Clean up IDs for orders that are no longer in the list
+      const currentIds = new Set(liveOrders.map(o => o.id))
+      scheduledReminderRef.current.forEach(id => {
+        if (!currentIds.has(id)) scheduledReminderRef.current.delete(id)
+      })
+    }
+
+    checkScheduledReminders()
+    const interval = setInterval(checkScheduledReminders, 30000) // Check every 30s
+    return () => clearInterval(interval)
+  }, [liveOrders])
+
   // Fetch history orders (completed, cancelled)
   const { data: historyOrders = [], isLoading: historyLoading } = useQuery({
     queryKey: ['orders', clientId, selectedLocation, 'history'],
@@ -375,19 +370,47 @@ export default function OperationsSection({ clientId, user: userProp }) {
     }
   })
 
-  // Update order status mutation
+  // Update order status mutation with optimistic updates for instant feel
   const updateStatusMutation = useMutation({
     mutationFn: ({ orderId, status }) => updateOrderStatus(clientId, orderId, status),
-    onSuccess: (_, { status }) => {
-      // Invalidate both live and history queries for immediate update
+    onMutate: async ({ orderId, status }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries(['orders', clientId, selectedLocation, 'live'])
+      await queryClient.cancelQueries(['orders', clientId, selectedLocation, 'history'])
+
+      // Snapshot previous values for rollback
+      const prevLive = queryClient.getQueryData(['orders', clientId, selectedLocation, 'live'])
+      const prevHistory = queryClient.getQueryData(['orders', clientId, selectedLocation, 'history'])
+
+      // Optimistically update live orders cache
+      queryClient.setQueryData(['orders', clientId, selectedLocation, 'live'], (old = []) => {
+        if (status === 'completed' || status === 'cancelled') {
+          // Remove from live
+          return old.filter(o => o.id !== orderId)
+        }
+        return old.map(o => o.id === orderId ? { ...o, status } : o)
+      })
+
+      // If completing, optimistically add to history
+      if (status === 'completed' || status === 'cancelled') {
+        queryClient.setQueryData(['orders', clientId, selectedLocation, 'history'], (old = []) => {
+          const order = prevLive?.find(o => o.id === orderId)
+          if (order) return [{ ...order, status }, ...old]
+          return old
+        })
+      }
+
+      return { prevLive, prevHistory }
+    },
+    onError: (_err, _vars, context) => {
+      // Roll back on error
+      if (context?.prevLive) queryClient.setQueryData(['orders', clientId, selectedLocation, 'live'], context.prevLive)
+      if (context?.prevHistory) queryClient.setQueryData(['orders', clientId, selectedLocation, 'history'], context.prevHistory)
+    },
+    onSettled: () => {
+      // Refetch after settled to ensure server state is in sync
       queryClient.invalidateQueries(['orders', clientId, selectedLocation, 'live'])
       queryClient.invalidateQueries(['orders', clientId, selectedLocation, 'history'])
-      queryClient.invalidateQueries(['orders', clientId])
-      
-      // Keep user on live orders tab - don't auto-switch to history
-      // if (status === 'completed' || status === 'cancelled') {
-      //   setActiveTab('history')
-      // }
     }
   })
 
@@ -418,22 +441,31 @@ export default function OperationsSection({ clientId, user: userProp }) {
     return liveOrders.filter(o => o.status === status).length
   }
 
-  // Calculate today's revenue for clients
+  // Calculate today's revenue for clients (from historyOrders which has completed/cancelled)
   const getTodayRevenue = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const todayOrders = liveOrders.filter(o => 
+    const todayCompleted = historyOrders.filter(o => 
       new Date(o.createdAt) >= today && o.status === 'completed'
     )
-    return todayOrders.reduce((sum, order) => sum + order.total, 0)
+    return todayCompleted.reduce((sum, order) => sum + (order.total || 0), 0)
   }
 
-  // Calculate average order value
+  // Calculate average order value (from all completed history orders)
   const getAverageOrderValue = () => {
-    const completedOrders = liveOrders.filter(o => o.status === 'completed')
+    const completedOrders = historyOrders.filter(o => o.status === 'completed')
     if (completedOrders.length === 0) return 0
-    const total = completedOrders.reduce((sum, order) => sum + order.total, 0)
+    const total = completedOrders.reduce((sum, order) => sum + (order.total || 0), 0)
     return total / completedOrders.length
+  }
+
+  // Count completed orders today (for client dashboard)
+  const getCompletedTodayCount = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return historyOrders.filter(o => 
+      new Date(o.createdAt) >= today && o.status === 'completed'
+    ).length
   }
 
   return (
@@ -510,30 +542,6 @@ export default function OperationsSection({ clientId, user: userProp }) {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Status Bar */}
-      <div style={{
-        background: C.panel,
-        borderBottom: `1px solid ${C.border}`,
-        padding: '12px 24px',
-        display: 'flex',
-        gap: 24,
-        flexShrink: 0
-      }}>
-        {['new', 'accepted', 'preparing', 'ready'].map(status => (
-          <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: STATUS_COLORS[status]
-            }} />
-            <span style={{ fontSize: 13, color: C.t2 }}>
-              {STATUS_LABELS[status]}: <strong style={{ color: C.t0 }}>{getOrderCountByStatus(status)}</strong>
-            </span>
-          </div>
-        ))}
       </div>
 
       {/* Tabs */}
@@ -626,7 +634,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
                   color: C.acc,
                   marginBottom: '4px' 
                 }}>
-                  {getOrderCountByStatus('completed')}
+                  {getCompletedTodayCount()}
                 </div>
                 <div style={{ fontSize: '12px', color: C.t2 }}>Orders Completed</div>
               </div>
@@ -653,34 +661,397 @@ export default function OperationsSection({ clientId, user: userProp }) {
           </div>
         )}
         
-        {/* Live Orders */}
-        {activeTab === 'live' && (
-          <div>
-            {liveLoading ? (
-              <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>Loading orders...</div>
-            ) : liveOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>
-                {isClient ? 'No orders yet. You\'ll see new orders here when customers place them!' : 'No live orders'}
+        {/* Live Orders — Pipeline Board */}
+        {activeTab === 'live' && (() => {
+          const now = new Date()
+          const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+          const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+
+          // Helper: is this a scheduled order with a future pickup time?
+          const isScheduled = (o) => !!o.pickupTime
+          // Helper: is pickup day today?
+          const isPickupToday = (o) => {
+            if (!o.pickupTime) return false
+            const pt = new Date(o.pickupTime)
+            return pt >= todayStart && pt < todayEnd
+          }
+          // Helper: minutes until pickup
+          const minsUntilPickup = (o) => {
+            if (!o.pickupTime) return Infinity
+            return Math.floor((new Date(o.pickupTime).getTime() - now.getTime()) / 60000)
+          }
+          // Helper: is approaching (within 20 mins)
+          const isApproaching = (o) => {
+            const m = minsUntilPickup(o)
+            return m >= 0 && m <= 20
+          }
+
+          // Filter: scheduled orders for future days are hidden ONLY if already accepted.
+          // New (unaccepted) scheduled orders always show so staff can accept/decline them.
+          const visibleLive = liveOrders.filter(o => {
+            if (!isScheduled(o)) return true
+            // Always show new/unaccepted scheduled orders so staff can act on them
+            if (o.status === 'new') return true
+            // For accepted scheduled orders: only show if pickup is today or overdue
+            return isPickupToday(o) || new Date(o.pickupTime) < now
+          })
+
+          // New column: new + accepted — split into regular and scheduled-accepted (compact)
+          // Scheduled orders within 20 mins get promoted to full-size cards
+          const allNewCol = visibleLive.filter(o => o.status === 'new' || o.status === 'accepted')
+          const isCompactScheduled = (o) => o.status === 'accepted' && isScheduled(o) && minsUntilPickup(o) > 20
+          const regularNew = allNewCol.filter(o => !isCompactScheduled(o))
+          const scheduledAccepted = allNewCol.filter(o => isCompactScheduled(o))
+            .sort((a, b) => new Date(a.pickupTime) - new Date(b.pickupTime))
+
+          const preparingOrders = visibleLive.filter(o => o.status === 'preparing')
+          const readyOrders = visibleLive.filter(o => o.status === 'ready')
+          const inProgressOrders = preparingOrders
+
+          const completedToday = historyOrders.filter(o => o.status === 'completed' && new Date(o.createdAt) >= todayStart)
+          const todayRevenue = completedToday.reduce((s, o) => s + (o.total || 0), 0)
+
+          const PIPELINE_COLORS = {
+            new: { main: '#BA7517', bg: 'rgba(186,117,23,0.12)' },
+            preparing: { main: '#185FA5', bg: 'rgba(24,95,165,0.12)' },
+            ready: { main: '#3B6D11', bg: 'rgba(59,109,17,0.12)' }
+          }
+
+          const VALID_DROPS = {
+            new: ['preparing'],
+            accepted: ['preparing'],
+            preparing: ['new', 'ready'],
+            ready: ['preparing', 'completed']
+          }
+
+          const elapsed = (dateStr) => {
+            if (!dateStr) return ''
+            const m = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
+            if (m < 1) return 'just now'
+            return `${m}m`
+          }
+
+          // Drag handlers
+          const handleDragStart = (e, order, fromStage) => {
+            e.dataTransfer.setData('orderId', order.id)
+            e.dataTransfer.setData('fromStage', fromStage)
+            e.dataTransfer.effectAllowed = 'move'
+            requestAnimationFrame(() => { e.target.style.opacity = '0.4' })
+          }
+          const handleDragEnd = (e) => { e.target.style.opacity = '1' }
+
+          const handleDragOver = (e, colStage) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+          }
+
+          const handleDragEnter = (e, colStage) => {
+            e.preventDefault()
+            e.currentTarget.style.background = `${PIPELINE_COLORS[colStage]?.bg || 'transparent'}`
+            e.currentTarget.style.outline = `2px dashed ${PIPELINE_COLORS[colStage]?.main || C.border}`
+            e.currentTarget.style.outlineOffset = '-2px'
+          }
+          const handleDragLeave = (e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.outline = 'none'
+          }
+
+          const handleDrop = (e, toStage) => {
+            e.preventDefault()
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.outline = 'none'
+            const orderId = e.dataTransfer.getData('orderId')
+            const fromStage = e.dataTransfer.getData('fromStage')
+            if (!orderId || fromStage === toStage) return
+            const allowed = VALID_DROPS[fromStage]
+            if (allowed && allowed.includes(toStage)) {
+              handleStatusChange(orderId, toStage)
+            }
+          }
+
+          // Full-size pipeline card (regular orders + unaccepted new scheduled orders)
+          const PipelineCard = ({ order, stage, actionLabel, actionColor, nextStatus }) => (
+            <div
+              draggable
+              onDragStart={(e) => handleDragStart(e, order, stage === 'new' && order.status === 'accepted' ? 'accepted' : stage)}
+              onDragEnd={handleDragEnd}
+              onClick={() => setSelectedOrder(order)}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.t3; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = 'none' }}
+              style={{
+                background: C.card,
+                border: `0.5px solid ${C.border}`,
+                borderLeft: `3px solid ${PIPELINE_COLORS[stage].main}`,
+                borderRadius: 10,
+                padding: '14px 16px',
+                cursor: 'grab',
+                transition: 'border-color 0.15s, transform 0.15s, opacity 0.2s',
+                userSelect: 'none'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: C.t0 }}>#{order.orderNumber} · {order.customerName}</span>
+                  <div style={{ fontSize: 11, color: C.t2, marginTop: 2 }}>
+                    {order.tableNumber ? `Table ${order.tableNumber}` : order.orderType === 'dine_in' ? 'Dine-in' : 'Pick-up'}
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 500, color: PIPELINE_COLORS[stage].main, fontVariantNumeric: 'tabular-nums' }}>
+                  {elapsed(order.createdAt)}
+                </span>
               </div>
-            ) : (
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
-                gap: '16px' 
-              }}>
-                {liveOrders.map(order => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onClick={() => setSelectedOrder(order)}
-                    onStatusChange={handleStatusChange}
-                    onRefund={setRefundOrder}
-                  />
+              {order.pickupTime && (
+                <div style={{ fontSize: 11, color: C.acc, fontWeight: 500, marginBottom: 6 }}>
+                  Scheduled: {new Date(order.pickupTime).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+              <div style={{ borderTop: `0.5px solid ${C.border}`, paddingTop: 8, marginBottom: 8 }}>
+                {order.items?.slice(0, 4).map((item, i) => (
+                  <div key={i} style={{ fontSize: 13, color: C.t0, margin: '2px 0' }}>
+                    {item.quantity}x {item.name}
+                    {item.selectedAddons?.length > 0 && <span style={{ fontSize: 11, color: C.t3 }}> ({item.selectedAddons.map(a => a.name).join(', ')})</span>}
+                  </div>
                 ))}
+                {order.items?.length > 4 && <div style={{ fontSize: 11, color: C.t3 }}>+{order.items.length - 4} more</div>}
               </div>
-            )}
-          </div>
-        )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: C.t0 }}>${(order.total || 0).toFixed(2)}</span>
+                {order.paymentStatus === 'paid' && (
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'rgba(59,109,17,0.1)', color: '#3B6D11' }}>Paid</span>
+                )}
+              </div>
+              {/* Action button */}
+              {nextStatus && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleStatusChange(order.id, nextStatus) }}
+                  style={{
+                    width: '100%', marginTop: 10, padding: '7px 0', fontSize: 12, fontWeight: 500,
+                    borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    background: actionColor, color: '#fff'
+                  }}
+                >
+                  {actionLabel}
+                </button>
+              )}
+              {/* New orders: Accept + Decline */}
+              {stage === 'new' && order.status === 'new' && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleStatusChange(order.id, 'accepted') }}
+                    style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: '#3B6D11', color: '#fff' }}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); if (window.confirm('Decline this order? This cannot be undone.')) handleStatusChange(order.id, 'cancelled') }}
+                    style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 500, borderRadius: 8, border: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', color: C.t2 }}
+                  >
+                    Decline
+                  </button>
+                </div>
+              )}
+              {/* Non-scheduled accepted orders: Start Preparing */}
+              {stage === 'new' && order.status === 'accepted' && !isScheduled(order) && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(59,109,17,0.08)', border: '0.5px solid rgba(59,109,17,0.2)' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11' }} />
+                    <span style={{ fontSize: 11, fontWeight: 500, color: '#3B6D11' }}>Accepted</span>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleStatusChange(order.id, 'preparing') }}
+                    style={{ width: '100%', padding: '7px 0', fontSize: 12, fontWeight: 500, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: '#185FA5', color: '#fff' }}
+                  >
+                    Start Preparing
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+
+          // Compact card for accepted scheduled orders (small footprint)
+          const ScheduledCompactCard = ({ order }) => {
+            const approaching = isApproaching(order)
+            const mins = minsUntilPickup(order)
+            const overdue = mins < 0
+            const timeLabel = new Date(order.pickupTime).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
+            const urgentColor = overdue ? '#DC2626' : approaching ? '#EA580C' : '#3B6D11'
+            const urgentBg = overdue ? 'rgba(220,38,38,0.08)' : approaching ? 'rgba(234,88,12,0.08)' : 'rgba(59,109,17,0.06)'
+            const urgentBorder = overdue ? 'rgba(220,38,38,0.3)' : approaching ? 'rgba(234,88,12,0.3)' : `${C.border}`
+
+            return (
+              <div
+                draggable
+                onDragStart={(e) => handleDragStart(e, order, 'new')}
+                onDragEnd={handleDragEnd}
+                onClick={() => setSelectedOrder(order)}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.t3 }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = urgentBorder }}
+                style={{
+                  background: urgentBg,
+                  border: `0.5px solid ${urgentBorder}`,
+                  borderLeft: `3px solid ${urgentColor}`,
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  cursor: 'grab',
+                  transition: 'border-color 0.15s, opacity 0.2s',
+                  userSelect: 'none'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: urgentColor, whiteSpace: 'nowrap' }}>{timeLabel}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: C.t0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#{order.orderNumber} · {order.customerName}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: C.t2 }}>${(order.total || 0).toFixed(2)}</span>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleStatusChange(order.id, 'preparing') }}
+                    style={{
+                      padding: '4px 10px', fontSize: 11, fontWeight: 500, borderRadius: 6,
+                      border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                      background: approaching || overdue ? '#EA580C' : '#185FA5', color: '#fff'
+                    }}
+                  >
+                    {overdue ? 'Overdue — Prepare' : approaching ? 'Due soon — Prepare' : 'Start Preparing'}
+                  </button>
+                </div>
+                {(approaching || overdue) && (
+                  <div style={{ fontSize: 10, fontWeight: 600, color: urgentColor, marginTop: 4 }}>
+                    {overdue ? `Overdue by ${Math.abs(mins)}m` : `Due in ${mins}m`}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          // Reusable column component with drop target
+          const PipelineColumn = ({ stage, icon, label, orders, emptyText, cardProps, scheduledOrders }) => (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: C.t0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {icon} {label}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: PIPELINE_COLORS[stage].bg, color: PIPELINE_COLORS[stage].main }}>
+                  {orders.length + (scheduledOrders?.length || 0)}
+                </span>
+              </div>
+              <div
+                onDragOver={(e) => handleDragOver(e, stage)}
+                onDragEnter={(e) => handleDragEnter(e, stage)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, stage)}
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 10,
+                  minHeight: 80, borderRadius: 10, padding: 4,
+                  transition: 'background 0.2s, outline 0.2s'
+                }}
+              >
+                {orders.length === 0 && (!scheduledOrders || scheduledOrders.length === 0)
+                  ? <div style={{ fontSize: 13, color: C.t3, textAlign: 'center', padding: '2rem 0' }}>{emptyText}</div>
+                  : <>
+                      {orders.map(o => <PipelineCard key={o.id} order={o} stage={stage} {...(cardProps || {})} />)}
+                      {/* Scheduled accepted — compact section */}
+                      {scheduledOrders && scheduledOrders.length > 0 && (
+                        <div style={{ marginTop: orders.length > 0 ? 6 : 0 }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, paddingLeft: 4 }}>
+                            Scheduled ({scheduledOrders.length})
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {scheduledOrders.map(o => <ScheduledCompactCard key={o.id} order={o} />)}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                }
+              </div>
+            </div>
+          )
+
+          return (
+            <div style={{ padding: '4px 0' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 500, color: C.t0, margin: 0 }}>Live orders</h3>
+                  <span style={{ fontSize: 13, color: C.t2 }}>
+                    {new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })} · {new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: C.t3 }}>Drag cards between columns</span>
+                  <span style={{ fontSize: 12, padding: '5px 12px', borderRadius: 8, background: C.card, color: C.t2, border: `0.5px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11', display: 'inline-block' }} />
+                    Live
+                  </span>
+                </div>
+              </div>
+
+              {/* Stat Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+                <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+                  <span style={{ fontSize: 13, color: C.t2, display: 'block', marginBottom: 4 }}>New incoming</span>
+                  <span style={{ fontSize: 26, fontWeight: 500, color: '#BA7517' }}>{allNewCol.length}</span>
+                </div>
+                <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+                  <span style={{ fontSize: 13, color: C.t2, display: 'block', marginBottom: 4 }}>Preparing</span>
+                  <span style={{ fontSize: 26, fontWeight: 500, color: '#185FA5' }}>{inProgressOrders.length}</span>
+                </div>
+                <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+                  <span style={{ fontSize: 13, color: C.t2, display: 'block', marginBottom: 4 }}>Ready to collect</span>
+                  <span style={{ fontSize: 26, fontWeight: 500, color: '#3B6D11' }}>{readyOrders.length}</span>
+                </div>
+                <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+                  <span style={{ fontSize: 13, color: C.t2, display: 'block', marginBottom: 4 }}>Completed today</span>
+                  <span style={{ fontSize: 26, fontWeight: 500, color: C.t0 }}>{completedToday.length}</span>
+                </div>
+              </div>
+
+              {/* Pipeline Columns */}
+              {liveLoading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>Loading orders...</div>
+              ) : visibleLive.length === 0 && completedToday.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: C.t3, fontSize: 14 }}>
+                  {isClient ? 'No orders yet. New orders will appear here in real-time!' : 'No live orders'}
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
+                    <PipelineColumn stage="new" icon={<Bell size={14} color="#BA7517" />} label="New" orders={regularNew} scheduledOrders={scheduledAccepted} emptyText="No new orders" />
+                    <PipelineColumn stage="preparing" icon={<ChefHat size={14} color="#185FA5" />} label="Preparing" orders={inProgressOrders} emptyText="Nothing preparing" cardProps={{ actionLabel: 'Mark ready', actionColor: '#3B6D11', nextStatus: 'ready' }} />
+                    <PipelineColumn stage="ready" icon={<CheckCircle size={14} color="#3B6D11" />} label="Ready" orders={readyOrders} emptyText="Nothing ready yet" cardProps={{ actionLabel: 'Collected ✓', actionColor: '#3B6D11', nextStatus: 'completed' }} />
+                  </div>
+
+                  {/* Completed Today */}
+                  {completedToday.length > 0 && (
+                    <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                      <div style={{ padding: '10px 16px', background: C.page, borderBottom: `0.5px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>Completed today</span>
+                        <span style={{ fontSize: 12, color: C.t2 }}>${todayRevenue.toFixed(2)} revenue</span>
+                      </div>
+                      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                        {completedToday.slice(0, 20).map((o, i) => (
+                          <div key={o.id} onClick={() => setSelectedOrder(o)} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '10px 16px', borderBottom: `0.5px solid ${C.border}40`, cursor: 'pointer'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span style={{ fontSize: 12, color: C.t2 }}>#{o.orderNumber}</span>
+                              <span style={{ fontSize: 13, color: C.t0 }}>{o.customerName}</span>
+                              <span style={{ fontSize: 12, color: C.t3 }}>{o.items?.map(it => `${it.quantity}x ${it.name}`).join(', ')}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>${(o.total || 0).toFixed(2)}</span>
+                              <span style={{ fontSize: 11, color: C.t3 }}>{new Date(o.createdAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Order History */}
         {activeTab === 'history' && (
@@ -849,45 +1220,24 @@ function OrderCard({ order, onClick, onStatusChange, onRefund, isHistory = false
         </div>
       </div>
 
-      {/* Order Progress */}
+      {/* Order Status */}
       {order.status !== 'new' && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', marginBottom: 4 }}>
-            Order Progress
+            Status
           </div>
-          {(() => {
-            const progress = getOrderProgressTime(order)
-            if (!progress) return null
-            
-            return (
-              <div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: 4
-                }}>
-                  <span style={{ fontSize: 12, color: C.t2 }}>
-                    {progress.statusText}{progress.timeElapsed ? ` - ${progress.timeElapsed}` : ''}
-                  </span>
-                </div>
-                <div style={{
-                  width: '100%',
-                  height: 6,
-                  background: C.border,
-                  borderRadius: 3,
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${progress.progressPercent}%`,
-                    height: '100%',
-                    background: STATUS_COLORS[order.status],
-                    transition: 'width 0.3s ease'
-                  }} />
-                </div>
-              </div>
-            )
-          })()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[order.status] }} />
+            <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>{STATUS_LABELS[order.status]}</span>
+            {order.createdAt && (
+              <span style={{ fontSize: 11, color: C.t3 }}>
+                · {(() => {
+                  const m = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000)
+                  return m < 1 ? 'just now' : `${m}m ago`
+                })()}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -1050,7 +1400,7 @@ function OrderCard({ order, onClick, onStatusChange, onRefund, isHistory = false
 
 // Analytics Dashboard Component with time period filtering
 function AnalyticsSection({ liveOrders, historyOrders }) {
-  const [timePeriod, setTimePeriod] = useState('today')
+  const [timePeriod, setTimePeriod] = useState('currentWeek')
 
   // Helper function to get date range for time period
   const getDateRange = (period) => {
@@ -1093,23 +1443,53 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
     }
   }
 
+  // Get previous period range for delta comparison
+  const getPreviousPeriodRange = (period) => {
+    const { start, end } = getDateRange(period)
+    const duration = end.getTime() - start.getTime()
+    return { start: new Date(start.getTime() - duration), end: start }
+  }
+
   // Filter orders based on selected time period (exclude 'new' orders from analytics)
+  const allOrders = [...liveOrders, ...historyOrders]
   const { start, end } = getDateRange(timePeriod)
-  const filteredOrders = [...liveOrders, ...historyOrders].filter(order => {
+  const filteredOrders = allOrders.filter(order => {
     if (!order.createdAt) return false
-    if (order.status === 'new') return false // Exclude new orders from analytics
+    if (order.status === 'new') return false
     const orderDate = new Date(order.createdAt)
     return orderDate >= start && orderDate < end
   })
 
-  // Calculate revenue from filtered orders
-  const periodRevenue = filteredOrders
-    .reduce((sum, order) => sum + (order.total || 0), 0)
+  // Previous period orders for delta
+  const prev = getPreviousPeriodRange(timePeriod)
+  const prevOrders = allOrders.filter(order => {
+    if (!order.createdAt || order.status === 'new') return false
+    const d = new Date(order.createdAt)
+    return d >= prev.start && d < prev.end
+  })
 
+  // Calculate metrics
+  const periodRevenue = filteredOrders.reduce((sum, order) => sum + (order.total || 0), 0)
+  const prevRevenue = prevOrders.reduce((sum, order) => sum + (order.total || 0), 0)
   const periodOrderCount = filteredOrders.length
-
-  // Calculate average order value
+  const prevOrderCount = prevOrders.length
   const averageOrderValue = periodOrderCount > 0 ? periodRevenue / periodOrderCount : 0
+
+  // Unique customers
+  const uniqueCustomers = new Set(filteredOrders.map(o => o.customerPhone || o.customerEmail || o.customerName).filter(Boolean)).size
+  const prevUniqueCustomers = new Set(prevOrders.map(o => o.customerPhone || o.customerEmail || o.customerName).filter(Boolean)).size
+
+  // Delta helper
+  const getDelta = (current, previous) => {
+    if (previous === 0 && current === 0) return { pct: 0, direction: 'flat' }
+    if (previous === 0) return { pct: 100, direction: 'up' }
+    const pct = Math.round(((current - previous) / previous) * 100)
+    return { pct: Math.abs(pct), direction: pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat' }
+  }
+
+  const orderDelta = getDelta(periodOrderCount, prevOrderCount)
+  const revenueDelta = getDelta(periodRevenue, prevRevenue)
+  const customerDelta = getDelta(uniqueCustomers, prevUniqueCustomers)
 
   // Calculate top selling items
   const itemCounts = {}
@@ -1129,311 +1509,278 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
     .slice(0, 5)
     .map(([name, count]) => ({ name, count }))
 
-  const periodLabels = {
-    today: 'Today',
-    yesterday: 'Yesterday',
-    currentWeek: 'This Week',
-    lastWeek: 'Last Week',
-    currentMonth: 'This Month',
-    lastMonth: 'Last Month',
-    all: 'All Time'
+  // Calculate daily/hourly revenue based on selected time period
+  const getDailyRevenue = () => {
+    const now = new Date()
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+
+    // For today, yesterday, this week, last week: show Mon-Sun weekly view
+    if (timePeriod === 'today' || timePeriod === 'yesterday' || timePeriod === 'currentWeek' || timePeriod === 'lastWeek') {
+      const weekPeriod = (timePeriod === 'lastWeek') ? 'lastWeek' : 'currentWeek'
+      const { start: weekStart } = getDateRange(weekPeriod)
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      const dow = now.getDay()
+      return days.map((dayLabel, index) => {
+        const dayStart = new Date(weekStart)
+        dayStart.setDate(weekStart.getDate() + index)
+        const dayEnd = new Date(dayStart)
+        dayEnd.setDate(dayStart.getDate() + 1)
+        const rev = allOrders.filter(o => {
+          if (!o.createdAt || o.status === 'new') return false
+          const d = new Date(o.createdAt)
+          return d >= dayStart && d < dayEnd
+        }).reduce((s, o) => s + (o.total || 0), 0)
+        const isCurrent = timePeriod === 'currentWeek' && index === (dow === 0 ? 6 : dow - 1)
+        return { day: dayLabel, revenue: rev, isToday: isCurrent }
+      })
+    }
+
+    // For month periods: show each day of the month
+    if (timePeriod === 'currentMonth' || timePeriod === 'lastMonth') {
+      const { start: monthStart, end: monthEnd } = getDateRange(timePeriod)
+      const totalDays = Math.round((monthEnd - monthStart) / 86400000)
+      const result = []
+      for (let i = 0; i < totalDays; i++) {
+        const dayStart = new Date(monthStart.getTime() + i * 86400000)
+        const dayEnd = new Date(dayStart.getTime() + 86400000)
+        const rev = allOrders.filter(o => {
+          if (!o.createdAt || o.status === 'new') return false
+          const d = new Date(o.createdAt)
+          return d >= dayStart && d < dayEnd
+        }).reduce((s, o) => s + (o.total || 0), 0)
+        const isCurrent = timePeriod === 'currentMonth' && dayStart.toDateString() === todayStart.toDateString()
+        result.push({ day: String(dayStart.getDate()), revenue: rev, isToday: isCurrent })
+      }
+      return result
+    }
+
+    // For 'all': group by month
+    if (timePeriod === 'all') {
+      const monthMap = {}
+      allOrders.forEach(o => {
+        if (!o.createdAt || o.status === 'new') return
+        const d = new Date(o.createdAt)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        monthMap[key] = (monthMap[key] || 0) + (o.total || 0)
+      })
+      const keys = Object.keys(monthMap).sort()
+      if (keys.length === 0) return []
+      const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+      return keys.map(k => {
+        const [, m] = k.split('-')
+        return { day: months[parseInt(m) - 1], revenue: monthMap[k], isToday: k === nowKey }
+      })
+    }
+
+    return []
   }
 
-  // Calculate daily revenue for the current week (Mon-Sun)
-  const getDailyRevenue = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const dayOfWeek = today.getDay()
-    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
-    const weekStart = new Date(today)
-    weekStart.setDate(diff)
-
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    const dailyRevenue = days.map((dayLabel, index) => {
-      const dayStart = new Date(weekStart)
-      dayStart.setDate(weekStart.getDate() + index)
-      const dayEnd = new Date(dayStart)
-      dayEnd.setDate(dayStart.getDate() + 1)
-
-      const dayOrders = [...liveOrders, ...historyOrders].filter(order => {
-        if (!order.createdAt || order.status === 'new') return false
-        const orderDate = new Date(order.createdAt)
-        return orderDate >= dayStart && orderDate < dayEnd
-      })
-
-      const revenue = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0)
-      const isToday = index === (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
-
-      return { day: dayLabel, revenue, isToday }
+  // Calculate orders by hour for the filtered period
+  const getOrdersByHour = () => {
+    const hourCounts = {}
+    filteredOrders.forEach(order => {
+      if (!order.createdAt) return
+      const h = new Date(order.createdAt).getHours()
+      hourCounts[h] = (hourCounts[h] || 0) + 1
     })
-
-    return dailyRevenue
+    // Find the range of active hours
+    const activeHours = Object.keys(hourCounts).map(Number).sort((a, b) => a - b)
+    if (activeHours.length === 0) return []
+    const minH = Math.max(0, activeHours[0] - 1)
+    const maxH = Math.min(23, activeHours[activeHours.length - 1] + 1)
+    const result = []
+    for (let h = minH; h <= maxH; h++) {
+      const label = h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`
+      result.push({ hour: label, count: hourCounts[h] || 0 })
+    }
+    return result
   }
 
   const dailyRevenue = getDailyRevenue()
   const maxRevenue = Math.max(...dailyRevenue.map(d => d.revenue), 1)
+  const hourlyOrders = getOrdersByHour()
+  const maxHourly = Math.max(...hourlyOrders.map(h => h.count), 1)
+
+  // Delta badge component
+  const DeltaBadge = ({ delta }) => {
+    if (delta.direction === 'flat') return <span style={{ fontSize: 12, color: C.t3 }}>— vs last period</span>
+    const color = delta.direction === 'up' ? '#16a34a' : '#dc2626'
+    const arrow = delta.direction === 'up' ? '↑' : '↓'
+    return <span style={{ fontSize: 12, color }}>{arrow} {delta.pct}% vs last period</span>
+  }
 
   return (
-    <div>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '20px' 
-      }}>
-        <h3 style={{ 
-          fontSize: '18px', 
-          fontWeight: 'bold', 
-          color: C.t0, 
-          margin: 0,
-          textTransform: 'uppercase',
-          letterSpacing: '0.07em'
-        }}>
-          Analytics
-        </h3>
-        
-        {/* Time Period Selector */}
+    <div style={{ padding: '4px 0' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h3 style={{ fontSize: 18, fontWeight: 500, color: C.t0, margin: 0 }}>Analytics</h3>
+        </div>
         <select
           value={timePeriod}
           onChange={(e) => setTimePeriod(e.target.value)}
           style={{
-            padding: '8px 12px',
+            padding: '7px 12px',
             background: C.input,
             border: `1px solid ${C.border}`,
             borderRadius: 8,
             color: C.t0,
             fontSize: 13,
             fontFamily: 'inherit',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            outline: 'none'
           }}
         >
           <option value="today">Today</option>
           <option value="yesterday">Yesterday</option>
-          <option value="currentWeek">This Week</option>
-          <option value="lastWeek">Last Week</option>
-          <option value="currentMonth">This Month</option>
-          <option value="lastMonth">Last Month</option>
-          <option value="all">All Time</option>
+          <option value="currentWeek">This week</option>
+          <option value="lastWeek">Last week</option>
+          <option value="currentMonth">This month</option>
+          <option value="lastMonth">Last month</option>
+          <option value="all">All time</option>
         </select>
       </div>
       
-      {/* Metrics Grid */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '16px', 
-        marginBottom: '24px' 
-      }}>
-        <div style={{ 
-          background: C.card, 
-          padding: '20px', 
-          borderRadius: '12px', 
-          textAlign: 'center' 
-        }}>
-          <div style={{ 
-            fontSize: '32px', 
-            fontWeight: 'bold', 
-            color: C.green, 
-            marginBottom: '8px' 
-          }}>
-            {periodOrderCount}
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {/* Total Orders */}
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <ShoppingCart size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Total orders</span>
           </div>
-          <div style={{ fontSize: '14px', color: C.t2 }}>Orders {periodLabels[timePeriod]}</div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0, marginBottom: 4 }}>{periodOrderCount}</div>
+          <DeltaBadge delta={orderDelta} />
         </div>
-        
-        <div style={{ 
-          background: C.card, 
-          padding: '20px', 
-          borderRadius: '12px', 
-          textAlign: 'center' 
-        }}>
-          <div style={{ 
-            fontSize: '32px', 
-            fontWeight: 'bold', 
-            color: C.acc, 
-            marginBottom: '8px' 
-          }}>
-            ${periodRevenue.toFixed(2)}
+        {/* Revenue */}
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <DollarSign size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Revenue</span>
           </div>
-          <div style={{ fontSize: '14px', color: C.t2 }}>Revenue {periodLabels[timePeriod]}</div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0, marginBottom: 4 }}>${periodRevenue.toFixed(2)}</div>
+          <DeltaBadge delta={revenueDelta} />
         </div>
-        
-        <div style={{ 
-          background: C.card, 
-          padding: '20px', 
-          borderRadius: '12px', 
-          textAlign: 'center' 
-        }}>
-          <div style={{ 
-            fontSize: '32px', 
-            fontWeight: 'bold', 
-            color: C.t0, 
-            marginBottom: '8px' 
-          }}>
-            ${averageOrderValue.toFixed(2)}
+        {/* Avg Order */}
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <Package size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Avg order</span>
           </div>
-          <div style={{ fontSize: '14px', color: C.t2 }}>Average Order</div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0, marginBottom: 4 }}>${averageOrderValue.toFixed(2)}</div>
+          <span style={{ fontSize: 12, color: C.t3 }}>per transaction</span>
         </div>
-      </div>
-      
-      {/* Daily Revenue Bar Chart */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: 12 
-        }}>
-          <h4 style={{ 
-            fontSize: '16px', 
-            fontWeight: 'bold', 
-            color: C.t0,
-            margin: 0,
-            textTransform: 'uppercase',
-            letterSpacing: '0.07em'
-          }}>
-            Daily Revenue
-          </h4>
-          <span style={{ fontSize: 12, color: C.t2 }}>This Week</span>
-        </div>
-        
-        <div style={{ 
-          background: C.card, 
-          borderRadius: '12px', 
-          padding: '20px'
-        }}>
-          {/* Chart container */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'flex-end', 
-            justifyContent: 'space-between',
-            height: '180px',
-            gap: '8px',
-            paddingBottom: '8px'
-          }}>
-            {dailyRevenue.map((day, index) => {
-              const barHeight = maxRevenue > 0 ? (day.revenue / maxRevenue) * 140 : 0
-              const hasRevenue = day.revenue > 0
-              
-              return (
-                <div key={index} style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center',
-                  flex: 1,
-                  gap: '8px'
-                }}>
-                  {/* Revenue label */}
-                  <span style={{ 
-                    fontSize: '11px', 
-                    fontWeight: '600',
-                    color: hasRevenue ? C.acc : C.t3,
-                    opacity: hasRevenue ? 1 : 0.5
-                  }}>
-                    {hasRevenue ? `$${day.revenue.toFixed(2)}` : ''}
-                  </span>
-                  
-                  {/* Bar */}
-                  <div style={{
-                    width: '100%',
-                    maxWidth: '40px',
-                    height: `${Math.max(barHeight, 4)}px`,
-                    minHeight: hasRevenue ? '4px' : '4px',
-                    background: day.isToday 
-                      ? 'linear-gradient(180deg, #FF8C42 0%, #FF6B35 100%)'
-                      : hasRevenue 
-                        ? 'linear-gradient(180deg, #FF8C42 0%, #FF6B35 100%)'
-                        : C.border,
-                    borderRadius: '4px 4px 0 0',
-                    opacity: hasRevenue ? (day.isToday ? 1 : 0.8) : 0.3,
-                    transition: 'all 0.3s ease'
-                  }} />
-                  
-                  {/* Day label */}
-                  <span style={{ 
-                    fontSize: '12px', 
-                    fontWeight: day.isToday ? '600' : '400',
-                    color: day.isToday ? C.t0 : C.t2
-                  }}>
-                    {day.day}
-                  </span>
-                </div>
-              )
-            })}
+        {/* Customers */}
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <User size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Customers</span>
           </div>
-          
-          {/* Legend */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '16px',
-            marginTop: '16px',
-            paddingTop: '12px',
-            borderTop: `1px solid ${C.border}30`
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ 
-                width: '12px', 
-                height: '12px', 
-                background: 'linear-gradient(180deg, #FF8C42 0%, #FF6B35 100%)',
-                borderRadius: '2px'
-              }} />
-              <span style={{ fontSize: '12px', color: C.t2 }}>Revenue (AUD)</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ 
-                width: '12px', 
-                height: '12px', 
-                background: C.border,
-                borderRadius: '2px'
-              }} />
-              <span style={{ fontSize: '12px', color: C.t2 }}>No sales</span>
-            </div>
-          </div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0, marginBottom: 4 }}>{uniqueCustomers}</div>
+          <DeltaBadge delta={customerDelta} />
         </div>
       </div>
 
-      {/* Top Selling Items */}
-      <div style={{ marginBottom: 16 }}>
-        <h4 style={{ 
-          fontSize: '16px', 
-          fontWeight: 'bold', 
-          color: C.t0, 
-          marginBottom: '12px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.07em'
-        }}>
-          Top Selling Items {periodLabels[timePeriod]}
-        </h4>
-        <div style={{ 
-          background: C.card, 
-          borderRadius: '12px', 
-          padding: '16px' 
-        }}>
+      {/* Daily Revenue Chart */}
+      <div style={{ background: C.card, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: C.t0 }}>{timePeriod === 'all' ? 'Monthly revenue' : 'Daily revenue'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: C.t2 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: '#D85A30', display: 'inline-block' }} />
+              Revenue (AUD)
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: C.border, display: 'inline-block' }} />
+              No sales
+            </span>
+          </div>
+        </div>
+        {/* Bar chart */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: 180, gap: 6, paddingBottom: 4 }}>
+          {dailyRevenue.map((day, i) => {
+            const barH = maxRevenue > 0 ? (day.revenue / maxRevenue) * 150 : 0
+            const hasRev = day.revenue > 0
+            return (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 500, color: hasRev ? C.t0 : 'transparent', minHeight: 14 }}>
+                  ${day.revenue.toFixed(2)}
+                </span>
+                <div style={{
+                  width: '100%', maxWidth: 36,
+                  height: Math.max(barH, 4),
+                  background: hasRev ? '#D85A30' : C.border,
+                  borderRadius: '4px 4px 0 0',
+                  opacity: hasRev ? (day.isToday ? 1 : 0.85) : 0.3,
+                  transition: 'all 0.3s ease'
+                }} />
+                <span style={{ fontSize: 12, fontWeight: day.isToday ? 600 : 400, color: day.isToday ? C.t0 : C.t2 }}>
+                  {day.day}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Two-column: Top Items + Orders by Hour */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        {/* Top Selling Items */}
+        <div style={{ background: C.card, borderRadius: 10, padding: 16 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: C.t0, display: 'block', marginBottom: 12 }}>Top selling items</span>
           {topItems.length === 0 ? (
-            <div style={{ textAlign: 'center', color: C.t3, padding: '20px' }}>
-              No items sold {periodLabels[timePeriod].toLowerCase()}
+            <div style={{ textAlign: 'center', color: C.t3, padding: '24px 0', fontSize: 13 }}>
+              No items sold this period
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {topItems.map((item, index) => (
-                <div key={index} style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
+            <div>
+              {topItems.map((item, i) => (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '8px 0',
-                  borderBottom: index < topItems.length - 1 ? `1px solid ${C.border}20` : 'none'
+                  borderBottom: i < topItems.length - 1 ? `0.5px solid ${C.border}40` : 'none'
                 }}>
-                  <span style={{ fontSize: '14px', color: C.t0 }}>{item.name}</span>
-                  <span style={{ 
-                    fontSize: '14px', 
-                    fontWeight: '600', 
-                    color: C.acc 
-                  }}>
-                    {item.count} sold
-                  </span>
+                  <span style={{ fontSize: 13, color: C.t0 }}>{item.name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>{item.count} sold</span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Orders by Hour */}
+        <div style={{ background: C.card, borderRadius: 10, padding: 16 }}>
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: C.t0, display: 'block' }}>Orders by hour</span>
+            <span style={{ fontSize: 11, color: C.t3 }}>
+              {timePeriod === 'today' ? 'Today' : timePeriod === 'yesterday' ? 'Yesterday' : timePeriod === 'currentWeek' ? 'This week (avg)' : timePeriod === 'lastWeek' ? 'Last week (avg)' : timePeriod === 'currentMonth' ? 'This month (avg)' : timePeriod === 'lastMonth' ? 'Last month (avg)' : 'All time (avg)'}
+            </span>
+          </div>
+          {hourlyOrders.length === 0 ? (
+            <div style={{ textAlign: 'center', color: C.t3, padding: '24px 0', fontSize: 13 }}>
+              No orders this period
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: 140, gap: 3, paddingBottom: 4 }}>
+              {hourlyOrders.map((h, i) => {
+                const barH = maxHourly > 0 ? (h.count / maxHourly) * 110 : 0
+                return (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: 4 }}>
+                    {h.count > 0 && <span style={{ fontSize: 10, fontWeight: 500, color: C.t2 }}>{h.count}</span>}
+                    <div style={{
+                      width: '100%', maxWidth: 24,
+                      height: Math.max(barH, 3),
+                      background: h.count > 0 ? '#D85A30' : C.border,
+                      borderRadius: '3px 3px 0 0',
+                      opacity: h.count > 0 ? 0.9 : 0.2,
+                      transition: 'all 0.3s ease'
+                    }} />
+                    <span style={{ fontSize: 10, color: C.t2 }}>{h.hour}</span>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -1445,27 +1792,22 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
 // Enhanced Customer Management Component (Loyalty Program)
 function CustomersSection({ historyOrders, clientId }) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [tierFilter, setTierFilter] = useState('')
+  const [sortBy, setSortBy] = useState('revenue')
   const [selectedCustomer, setSelectedCustomer] = useState(null)
-  
-  // Fetch loyalty config
-  const { data: config } = useQuery({
-    queryKey: ['config', clientId],
-    queryFn: () => getLocations(clientId).then(() => ({})), // Simplified for now
-    enabled: false // Disable for now, will implement properly
-  })
 
   // Points earning rate (default 1 point per dollar, configurable)
   const pointsPerDollar = 1
   
   // Extract unique customers from orders (phone numbers as loyalty accounts)
-  const customers = {}
+  const customersMap = {}
   historyOrders.forEach(order => {
     const phone = order.customerPhone || 'No Phone'
     const email = order.customerEmail || 'No Email'
-    const key = phone // Use phone number as unique identifier for loyalty
+    const key = phone
     
-    if (!customers[key]) {
-      customers[key] = {
+    if (!customersMap[key]) {
+      customersMap[key] = {
         name: order.customerName,
         phone,
         email,
@@ -1482,393 +1824,282 @@ function CustomersSection({ historyOrders, clientId }) {
       }
     }
     
-    customers[key].orderCount += 1
-    customers[key].totalSpent += order.total || 0
-    
-    // Calculate points earned (1 point per dollar)
+    customersMap[key].orderCount += 1
+    customersMap[key].totalSpent += order.total || 0
     const pointsEarned = Math.floor((order.total || 0) * pointsPerDollar)
-    customers[key].pointsEarned += pointsEarned
+    customersMap[key].pointsEarned += pointsEarned
+    if (order.pointsUsed) customersMap[key].pointsUsed += order.pointsUsed
+    customersMap[key].loyaltyPoints = customersMap[key].pointsEarned - customersMap[key].pointsUsed
+    customersMap[key].orders.push(order)
     
-    // Handle points used from order
-    if (order.pointsUsed) {
-      customers[key].pointsUsed += order.pointsUsed
-    }
+    if (customersMap[key].totalSpent >= 1000) customersMap[key].tier = 'Gold'
+    else if (customersMap[key].totalSpent >= 500) customersMap[key].tier = 'Silver'
+    else customersMap[key].tier = 'Bronze'
     
-    // Calculate net loyalty points
-    customers[key].loyaltyPoints = customers[key].pointsEarned - customers[key].pointsUsed
-    
-    customers[key].orders.push(order)
-    
-    // Determine tier based on total spent
-    if (customers[key].totalSpent >= 1000) {
-      customers[key].tier = 'Gold'
-    } else if (customers[key].totalSpent >= 500) {
-      customers[key].tier = 'Silver'
-    } else {
-      customers[key].tier = 'Bronze'
-    }
-    
-    // Update first order date if earlier
     const orderDate = new Date(order.createdAt)
-    const firstOrderDate = new Date(customers[key].firstOrder)
-    if (orderDate < firstOrderDate) {
-      customers[key].firstOrder = order.createdAt
-    }
-    
-    // Update last order date if more recent
-    const lastOrderDate = new Date(customers[key].lastOrder)
-    if (orderDate > lastOrderDate) {
-      customers[key].lastOrder = order.createdAt
-    }
+    if (orderDate < new Date(customersMap[key].firstOrder)) customersMap[key].firstOrder = order.createdAt
+    if (orderDate > new Date(customersMap[key].lastOrder)) customersMap[key].lastOrder = order.createdAt
   })
   
-  // Calculate average order value for each customer
-  Object.values(customers).forEach(customer => {
-    customer.averageOrderValue = customer.orderCount > 0 ? customer.totalSpent / customer.orderCount : 0
+  const allCustomers = Object.values(customersMap)
+  allCustomers.forEach(c => { c.averageOrderValue = c.orderCount > 0 ? c.totalSpent / c.orderCount : 0 })
+
+  // Stats
+  const totalCustomers = allCustomers.length
+  const goldMembers = allCustomers.filter(c => c.tier === 'Gold').length
+  const totalRevenue = allCustomers.reduce((s, c) => s + c.totalSpent, 0)
+  const repeatCustomers = allCustomers.filter(c => c.orderCount > 1).length
+
+  // Filter + sort
+  let filteredCustomers = allCustomers.filter(c => {
+    const matchQ = !searchTerm || c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.phone.includes(searchTerm) || (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchT = !tierFilter || c.tier === tierFilter
+    return matchQ && matchT
   })
-  
-  // Filter customers based on search
-  const filteredCustomers = Object.values(customers).filter(customer => {
-    if (searchTerm === '') return true
-    return customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           customer.phone.includes(searchTerm) ||
-           (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
-  })
-  
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleDateString('en-AU', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric' 
-    })
+  if (sortBy === 'revenue') filteredCustomers.sort((a, b) => b.totalSpent - a.totalSpent)
+  else if (sortBy === 'orders') filteredCustomers.sort((a, b) => b.orderCount - a.orderCount)
+  else if (sortBy === 'points') filteredCustomers.sort((a, b) => b.loyaltyPoints - a.loyaltyPoints)
+  else if (sortBy === 'recent') filteredCustomers.sort((a, b) => new Date(b.lastOrder) - new Date(a.lastOrder))
+
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+
+  const tierStyle = (tier) => {
+    if (tier === 'Gold') return { bg: 'rgba(186,117,23,0.12)', color: '#BA7517', label: 'Gold' }
+    if (tier === 'Silver') return { bg: 'rgba(100,100,110,0.12)', color: '#5F5E5A', label: 'Silver' }
+    return { bg: 'rgba(154,91,48,0.12)', color: '#993C1D', label: 'Bronze' }
   }
-  
-  const getTierColor = (tier) => {
-    switch(tier) {
-      case 'Gold': return '#FFD700'
-      case 'Silver': return '#C0C0C0'
-      case 'Bronze': return '#CD7F32'
-      default: return '#999'
-    }
+
+  const avatarColor = (name) => {
+    const colors = ['#D85A30','#185FA5','#0F6E56','#3B6D11','#854F0B','#993556','#534AB7']
+    let h = 0; for (const ch of (name || '')) h = (h * 31 + ch.charCodeAt(0)) % colors.length
+    return colors[Math.abs(h)]
   }
-  
+
+  const initials = (name) => (name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+
+  const selectStyle = { padding: '7px 10px', background: C.input, border: `1px solid ${C.border}`, borderRadius: 8, color: C.t0, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }
+
+  // Unique tiers for filter
+  const tiers = [...new Set(allCustomers.map(c => c.tier))]
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <div style={{ padding: '4px 0' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: C.t0 }}>Customers</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: C.t3 }}>
-            View customer loyalty and order history
-          </p>
+          <h3 style={{ fontSize: 18, fontWeight: 500, color: C.t0, margin: 0 }}>Customers</h3>
+          <span style={{ fontSize: 13, color: C.t2 }}>Loyalty, points & order history</span>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: C.t3 }}>
-            {Object.keys(customers).length} total customers
-          </span>
-        </div>
+        <span style={{ fontSize: 13, color: C.t2, background: C.card, padding: '6px 12px', borderRadius: 8, border: `0.5px solid ${C.border}` }}>
+          {totalCustomers} customer{totalCustomers !== 1 ? 's' : ''}
+        </span>
       </div>
-      
-      {/* Search */}
-      <div style={{ marginBottom: 16 }}>
-        <input
-          type="text"
-          placeholder="Search by name, phone, or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '12px',
-            border: `1px solid ${C.border}`,
-            borderRadius: 8,
-            fontSize: 14,
-            fontFamily: 'inherit'
-          }}
-        />
-      </div>
-      
-      {/* Customer List */}
-      <div style={{ 
-        background: C.card, 
-        borderRadius: '12px', 
-        overflow: 'hidden' 
-      }}>
-        {filteredCustomers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>
-            No customers found
+
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <User size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Total customers</span>
           </div>
-        ) : (
-          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            {filteredCustomers.map((customer, index) => (
-              <div 
-                key={index} 
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  padding: '16px',
-                  borderBottom: index < filteredCustomers.length - 1 ? `1px solid ${C.border}20` : 'none',
-                  cursor: 'pointer',
-                  ':hover': {
-                    background: C.page
-                  }
-                }}
-                onClick={() => setSelectedCustomer(customer)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = C.page
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent'
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <div style={{ 
-                      fontSize: '16px', 
-                      fontWeight: '600', 
-                      color: C.t0 
-                    }}>
-                      {customer.name}
-                    </div>
-                    <span style={{
-                      background: `${getTierColor(customer.tier)}20`,
-                      color: getTierColor(customer.tier),
-                      padding: '2px 8px',
-                      borderRadius: 12,
-                      fontSize: '10px',
-                      fontWeight: '600'
-                    }}>
-                      {customer.tier}
-                    </span>
-                    <span style={{
-                      background: C.acc,
-                      color: 'white',
-                      padding: '2px 8px',
-                      borderRadius: 12,
-                      fontSize: '10px',
-                      fontWeight: '600'
-                    }}>
-                      {customer.loyaltyPoints} pts
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: C.t2, marginBottom: 4 }}>
-                    📱 {customer.phone}
-                  </div>
-                  {customer.email && customer.email !== 'No Email' && (
-                    <div style={{ fontSize: '12px', color: C.t2, marginBottom: 4 }}>
-                      ✉️ {customer.email}
-                    </div>
-                  )}
-                  <div style={{ fontSize: '11px', color: C.t3 }}>
-                    Member since: {formatDate(customer.firstOrder)}
-                  </div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0 }}>{totalCustomers}</div>
+        </div>
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <CheckCircle size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Gold members</span>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0 }}>{goldMembers}</div>
+        </div>
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <DollarSign size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Total revenue</span>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0 }}>${totalRevenue.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        </div>
+        <div style={{ background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <RotateCcw size={14} color={C.t2} />
+            <span style={{ fontSize: 13, color: C.t2 }}>Repeat customers</span>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 500, color: C.t0 }}>{repeatCustomers}</div>
+        </div>
+      </div>
+
+      {/* Search + Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <input
+            type="text"
+            placeholder="Search by name, phone or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ width: '100%', padding: '9px 12px 9px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, fontFamily: 'inherit', background: C.input, color: C.t0, outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+        <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} style={selectStyle}>
+          <option value="">All tiers</option>
+          {tiers.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+          <option value="revenue">Sort: Revenue</option>
+          <option value="orders">Sort: Orders</option>
+          <option value="points">Sort: Points</option>
+          <option value="recent">Sort: Recent</option>
+        </select>
+      </div>
+
+      {/* Customer List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 520, overflowY: 'auto' }}>
+        {filteredCustomers.length === 0 ? (
+          <div style={{ textAlign: 'center', color: C.t3, padding: '32px 0', fontSize: 14 }}>No customers match your search.</div>
+        ) : filteredCustomers.map((customer, i) => {
+          const ts = tierStyle(customer.tier)
+          const av = avatarColor(customer.name)
+          return (
+            <div
+              key={i}
+              onClick={() => setSelectedCustomer(customer)}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.t3 }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = `${C.border}` }}
+              style={{
+                background: C.card,
+                border: `0.5px solid ${C.border}`,
+                borderRadius: 12,
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                cursor: 'pointer',
+                transition: 'border-color 0.15s'
+              }}
+            >
+              {/* Avatar */}
+              <div style={{
+                width: 44, height: 44, minWidth: 44, borderRadius: '50%',
+                background: `${av}22`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 500, fontSize: 15, color: av
+              }}>
+                {initials(customer.name)}
+              </div>
+
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500, color: C.t0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{customer.name}</span>
+                  <span style={{ background: ts.bg, color: ts.color, padding: '2px 8px', borderRadius: 99, fontSize: 11, whiteSpace: 'nowrap' }}>{ts.label}</span>
+                  <span style={{ background: C.page, color: C.t2, padding: '2px 8px', borderRadius: 99, fontSize: 11, border: `0.5px solid ${C.border}` }}>{customer.loyaltyPoints} pts</span>
                 </div>
-                <div style={{ textAlign: 'right', minWidth: '150px' }}>
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: C.t3, 
-                    marginBottom: '4px' 
-                  }}>
-                    {customer.orderCount} orders
-                  </div>
-                  <div style={{ 
-                    fontSize: '14px', 
-                    fontWeight: '600', 
-                    color: C.acc, 
-                    marginBottom: '4px' 
-                  }}>
-                    ${customer.totalSpent.toFixed(2)}
-                  </div>
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: C.t3, 
-                    marginBottom: '4px' 
-                  }}>
-                    Avg: ${customer.averageOrderValue.toFixed(2)}
-                  </div>
-                  <div style={{ 
-                    fontSize: '11px', 
-                    color: C.t3 
-                  }}>
-                    Last: {formatDate(customer.lastOrder)}
-                  </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: C.t2 }}>
+                    <Phone size={12} style={{ marginRight: 3, verticalAlign: -1 }} />{customer.phone}
+                  </span>
+                  {customer.email && customer.email !== 'No Email' && (
+                    <span style={{ fontSize: 12, color: C.t2 }}>
+                      <span style={{ marginRight: 3 }}>@</span>{customer.email}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 12, color: C.t2 }}>
+                    <Calendar size={12} style={{ marginRight: 3, verticalAlign: -1 }} />Since {fmtDate(customer.firstOrder)}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+
+              {/* Revenue stats */}
+              <div style={{ textAlign: 'right', minWidth: 120 }}>
+                <div style={{ fontSize: 18, fontWeight: 500, color: C.t0, marginBottom: 2 }}>
+                  ${customer.totalSpent.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div style={{ fontSize: 12, color: C.t2, marginBottom: 2 }}>
+                  {customer.orderCount} order{customer.orderCount !== 1 ? 's' : ''} · avg ${customer.averageOrderValue.toFixed(2)}
+                </div>
+                <div style={{ fontSize: 11, color: C.t3 }}>Last: {fmtDate(customer.lastOrder)}</div>
+              </div>
+            </div>
+          )
+        })}
       </div>
       
       {/* Customer Detail Modal */}
       {selectedCustomer && (
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }} onClick={() => setSelectedCustomer(null)}>
           <div style={{
-            background: C.panel,
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '600px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflowY: 'auto'
+            background: C.panel, borderRadius: 12, padding: 24, maxWidth: 600, width: '90%', maxHeight: '80vh', overflowY: 'auto'
           }} onClick={e => e.stopPropagation()}>
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div>
-                <h3 style={{ 
-                  fontSize: '18px', 
-                  fontWeight: 'bold', 
-                  color: C.t0, 
-                  margin: 0,
-                  marginBottom: 4
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: '50%',
+                  background: `${avatarColor(selectedCustomer.name)}22`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 500, fontSize: 17, color: avatarColor(selectedCustomer.name)
                 }}>
-                  {selectedCustomer.name}
-                </h3>
-                <span style={{
-                  background: `${getTierColor(selectedCustomer.tier)}20`,
-                  color: getTierColor(selectedCustomer.tier),
-                  padding: '4px 12px',
-                  borderRadius: 12,
-                  fontSize: '12px',
-                  fontWeight: '600'
-                }}>
-                  {selectedCustomer.tier} Member
-                </span>
+                  {initials(selectedCustomer.name)}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 500, color: C.t0, margin: 0, marginBottom: 4 }}>{selectedCustomer.name}</h3>
+                  <span style={{ background: tierStyle(selectedCustomer.tier).bg, color: tierStyle(selectedCustomer.tier).color, padding: '3px 10px', borderRadius: 99, fontSize: 12 }}>
+                    {tierStyle(selectedCustomer.tier).label} Member
+                  </span>
+                </div>
               </div>
-              <button
-                onClick={() => setSelectedCustomer(null)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: C.t3,
-                  fontSize: 20,
-                  cursor: 'pointer',
-                  padding: 4
-                }}
-              >
+              <button onClick={() => setSelectedCustomer(null)} style={{ background: 'transparent', border: 'none', color: C.t3, cursor: 'pointer', padding: 4 }}>
                 <X size={20} />
               </button>
             </div>
             
-            {/* Customer Info Grid */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(2, 1fr)', 
-              gap: '16px', 
-              marginBottom: '20px' 
-            }}>
-              <div style={{ padding: '12px', background: C.page, borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: C.t3, textTransform: 'uppercase', marginBottom: 4 }}>
-                  Contact Info
-                </div>
-                <div style={{ fontSize: '13px', color: C.t0, marginBottom: 4 }}>
-                  📱 {selectedCustomer.phone}
-                </div>
+            {/* Info Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
+              <div style={{ padding: 12, background: C.page, borderRadius: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.t3, textTransform: 'uppercase', marginBottom: 6 }}>Contact</div>
+                <div style={{ fontSize: 13, color: C.t0, marginBottom: 4 }}><Phone size={12} style={{ marginRight: 4, verticalAlign: -1 }} />{selectedCustomer.phone}</div>
                 {selectedCustomer.email && selectedCustomer.email !== 'No Email' && (
-                  <div style={{ fontSize: '13px', color: C.t0 }}>
-                    ✉️ {selectedCustomer.email}
-                  </div>
+                  <div style={{ fontSize: 13, color: C.t0 }}><span style={{ marginRight: 4 }}>@</span>{selectedCustomer.email}</div>
                 )}
               </div>
-              
-              <div style={{ padding: '12px', background: C.page, borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: C.t3, textTransform: 'uppercase', marginBottom: 4 }}>
-                  Loyalty Points
-                </div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: C.acc, marginBottom: 4 }}>
-                  {selectedCustomer.loyaltyPoints} Points
-                </div>
-                <div style={{ fontSize: '11px', color: C.t3 }}>
-                  Earned: {selectedCustomer.pointsEarned} | Used: {selectedCustomer.pointsUsed}
-                </div>
+              <div style={{ padding: 12, background: C.page, borderRadius: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.t3, textTransform: 'uppercase', marginBottom: 6 }}>Loyalty Points</div>
+                <div style={{ fontSize: 18, fontWeight: 500, color: C.t0, marginBottom: 4 }}>{selectedCustomer.loyaltyPoints} pts</div>
+                <div style={{ fontSize: 11, color: C.t3 }}>Earned: {selectedCustomer.pointsEarned} · Used: {selectedCustomer.pointsUsed}</div>
               </div>
             </div>
             
-            {/* Order Stats */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(4, 1fr)', 
-              gap: '12px', 
-              marginBottom: '20px' 
-            }}>
-              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.green, marginBottom: 4 }}>
-                  {selectedCustomer.orderCount}
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+              {[
+                { label: 'Orders', value: selectedCustomer.orderCount, color: C.t0 },
+                { label: 'Total Spent', value: `$${selectedCustomer.totalSpent.toFixed(2)}`, color: C.t0 },
+                { label: 'Avg Order', value: `$${selectedCustomer.averageOrderValue.toFixed(2)}`, color: C.t0 },
+                { label: 'Tier', value: selectedCustomer.tier, color: tierStyle(selectedCustomer.tier).color }
+              ].map((s, i) => (
+                <div key={i} style={{ padding: 12, background: C.page, borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 500, color: s.color, marginBottom: 4 }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: C.t3 }}>{s.label}</div>
                 </div>
-                <div style={{ fontSize: '11px', color: C.t3 }}>Orders</div>
-              </div>
-              
-              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.acc, marginBottom: 4 }}>
-                  ${selectedCustomer.totalSpent.toFixed(2)}
-                </div>
-                <div style={{ fontSize: '11px', color: C.t3 }}>Total Spent</div>
-              </div>
-              
-              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: C.t0, marginBottom: 4 }}>
-                  ${selectedCustomer.averageOrderValue.toFixed(2)}
-                </div>
-                <div style={{ fontSize: '11px', color: C.t3 }}>Avg Order</div>
-              </div>
-              
-              <div style={{ padding: '12px', background: C.page, borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: getTierColor(selectedCustomer.tier), marginBottom: 4 }}>
-                  {selectedCustomer.tier}
-                </div>
-                <div style={{ fontSize: '11px', color: C.t3 }}>Tier</div>
-              </div>
+              ))}
             </div>
             
             {/* Recent Orders */}
             <div>
-              <h4 style={{ 
-                fontSize: '14px', 
-                fontWeight: 'bold', 
-                color: C.t0, 
-                marginBottom: '12px' 
-              }}>
-                Recent Orders (Last 10)
-              </h4>
-              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {selectedCustomer.orders.slice(-10).reverse().map((order, index) => (
-                  <div key={index} style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '8px 12px',
-                    borderBottom: index < 9 ? `1px solid ${C.border}20` : 'none',
-                    fontSize: '12px'
+              <h4 style={{ fontSize: 14, fontWeight: 500, color: C.t0, marginBottom: 10 }}>Recent Orders</h4>
+              <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                {selectedCustomer.orders.slice(-10).reverse().map((order, i) => (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '8px 0', borderBottom: i < 9 ? `0.5px solid ${C.border}40` : 'none', fontSize: 12
                   }}>
                     <div>
-                      <div style={{ fontWeight: '600', color: C.t0 }}>
-                        #{order.orderNumber}
-                      </div>
-                      <div style={{ color: C.t2 }}>
-                        {formatDate(order.createdAt)}
-                      </div>
+                      <div style={{ fontWeight: 500, color: C.t0 }}>#{order.orderNumber}</div>
+                      <div style={{ color: C.t2 }}>{fmtDate(order.createdAt)}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: '600', color: C.acc }}>
-                        ${order.total.toFixed(2)}
-                      </div>
-                      <div style={{ 
-                        fontSize: '10px', 
-                        color: C.t3,
-                        textTransform: 'capitalize'
-                      }}>
-                        {order.status}
-                      </div>
+                      <div style={{ fontWeight: 500, color: C.t0 }}>${order.total.toFixed(2)}</div>
+                      <div style={{ fontSize: 10, color: C.t3, textTransform: 'capitalize' }}>{order.status}</div>
                     </div>
                   </div>
                 ))}
@@ -1937,7 +2168,9 @@ function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange, onRe
             border: `1px solid ${C.border}`,
             borderRadius: 8,
             fontSize: 14,
-            fontFamily: 'inherit'
+            fontFamily: 'inherit',
+            background: C.input,
+            color: C.t0
           }}
         />
         
@@ -1950,7 +2183,10 @@ function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange, onRe
             borderRadius: 8,
             fontSize: 14,
             fontFamily: 'inherit',
-            minWidth: 120
+            minWidth: 120,
+            background: C.input,
+            color: C.t0,
+            cursor: 'pointer'
           }}
         >
           <option value="all">All Status</option>
@@ -1967,7 +2203,10 @@ function OrderHistorySection({ historyOrders, onOrderClick, onStatusChange, onRe
             borderRadius: 8,
             fontSize: 14,
             fontFamily: 'inherit',
-            minWidth: 120
+            minWidth: 120,
+            background: C.input,
+            color: C.t0,
+            cursor: 'pointer'
           }}
         >
           <option value="all">All Time</option>
@@ -2109,7 +2348,15 @@ function RefundModal({ order, clientId, onClose, onSuccess }) {
 function OrderDetailModal({ order, onClose, onStatusChange, onRefund }) {
   const statusColor = STATUS_COLORS[order.status]
   const statusLabel = STATUS_LABELS[order.status]
-  const nextStatuses = STATUS_FLOW[order.status] || []
+  // Filter status transitions: hide confusing backward transitions, keep only useful ones
+  const allNext = STATUS_FLOW[order.status] || []
+  const nextStatuses = allNext.filter(s => {
+    // Always show cancel
+    if (s === 'cancelled') return true
+    // Hide 'new' (going back to unaccepted) — confusing for staff
+    if (s === 'new') return false
+    return true
+  })
 
   // Helper functions inside component
   const formatDate = (dateStr) => {
@@ -2343,7 +2590,7 @@ function OrderDetailModal({ order, onClose, onStatusChange, onRefund }) {
               {nextStatuses.map(status => (
                 <button
                   key={status}
-                  onClick={() => onStatusChange(order.id, status)}
+                  onClick={() => { if (status === 'cancelled') { if (window.confirm('Cancel this order? This cannot be undone.')) onStatusChange(order.id, status) } else { onStatusChange(order.id, status) } }}
                   style={{
                     padding: '10px 20px',
                     border: `1px solid ${STATUS_COLORS[status]}`,

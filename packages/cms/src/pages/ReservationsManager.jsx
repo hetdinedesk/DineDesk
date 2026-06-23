@@ -12,7 +12,7 @@ const STATUS_COLORS = {
   cancelled: { bg: '#F1EFE8', border: '#5F5E5A', text: '#5F5E5A', chip: '#D3D1C7', chipText: '#444441' }
 }
 
-const TIME_SLOTS = ['12:00', '12:30', '13:00', '13:30', '14:00', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00']
+const TIME_SLOTS = ['12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00']
 
 export default function ReservationsManager({ clientId, selectedLocation, clientData }) {
   const [currentView, setCurrentView] = useState('calendar')

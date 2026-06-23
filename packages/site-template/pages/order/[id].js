@@ -41,11 +41,11 @@ export async function getServerSideProps({ query }) {
 }
 
 const statusConfig = {
-  new: { label: 'Order Sent to Restaurant', icon: Clock, color: '#f59e0b', description: 'Your order has been sent to the restaurant and is awaiting confirmation.' },
-  accepted: { label: 'Order Accepted', icon: Check, color: '#10b981', description: 'Your order has been accepted by the restaurant.' },
+  new: { label: 'Order Placed', icon: Clock, color: '#f59e0b', description: 'Your order has been sent to the restaurant and is awaiting confirmation.' },
+  accepted: { label: 'Order Confirmed', icon: Check, color: '#10b981', description: 'Your order has been accepted and is being prepared.' },
   preparing: { label: 'Preparing', icon: Package, color: '#3b82f6', description: 'Your order is being prepared.' },
-  almost_ready: { label: 'Almost Ready', icon: Clock, color: '#8b5cf6', description: 'Your order is almost ready!' },
-  packing: { label: 'Packing', icon: Package, color: '#06b6d4', description: 'Your order is being packed.' },
+  almost_ready: { label: 'Preparing', icon: Package, color: '#3b82f6', description: 'Your order is almost ready!' },
+  packing: { label: 'Preparing', icon: Package, color: '#3b82f6', description: 'Your order is being packed.' },
   ready: { label: 'Ready for Pickup', icon: CheckCircle, color: '#10b981', description: 'Your order is ready for pickup!' },
   completed: { label: 'Completed', icon: CheckCircle, color: '#10b981', description: 'Your order has been completed.' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: '#ef4444', description: 'Your order has been cancelled.' }
@@ -226,10 +226,7 @@ function PrintableReceipt({ order, data }) {
             }}>
               <span style={{ color: '#666' }}>
                 {(() => {
-                  if (order.status === 'accepted') return 'Order Accepted'
-                  if (order.status === 'preparing') return 'Preparing'
-                  if (order.status === 'almost_ready') return 'Almost Ready'
-                  if (order.status === 'packing') return 'Packing'
+                  if (['accepted', 'preparing', 'almost_ready', 'packing'].includes(order.status)) return 'Preparing'
                   if (order.status === 'ready') return 'Ready for Pickup'
                   return order.status
                 })()}
@@ -254,10 +251,8 @@ function PrintableReceipt({ order, data }) {
             }}>
               <div style={{
                 width: (() => {
-                  if (order.status === 'accepted') return '25%'
-                  if (order.status === 'preparing') return '50%'
-                  if (order.status === 'almost_ready') return '75%'
-                  if (order.status === 'packing') return '85%'
+                  if (order.status === 'accepted') return '15%'
+                  if (['preparing', 'almost_ready', 'packing'].includes(order.status)) return '50%'
                   if (order.status === 'ready') return '100%'
                   return '0%'
                 })(),
@@ -391,6 +386,9 @@ export default function OrderStatusPage({ data, orderId, template }) {
   const StatusIcon = statusInfo.icon
   const items = Array.isArray(order.items) ? order.items : []
 
+  // Estimated prep time from site config
+  const estimatedPrepTime = data?.ordering?.estimatedPrepTime || null
+
   // Check if order is scheduled (has a future pickup time)
   const isScheduledOrder = order.pickupTime && new Date(order.pickupTime) > new Date()
   const scheduledTime = order.pickupTime ? new Date(order.pickupTime) : null
@@ -399,6 +397,8 @@ export default function OrderStatusPage({ data, orderId, template }) {
   let statusDescription = statusInfo.description
   if (isScheduledOrder && order.status === 'new') {
     statusDescription = 'Your order has been received and will be prepared closer to your scheduled pickup time.'
+  } else if (isScheduledOrder && order.status === 'accepted') {
+    statusDescription = 'Your order has been confirmed! The restaurant will start preparing it closer to your scheduled pickup time.'
   } else if (isScheduledOrder && order.status === 'preparing') {
     statusDescription = 'Your order is being prepared for your scheduled pickup time.'
   }
@@ -472,6 +472,12 @@ export default function OrderStatusPage({ data, orderId, template }) {
             </div>
           </div>
           <p className="font-body text-sm text-[var(--color-secondary)]/60 max-w-xl mx-auto leading-relaxed">{statusDescription}</p>
+          {estimatedPrepTime && ['new', 'accepted', 'preparing'].includes(order.status) && (
+            <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-[var(--color-primary)]/10 rounded-full">
+              <Clock width={14} height={14} strokeWidth={2} className="text-[var(--color-primary)]" />
+              <span className="text-xs font-body font-bold tracking-widest text-[var(--color-primary)] uppercase">Estimated prep time: {estimatedPrepTime}</span>
+            </div>
+          )}
         </div>
 
         {/* Scheduled Order Banner */}
@@ -493,26 +499,34 @@ export default function OrderStatusPage({ data, orderId, template }) {
         <div className="bg-white rounded-2xl border border-[var(--color-secondary)]/10 p-8 mb-12">
           <h3 className="font-heading text-2xl italic text-[var(--color-secondary)] mb-8">Order Progress</h3>
           <div className="flex justify-between relative overflow-x-auto pb-4 -mx-8 px-8">
-            {['new', 'accepted', 'preparing', 'packing', 'ready'].map((status, index) => {
-              const statusOrder = ['new', 'accepted', 'preparing', 'almost_ready', 'packing', 'ready', 'completed']
-              const currentIndex = statusOrder.indexOf(order.status)
-              const displayOrder = ['new', 'accepted', 'preparing', 'packing', 'ready']
-              const displayIndex = displayOrder.indexOf(status)
-              const isComplete = currentIndex >= statusOrder.indexOf(status)
-              const isActive = order.status === status
-              const StatusIcon = statusConfig[status]?.icon || Clock
+            {['new', 'preparing', 'ready'].map((status, index) => {
+              // Map statuses for progress display
+              // 'accepted' stays on 'new' step (confirmed but not yet preparing)
+              // Only 'preparing' and beyond move the progress forward
+              const normalizedStatus = order.status === 'accepted' ? 'new' : ['preparing', 'almost_ready', 'packing'].includes(order.status) ? 'preparing' : order.status
+              const progressOrder = ['new', 'preparing', 'ready', 'completed']
+              const currentIdx = progressOrder.indexOf(normalizedStatus)
+              const stepIdx = progressOrder.indexOf(status)
+              const isComplete = currentIdx >= stepIdx
+              const isActive = normalizedStatus === status
+              const stepLabels = { new: 'Order Placed', preparing: 'Preparing', ready: 'Ready' }
+              const stepIcons = { new: Clock, preparing: Package, ready: CheckCircle }
+              const StepIcon = stepIcons[status]
 
               return (
-                <div key={status} className="flex flex-col items-center flex-shrink-0 w-20 relative">
+                <div key={status} className="flex flex-col items-center flex-shrink-0 flex-1 relative">
                   {index > 0 && (
-                    <div className={`absolute top-6 left-[-20px] w-10 h-0.5 z-0 ${isComplete ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-secondary)]/20'}`} />
+                    <div className={`absolute top-6 left-0 right-1/2 h-0.5 z-0 ${isComplete ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-secondary)]/20'}`} />
+                  )}
+                  {index < 2 && (
+                    <div className={`absolute top-6 left-1/2 right-0 h-0.5 z-0 ${currentIdx > stepIdx ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-secondary)]/20'}`} />
                   )}
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center z-10 mb-4 ${
-                    isComplete ? 'bg-[var(--color-primary)] text-[var(--color-accent)]' : isActive ? 'bg-[var(--color-primary)] text-[var(--color-accent)]' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]/60'
+                    isComplete ? 'bg-[var(--color-primary)] text-[var(--color-accent)]' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]/60'
                   }`}>
-                    {isComplete ? <Check width={20} height={20} strokeWidth={2} /> : <StatusIcon width={20} height={20} strokeWidth={2} />}
+                    {isComplete && currentIdx > stepIdx ? <Check width={20} height={20} strokeWidth={2} /> : <StepIcon width={20} height={20} strokeWidth={2} />}
                   </div>
-                  <div className="text-xs font-body font-bold tracking-widest uppercase text-[var(--color-secondary)]/60 whitespace-nowrap">{status.replace('_', ' ')}</div>
+                  <div className="text-xs font-body font-bold tracking-widest uppercase text-[var(--color-secondary)]/60 whitespace-nowrap">{stepLabels[status]}</div>
                 </div>
               )
             })}

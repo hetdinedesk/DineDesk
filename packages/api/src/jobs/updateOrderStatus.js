@@ -23,74 +23,15 @@ function parsePrepTime(prepTimeString) {
 
 /**
  * Update order statuses based on time elapsed since order acceptance
- * This should be called periodically (e.g., every minute via cron job)
+ * 
+ * DISABLED: All status transitions are now manual (controlled by staff).
+ * Flow: New → Accepted → Preparing → Ready → Completed
+ * This function is kept as a no-op so existing callers (cron, route) don't break.
  */
 async function updateOrderStatuses() {
-  try {
-    // Get all active orders (not completed or cancelled) - only process accepted orders
-    const activeOrders = await prisma.order.findMany({
-      where: {
-        status: {
-          in: ['accepted', 'preparing', 'almost_ready', 'packing']
-        },
-        acceptedAt: {
-          not: null
-        }
-      },
-      include: {
-        client: {
-          include: {
-            siteConfig: true
-          }
-        }
-      }
-    })
-
-    let updatedCount = 0
-
-    for (const order of activeOrders) {
-      const ordering = order.client.siteConfig?.ordering || {}
-      const prepTimeString = ordering.estimatedPrepTime || '15-25 min'
-      const prepTimeMinutes = parsePrepTime(prepTimeString)
-
-      // Use acceptedAt as the start time for timer
-      const orderStartTime = new Date(order.acceptedAt)
-      const now = new Date()
-      const elapsedMinutes = (now - orderStartTime) / (1000 * 60)
-      const percentageElapsed = (elapsedMinutes / prepTimeMinutes) * 100
-
-      let newStatus = null
-
-      // Determine new status based on percentage elapsed
-      if (percentageElapsed >= 90 && order.status !== 'ready' && order.status !== 'completed') {
-        newStatus = 'ready'
-      } else if (percentageElapsed >= 70 && order.status === 'almost_ready') {
-        newStatus = 'packing'
-      } else if (percentageElapsed >= 70 && order.status === 'preparing') {
-        newStatus = 'almost_ready'
-      } else if (percentageElapsed >= 10 && order.status === 'accepted') {
-        newStatus = 'preparing'
-      }
-
-      // Update status if it should change
-      if (newStatus && newStatus !== order.status) {
-        const updateData = { status: newStatus }
-        const now = new Date()
-        if (newStatus === 'preparing') updateData.preparingAt = now
-        if (newStatus === 'ready') updateData.readyAt = now
-
-        await prisma.order.update({
-          where: { id: order.id },
-          data: updateData
-        })
-        updatedCount++
-      }
-    }
-    return { success: true, updatedCount }
-  } catch (error) {
-    console.error('[ORDER STATUS] Error updating order statuses:', error)
-    return { success: false, error: error.message }
-  }
+  // All status changes are now handled manually by staff via the CMS pipeline board.
+  // No automatic status transitions.
+  return { success: true, updatedCount: 0 }
 }
 
 module.exports = { updateOrderStatuses }
