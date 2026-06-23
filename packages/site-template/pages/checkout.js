@@ -357,6 +357,33 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     phone: '',
     note: ''
   })
+  const [customerErrors, setCustomerErrors] = useState({})
+
+  // Validation helpers
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const isValidPhone = (phone) => {
+    const digits = phone.replace(/[\s\-\(\)\+]/g, '')
+    return digits.length >= 8 && digits.length <= 15 && /^\d+$/.test(digits)
+  }
+
+  const validateField = (field, value) => {
+    const errs = { ...customerErrors }
+    if (field === 'email') {
+      if (!value) errs.email = 'Email is required'
+      else if (!isValidEmail(value)) errs.email = 'Please enter a valid email address'
+      else delete errs.email
+    }
+    if (field === 'phone') {
+      if (!value) errs.phone = 'Phone number is required'
+      else if (!isValidPhone(value)) errs.phone = 'Please enter a valid phone number (8-15 digits)'
+      else delete errs.phone
+    }
+    if (field === 'name') {
+      if (!value.trim()) errs.name = 'Name is required'
+      else delete errs.name
+    }
+    setCustomerErrors(errs)
+  }
 
   // Pickup info
   const [pickupType, setPickupType] = useState('asap') // asap | scheduled
@@ -521,10 +548,14 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     return slots
   }
 
-  // Sync scheduledDate + scheduledTimeSlot → scheduledTime (the combined datetime-local string)
+  // Sync scheduledDate + scheduledTimeSlot → scheduledTime as a full ISO string with timezone
   useEffect(() => {
     if (scheduledDate && scheduledTimeSlot) {
-      setScheduledTime(`${scheduledDate}T${scheduledTimeSlot}`)
+      // Build a local Date object so the ISO string carries the correct absolute time
+      const [year, month, day] = scheduledDate.split('-').map(Number)
+      const [hour, minute] = scheduledTimeSlot.split(':').map(Number)
+      const localDate = new Date(year, month - 1, day, hour, minute, 0)
+      setScheduledTime(localDate.toISOString())
     } else {
       setScheduledTime('')
     }
@@ -751,9 +782,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
 
   const isStepValid = () => {
     if (step === 1) {
-      return customerInfo.name && customerInfo.email && customerInfo.phone &&
-             (!ordering?.requirePhone || customerInfo.phone) &&
-             (!ordering?.requireEmail || customerInfo.email)
+      return customerInfo.name.trim() && 
+             customerInfo.email && isValidEmail(customerInfo.email) &&
+             customerInfo.phone && isValidPhone(customerInfo.phone) &&
+             Object.keys(customerErrors).length === 0
     }
     if (step === 2) {
       const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
@@ -974,9 +1006,11 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                       type="text"
                       value={customerInfo.name}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
+                      onBlur={(e) => validateField('name', e.target.value)}
+                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans border ${customerErrors.name ? 'border-red-400' : ''} ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
                       placeholder="YOUR NAME"
                     />
+                    {customerErrors.name && <p className="text-xs text-red-500 mt-1 ml-2 font-medium">{customerErrors.name}</p>}
                   </div>
 
                   <div>
@@ -984,10 +1018,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     <input
                       type="email"
                       value={customerInfo.email}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
+                      onChange={(e) => { setCustomerInfo({ ...customerInfo, email: e.target.value }); if (customerErrors.email && isValidEmail(e.target.value)) validateField('email', e.target.value) }}
+                      onBlur={(e) => validateField('email', e.target.value)}
+                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans border ${customerErrors.email ? 'border-red-400' : ''} ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
                       placeholder="YOUR@EMAIL.COM"
                     />
+                    {customerErrors.email && <p className="text-xs text-red-500 mt-1 ml-2 font-medium">{customerErrors.email}</p>}
                   </div>
 
                   <div>
@@ -995,10 +1031,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     <input
                       type="tel"
                       value={customerInfo.phone}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
-                      placeholder="+1 (555) 000-0000"
+                      onChange={(e) => { setCustomerInfo({ ...customerInfo, phone: e.target.value }); if (customerErrors.phone && isValidPhone(e.target.value)) validateField('phone', e.target.value) }}
+                      onBlur={(e) => validateField('phone', e.target.value)}
+                      className={`w-full px-6 py-4 rounded-full focus:outline-none font-sans border ${customerErrors.phone ? 'border-red-400' : ''} ${normalizedTemplate === 'theme-d1' ? 'bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-teal-500' : 'bg-[var(--color-accent)] border-[var(--color-secondary)]/20 text-[var(--color-secondary)] placeholder:text-[var(--color-secondary)]/40 focus:border-[var(--color-primary)]'}`}
+                      placeholder="+61 400 000 000"
                     />
+                    {customerErrors.phone && <p className="text-xs text-red-500 mt-1 ml-2 font-medium">{customerErrors.phone}</p>}
                     {/* Loyalty info display */}
                     {isLoyaltyEnabled && customerInfo.phone && (
                       customer ? (

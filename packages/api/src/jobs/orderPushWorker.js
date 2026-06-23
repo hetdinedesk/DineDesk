@@ -106,7 +106,9 @@ async function processSingleJob(job) {
       paymentMethod: order.paymentMethod,
       paymentStatus: order.paymentStatus,
       notes: order.note,
-      currency: order.currency || 'AUD'
+      currency: order.currency || 'AUD',
+      pickupTime: order.pickupTime || null,
+      tableNumber: order.tableNumber || null
     }
 
     const result = await adapter.pushOrder(orderPayload)

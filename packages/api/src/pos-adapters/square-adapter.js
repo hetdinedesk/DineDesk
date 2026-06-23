@@ -152,40 +152,90 @@ class SquareAdapter extends BasePOSAdapter {
       throw new Error('Square adapter not fully configured')
     }
 
-    const lineItems = order.items.map(item => ({
-      name: item.name,
-      quantity: String(item.quantity || 1),
-      base_price_money: {
-        amount: Math.round((item.price || 0) * 100),
-        currency: order.currency || 'AUD'
-      },
-      note: item.notes || undefined
-    }))
+    const currency = order.currency || 'AUD'
+
+    // Build line items — include addons as separate line items
+    const lineItems = []
+    for (const item of (order.items || [])) {
+      const qty = item.quantity || 1
+      // Build note from selected addons/options for context
+      const addonNotes = []
+      if (item.selectedSize) addonNotes.push(`Size: ${item.selectedSize}`)
+      if (Array.isArray(item.selectedAddons)) {
+        item.selectedAddons.forEach(a => addonNotes.push(a.name || a))
+      }
+      const itemNote = [item.notes, ...addonNotes].filter(Boolean).join(', ')
+
+      lineItems.push({
+        name: item.name,
+        quantity: String(qty),
+        base_price_money: {
+          amount: Math.round((item.price || 0) * 100),
+          currency
+        },
+        note: itemNote || undefined
+      })
+    }
+
+    // Build fulfillment note
+    const fulfillmentNotes = []
+    if (order.orderNumber) fulfillmentNotes.push(`DineDesk #${order.orderNumber}`)
+    if (order.tableNumber) fulfillmentNotes.push(`Table ${order.tableNumber}`)
+    if (order.notes) fulfillmentNotes.push(order.notes)
+    const fulfillmentNote = fulfillmentNotes.join(' · ')
+
+    // Determine fulfillment type
+    const isDineIn = order.orderType === 'dine_in'
+    const isDelivery = order.orderType === 'delivery'
+    const fulfillmentType = isDelivery ? 'DELIVERY' : 'PICKUP'
+
+    // Build fulfillment with pickup_details (Square uses pickup_details for both pickup and dine-in)
+    const fulfillment = {
+      type: fulfillmentType,
+      state: 'PROPOSED'
+    }
+
+    if (!isDelivery) {
+      fulfillment.pickup_details = {
+        recipient: {
+          display_name: order.customerName || 'Guest',
+          phone_number: order.customerPhone || undefined,
+          email_address: order.customerEmail || undefined
+        },
+        note: fulfillmentNote || undefined,
+        schedule_type: order.pickupTime ? 'SCHEDULED' : 'ASAP',
+        pickup_at: order.pickupTime ? new Date(order.pickupTime).toISOString() : undefined,
+        is_curbside_pickup: false
+      }
+      if (isDineIn) {
+        fulfillment.pickup_details.note = `DINE-IN${order.tableNumber ? ` · Table ${order.tableNumber}` : ''}${order.notes ? ` · ${order.notes}` : ''}`
+      }
+    } else {
+      fulfillment.delivery_details = {
+        recipient: {
+          display_name: order.customerName || 'Guest',
+          phone_number: order.customerPhone || undefined,
+          email_address: order.customerEmail || undefined
+        },
+        note: fulfillmentNote || undefined,
+        schedule_type: order.pickupTime ? 'SCHEDULED' : 'ASAP',
+        deliver_at: order.pickupTime ? new Date(order.pickupTime).toISOString() : undefined
+      }
+    }
 
     const payload = {
       idempotency_key: `dinedesk-${order.id}-${Date.now()}`,
       order: {
         location_id: this.locationId,
+        reference_id: `DD-${order.orderNumber || order.id}`,
         line_items: lineItems,
+        fulfillments: [fulfillment],
         metadata: {
           dinedesk_order_id: order.id,
-          dinedesk_order_number: String(order.orderNumber)
+          dinedesk_order_number: String(order.orderNumber || ''),
+          order_type: order.orderType || 'pickup'
         }
       }
-    }
-
-    if (order.customerName) {
-      payload.order.fulfillments = [{
-        type: order.orderType === 'delivery' ? 'DELIVERY' : 'PICKUP',
-        state: 'PROPOSED',
-        pickup_details: order.orderType !== 'delivery' ? {
-          recipient: {
-            display_name: order.customerName,
-            phone_number: order.customerPhone
-          },
-          note: order.notes || undefined
-        } : undefined
-      }]
     }
 
     const result = await this._fetch(`${this.base}/v2/orders`, {
@@ -238,7 +288,7 @@ class SquareAdapter extends BasePOSAdapter {
       : 'https://connect.squareup.com/oauth2/authorize'
     const params = new URLSearchParams({
       client_id: clientId,
-      scope: 'MERCHANT_PROFILE_READ ORDERS_WRITE ORDERS_READ INVENTORY_READ',
+      scope: 'MERCHANT_PROFILE_READ ITEMS_READ ORDERS_WRITE ORDERS_READ INVENTORY_READ',
       session: 'false',
       redirect_uri: redirectUri,
       state

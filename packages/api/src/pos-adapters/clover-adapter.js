@@ -125,17 +125,51 @@ class CloverAdapter extends BasePOSAdapter {
   async pushOrder(order) {
     if (!this.accessToken || !this.merchantId) throw new Error('Clover adapter not fully configured')
 
-    const payload = {
-      currency: 'USD',
-      orderType: {
-        id: order.orderType === 'dine_in' ? 'online' : 'online'
-      },
-      note: order.notes || `DineDesk #${order.orderNumber}`,
-      lineItems: {
-        elements: order.items.map(item => ({
+    // Build line items — Clover uses price in cents, one line item per unit
+    const lineItemElements = []
+    for (const item of (order.items || [])) {
+      const qty = item.quantity || 1
+      // Build note from addons
+      const addonNotes = []
+      if (item.selectedSize) addonNotes.push(`Size: ${item.selectedSize}`)
+      if (Array.isArray(item.selectedAddons)) {
+        item.selectedAddons.forEach(a => addonNotes.push(a.name || a))
+      }
+      const itemNote = [item.notes, ...addonNotes].filter(Boolean).join(', ')
+
+      // Clover expects one line item per quantity unit
+      for (let i = 0; i < qty; i++) {
+        lineItemElements.push({
           name: item.name,
           price: Math.round((item.price || 0) * 100),
-          unitQty: (item.quantity || 1) * 1000
+          note: itemNote || undefined
+        })
+      }
+    }
+
+    // Build order note with all relevant info
+    const orderNotes = []
+    orderNotes.push(`DineDesk #${order.orderNumber || order.id}`)
+    if (order.orderType === 'dine_in') orderNotes.push('DINE-IN')
+    else if (order.orderType === 'delivery') orderNotes.push('DELIVERY')
+    else orderNotes.push('PICKUP')
+    if (order.tableNumber) orderNotes.push(`Table ${order.tableNumber}`)
+    if (order.customerName) orderNotes.push(order.customerName)
+    if (order.customerPhone) orderNotes.push(order.customerPhone)
+    if (order.pickupTime) {
+      const pt = new Date(order.pickupTime)
+      orderNotes.push(`Scheduled: ${pt.toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`)
+    }
+    if (order.notes) orderNotes.push(order.notes)
+
+    const payload = {
+      orderCart: {
+        currency: order.currency || 'AUD',
+        note: orderNotes.join(' · '),
+        lineItems: lineItemElements.map(li => ({
+          name: li.name,
+          price: li.price,
+          note: li.note
         }))
       }
     }

@@ -123,23 +123,67 @@ class ToastAdapter extends BasePOSAdapter {
   async pushOrder(order) {
     if (!this.isTokenValid()) await this.refreshToken()
 
-    const lineItems = order.items.map(item => ({
-      name: item.name,
-      quantity: item.quantity || 1,
-      sellingPrice: Math.round((item.price || 0) * 100)
-    }))
+    // Build line item selections
+    const selections = (order.items || []).map(item => {
+      const addonNotes = []
+      if (item.selectedSize) addonNotes.push(`Size: ${item.selectedSize}`)
+      if (Array.isArray(item.selectedAddons)) {
+        item.selectedAddons.forEach(a => addonNotes.push(a.name || a))
+      }
+      const specialRequest = [item.notes, ...addonNotes].filter(Boolean).join(', ')
+
+      return {
+        displayName: item.name,
+        quantity: item.quantity || 1,
+        preDiscountPrice: Math.round((item.price || 0) * 100),
+        price: Math.round((item.price || 0) * 100),
+        specialRequest: specialRequest || undefined
+      }
+    })
+
+    // Map order type to Toast dining options
+    let diningOption = 'TAKE_OUT'
+    if (order.orderType === 'delivery') diningOption = 'DELIVERY'
+    else if (order.orderType === 'dine_in') diningOption = 'DINE_IN'
+
+    // Build customer
+    const nameParts = (order.customerName || 'Guest').split(' ')
+    const customer = {
+      firstName: nameParts[0] || 'Guest',
+      lastName: nameParts.slice(1).join(' ') || '',
+      phone: order.customerPhone || undefined,
+      email: order.customerEmail || undefined
+    }
+
+    // Build order note
+    const orderNotes = []
+    if (order.orderNumber) orderNotes.push(`DineDesk #${order.orderNumber}`)
+    if (order.tableNumber) orderNotes.push(`Table ${order.tableNumber}`)
+    if (order.notes) orderNotes.push(order.notes)
 
     const payload = {
+      entityType: 'Order',
+      externalReferenceId: `DD-${order.orderNumber || order.id}`,
       restaurantGuid: this.restaurantGuid,
-      diningOption: order.orderType === 'delivery' ? 'DELIVERY' : 'TAKE_OUT',
+      source: 'DineDesk',
+      diningOption,
+      promisedDateTime: order.pickupTime ? new Date(order.pickupTime).toISOString() : undefined,
+      deliveryInfo: order.orderType === 'delivery' ? {
+        notes: order.notes || undefined
+      } : undefined,
       checks: [{
-        customer: {
-          firstName: order.customerName?.split(' ')[0] || order.customerName,
-          lastName: order.customerName?.split(' ').slice(1).join(' ') || '',
-          phone: order.customerPhone
-        },
-        selections: lineItems
+        customer,
+        displayName: order.customerName || 'Guest',
+        selections,
+        amount: Math.round((order.total || 0) * 100),
+        totalAmount: Math.round((order.total || 0) * 100),
+        specialInstructions: orderNotes.join(' · ') || undefined
       }]
+    }
+
+    // Add table info for dine-in
+    if (order.orderType === 'dine_in' && order.tableNumber) {
+      payload.table = { displayName: `Table ${order.tableNumber}` }
     }
 
     const result = await this._fetch(
