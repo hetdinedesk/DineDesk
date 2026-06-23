@@ -1378,7 +1378,7 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
                 background: 'linear-gradient(180deg, #FF8C42 0%, #FF6B35 100%)',
                 borderRadius: '2px'
               }} />
-              <span style={{ fontSize: '12px', color: C.t2 }}>Revenue (USD)</span>
+              <span style={{ fontSize: '12px', color: C.t2 }}>Revenue (AUD)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{ 

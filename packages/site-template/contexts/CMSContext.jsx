@@ -72,10 +72,11 @@ function adaptCMSData(data) {
 
     if (Array.isArray(hours)) {
       hours.forEach(h => {
+        const normalizedDay = dayNameMap[h.day] || h.day;
         const hasTimes = h.open && h.close;
         const isClosed = !hasTimes && (h.closed === true || h.closed !== false);
-        hoursMap[h.day] = {
-          day: h.day,
+        hoursMap[normalizedDay] = {
+          day: normalizedDay,
           open: h.open || '',
           close: h.close || '',
           closed: isClosed
