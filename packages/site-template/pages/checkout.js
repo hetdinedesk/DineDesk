@@ -445,12 +445,18 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   }, [scheduledTime, pickupType])
 
   // Helper to find hours for a given day name from either object or array format
+  // Handles both full names (Monday) and abbreviated names (Mon) in both directions
   const getHoursForDay = (hours, dayName) => {
     if (!hours) return null
+    const fullToShort = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' }
+    const shortToFull = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }
+    const altName = fullToShort[dayName] || shortToFull[dayName] || dayName
+
     if (Array.isArray(hours)) {
-      return hours.find(h => h.day === dayName) || null
+      return hours.find(h => h.day === dayName || h.day === altName) || null
     }
-    return hours[dayName] || null
+    // Object format — try both full and short keys
+    return hours[dayName] || hours[altName] || null
   }
 
   // Parse a time string (supports "0900", "09:00", "9:00am", "9am", "21:00", etc.) into minutes since midnight
@@ -480,30 +486,6 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   // State for custom date/time picker
   const [scheduledDate, setScheduledDate] = useState('')
   const [scheduledTimeSlot, setScheduledTimeSlot] = useState('')
-
-  // Get available dates (next 7 days)
-  const getAvailableDates = () => {
-    const dates = []
-    const now = new Date()
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now)
-      d.setDate(now.getDate() + i)
-      d.setHours(0, 0, 0, 0)
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
-      const dayHours = getHoursForDay(selectedLocationData?.hours, dayName)
-      const isClosed = !dayHours || dayHours.closed || !dayHours.open || !dayHours.close
-      dates.push({
-        date: d,
-        dateStr: d.toISOString().slice(0, 10),
-        dayShort: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        dayNum: d.getDate(),
-        monthShort: d.toLocaleDateString('en-US', { month: 'short' }),
-        isToday: i === 0,
-        isClosed
-      })
-    }
-    return dates
-  }
 
   // Generate 15-min time slots for a given date within operating hours
   const getTimeSlotsForDate = (dateStr) => {
@@ -1279,27 +1261,23 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                       {/* Date Selector */}
                       <div>
                         <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-3 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Select Date *</label>
-                        <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                          {getAvailableDates().map((d) => (
-                            <button
-                              key={d.dateStr}
-                              disabled={d.isClosed}
-                              onClick={() => { setScheduledDate(d.dateStr); setScheduledTimeSlot('') }}
-                              className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-2xl border-2 transition-all font-sans min-w-[72px] ${
-                                d.isClosed
-                                  ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
-                                  : scheduledDate === d.dateStr
-                                    ? (normalizedTemplate === 'theme-d1' ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/10 text-[var(--color-secondary)] shadow-sm' : normalizedTemplate === 'theme-d2' ? 'border-teal-500 bg-teal-500/10 text-teal-600 shadow-sm' : 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)] shadow-sm')
-                                    : 'border-[var(--color-secondary)]/15 bg-white text-[var(--color-secondary)] hover:border-[var(--color-secondary)]/40'
-                              }`}
-                            >
-                              <span className="text-[10px] font-bold uppercase tracking-wider">{d.isToday ? 'Today' : d.dayShort}</span>
-                              <span className="text-xl font-extrabold leading-tight">{d.dayNum}</span>
-                              <span className="text-[9px] font-medium uppercase tracking-wider opacity-60">{d.monthShort}</span>
-                              {d.isClosed && <span className="text-[8px] font-bold text-red-400 mt-0.5">Closed</span>}
-                            </button>
-                          ))}
-                        </div>
+                        <input
+                          type="date"
+                          value={scheduledDate}
+                          onChange={(e) => { setScheduledDate(e.target.value); setScheduledTimeSlot('') }}
+                          min={new Date().toISOString().slice(0, 10)}
+                          className="w-full px-6 py-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/20 rounded-full focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-secondary)] font-sans text-sm"
+                        />
+                        {scheduledDate && (() => {
+                          const d = new Date(scheduledDate + 'T00:00:00')
+                          const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
+                          const dayHours = getHoursForDay(selectedLocationData?.hours, dayName)
+                          const isClosed = !dayHours || dayHours.closed || !dayHours.open || !dayHours.close
+                          if (isClosed) {
+                            return <p className="text-xs text-red-500 font-medium mt-2">Restaurant is closed on {dayName}. Please choose another date.</p>
+                          }
+                          return null
+                        })()}
                       </div>
 
                       {/* Time Slot Selector */}
@@ -1309,10 +1287,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                           {(() => {
                             const slots = getTimeSlotsForDate(scheduledDate)
                             if (slots.length === 0) {
-                              return <p className="text-sm text-red-500 font-medium">No available time slots for this date.</p>
+                              return <p className="text-sm text-[var(--color-secondary)]/50 font-medium">No available time slots for this date.</p>
                             }
                             return (
-                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[200px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[220px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
                                 {slots.map((slot) => (
                                   <button
                                     key={slot.value}
