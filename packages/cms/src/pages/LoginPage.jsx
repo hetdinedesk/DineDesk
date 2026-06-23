@@ -18,14 +18,8 @@ export default function LoginPage() {
     if (!email || !password) { setError('Please enter your email and password.'); return }
     try {
       setError(''); setLoading(true)
-      const user = await login(email, password)
-      // Redirect based on role — no manual selection needed
-      if (user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
-        navigate('/home')
-      } else {
-        // EDITOR goes to sites (their assigned sites only)
-        navigate('/sites')
-      }
+      await login(email, password)
+      navigate('/sites')
     } catch(e) {
       setError('Invalid email or password. Please try again.')
     } finally {

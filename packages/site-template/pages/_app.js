@@ -54,6 +54,47 @@ export default function App({ Component, pageProps }) {
   const siteName  = settings.displayName || settings.restaurantName || data.client?.name || 'Restaurant'
   const faviconUrl = settings.favicon || colours.logoLight || colours.logoDark || null
   const themeKey  = data.themeKey || 'theme-d1'
+  const siteDescription = settings.tagline || data.client?.description || `${siteName} — Order online, view our menu, book a table and more.`
+  const domain = data.client?.domain || ''
+  const siteUrl = domain ? (domain.startsWith('http') ? domain : `https://${domain}`) : ''
+  const logoUrl = settings.logoLight || settings.logoDark || colours.logoLight || colours.logoDark || ''
+  const primaryLoc = data.client?.locations?.find(l => l.isPrimary) || data.client?.locations?.[0] || {}
+  const phone = primaryLoc.phone || settings.phone || ''
+  const address = primaryLoc.address || ''
+  const city = primaryLoc.city || ''
+  const state = primaryLoc.state || ''
+  const postcode = primaryLoc.postcode || ''
+  const country = primaryLoc.country || 'AU'
+  const siteType = data.siteType || settings.siteType || 'restaurant'
+  const currentPath = router.asPath?.split('?')[0] || '/'
+  const canonicalUrl = siteUrl ? `${siteUrl}${currentPath === '/' ? '' : currentPath}` : ''
+
+  // Build JSON-LD structured data
+  const jsonLd = siteUrl ? {
+    '@context': 'https://schema.org',
+    '@type': siteType === 'cafe' ? 'CafeOrCoffeeShop' : 'Restaurant',
+    name: siteName,
+    description: siteDescription,
+    url: siteUrl,
+    ...(logoUrl && { logo: logoUrl, image: logoUrl }),
+    ...(phone && { telephone: phone }),
+    ...(address && {
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: typeof address === 'string' ? address : (address.street || ''),
+        addressLocality: city,
+        addressRegion: state,
+        postalCode: postcode,
+        addressCountry: country,
+      }
+    }),
+    ...(primaryLoc.lat && primaryLoc.lng && {
+      geo: { '@type': 'GeoCoordinates', latitude: primaryLoc.lat, longitude: primaryLoc.lng }
+    }),
+    servesCuisine: settings.cuisineType || 'Various',
+    priceRange: settings.priceRange || '$$',
+    ...(data.ordering?.acceptingOrders && { hasMenu: `${siteUrl}/menu` }),
+  } : null
 
   // Only show floating cart on menu and specials pages
   const showFloatingCart = router.pathname === '/menu' || router.pathname === '/specials'
@@ -71,11 +112,40 @@ export default function App({ Component, pageProps }) {
         {faviconUrl && <link rel="apple-touch-icon" href={faviconUrl}/>}
         {!faviconUrl && <link rel="icon" href="/favicon.ico"/>}
 
+        {/* SEO description */}
+        <meta name="description" content={siteDescription}/>
+
+        {/* Canonical URL */}
+        {canonicalUrl && <link rel="canonical" href={canonicalUrl}/>}
+
+        {/* Open Graph */}
+        <meta property="og:type" content="website"/>
+        <meta property="og:site_name" content={siteName}/>
+        <meta property="og:title" content={siteName}/>
+        <meta property="og:description" content={siteDescription}/>
+        <meta property="og:locale" content="en_AU"/>
+        {canonicalUrl && <meta property="og:url" content={canonicalUrl}/>}
+        {logoUrl && <meta property="og:image" content={logoUrl}/>}
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image"/>
+        <meta name="twitter:title" content={siteName}/>
+        <meta name="twitter:description" content={siteDescription}/>
+        {logoUrl && <meta name="twitter:image" content={logoUrl}/>}
+
         {/* Robots */}
         {isLive
-          ? <meta name="robots" content="index, follow"/>
+          ? <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
           : <meta name="robots" content="noindex, nofollow"/>
         }
+
+        {/* JSON-LD Structured Data */}
+        {jsonLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+        )}
 
         {/* Google Site Verification */}
         {analytics.googleVerification && (

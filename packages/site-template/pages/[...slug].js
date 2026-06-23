@@ -144,13 +144,22 @@ export default function DynamicPage({ data, slug, template }) {
   const isLocations= pageType === 'locations'|| norm(slug) === 'locations'
   const isHardcoded = isMenu || isSpecials || isTeam || isLocations
 
+  const domain = data?.client?.domain || ''
+  const siteUrl = domain ? (domain.startsWith('http') ? domain : `https://${domain}`) : ''
+  const canonicalUrl = siteUrl && slug ? `${siteUrl}/${slug}` : ''
+
   const headTags = (
     <Head>
       <title>{sc(title)}</title>
       {desc && <meta name="description" content={sc(desc)} />}
+      {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
       <meta property="og:title" content={sc(title)} />
       {desc && <meta property="og:description" content={sc(desc)} />}
+      {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
       {ogImage && <meta property="og:image" content={ogImage} />}
+      <meta name="twitter:title" content={sc(title)} />
+      {desc && <meta name="twitter:description" content={sc(desc)} />}
+      {ogImage && <meta name="twitter:image" content={ogImage} />}
     </Head>
   )
 

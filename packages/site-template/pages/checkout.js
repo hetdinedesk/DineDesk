@@ -212,6 +212,7 @@ export default function CheckoutPage({ data, template }) {
         <CMSProvider data={data}>
           <Head>
             <title>Checkout - {normalizedTemplate === 'theme-d1' ? 'Your Cart is Empty' : normalizedTemplate === 'theme-d2' ? 'Your Cart is Empty' : 'Your Harvest is Empty'}</title>
+            <meta name="robots" content="noindex, nofollow" />
           </Head>
           <div className="min-h-screen bg-[var(--color-accent)]">
             <Header />
@@ -430,7 +431,10 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   // Validate scheduled time when it changes
   useEffect(() => {
     if (pickupType === 'scheduled' && scheduledTime) {
-      if (!isScheduledTimeValid(scheduledTime)) {
+      const scheduledDate = new Date(scheduledTime)
+      if (scheduledDate <= new Date()) {
+        setScheduledTimeError('Selected time has already passed. Please choose a future time.')
+      } else if (!isScheduledTimeValid(scheduledTime)) {
         setScheduledTimeError('Restaurant is closed at the selected time. Please choose a time when we are open.')
       } else {
         setScheduledTimeError('')
@@ -440,11 +444,20 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     }
   }, [scheduledTime, pickupType])
 
+  // Helper to find hours for a given day name from either object or array format
+  const getHoursForDay = (hours, dayName) => {
+    if (!hours) return null
+    if (Array.isArray(hours)) {
+      return hours.find(h => h.day === dayName) || null
+    }
+    return hours[dayName] || null
+  }
+
   // Calculate minimum scheduled time (opening time + 15 minutes)
   const getMinScheduledTime = () => {
     const now = new Date()
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' })
-    const todayHours = selectedLocationData?.hours?.[currentDay]
+    const todayHours = getHoursForDay(selectedLocationData?.hours, currentDay)
     
     if (!todayHours || todayHours.closed || !todayHours.open) {
       // If closed today, return tomorrow's opening time + 15 min
@@ -490,7 +503,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     const scheduledDay = scheduledDate.toLocaleDateString('en-US', { weekday: 'long' })
     const scheduledMinutes = scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
     
-    const dayHours = selectedLocationData?.hours?.[scheduledDay]
+    const dayHours = getHoursForDay(selectedLocationData?.hours, scheduledDay)
     if (!dayHours || dayHours.closed || !dayHours.open || !dayHours.close) {
       return false
     }
@@ -535,10 +548,18 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     setError(null)
 
     // Validate scheduled time if pickup type is scheduled
-    if (pickupType === 'scheduled' && !isScheduledTimeValid(scheduledTime)) {
-      setError('Please select a pickup time when the restaurant is open.')
-      setLoading(false)
-      return
+    if (pickupType === 'scheduled') {
+      const scheduledDate = new Date(scheduledTime)
+      if (scheduledDate <= new Date()) {
+        setError('Selected time has already passed. Please choose a future time.')
+        setLoading(false)
+        return
+      }
+      if (!isScheduledTimeValid(scheduledTime)) {
+        setError('Please select a pickup time when the restaurant is open.')
+        setLoading(false)
+        return
+      }
     }
 
     try {
@@ -729,6 +750,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       <CMSProvider data={data}>
         <Head>
           <title>Orders Unavailable - {siteName}</title>
+          <meta name="robots" content="noindex, nofollow" />
         </Head>
         <div className="min-h-screen bg-[var(--color-accent)]">
           <Header />
@@ -833,6 +855,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
     <CMSProvider data={data}>
       <Head>
         <title>Checkout - {siteName}</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div className="min-h-screen bg-[var(--color-accent)]">
         <Header />
@@ -1123,6 +1146,26 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                     </div>
                   )}
 
+                  {/* Location dropdown - show only if multiple active locations */}
+                  {data?.locations && data.locations.filter(loc => loc.isActive !== false).length > 1 && (
+                    <div>
+                      <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Select Location *</label>
+                      <select
+                        value={selectedLocation}
+                        onChange={(e) => setSelectedLocation(e.target.value)}
+                        className="w-full px-6 py-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/20 rounded-full focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-secondary)] font-sans"
+                        required
+                      >
+                        <option value="">Choose a location...</option>
+                        {data.locations.filter(loc => loc.isActive !== false).map(loc => (
+                          <option key={loc.id} value={loc.id}>
+                            {loc.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <label className={`block font-sans text-[10px] font-bold tracking-widest uppercase mb-4 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-secondary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-primary)]'}`}>Order Type</label>
                     <div className="flex gap-4">
@@ -1206,26 +1249,6 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                       <p className="text-xs text-[var(--color-secondary)]/40 mt-2">
                         {isRestaurantCurrentlyOpen ? 'Pickup available now or schedule for later' : 'Scheduled orders available 15 minutes after opening'}
                       </p>
-                    </div>
-                  )}
-
-                  {/* Location dropdown - show only if multiple active locations */}
-                  {data?.locations && data.locations.filter(loc => loc.isActive !== false).length > 1 && (
-                    <div>
-                      <label className="block font-sans text-[10px] font-bold tracking-widest text-[var(--color-primary)] uppercase mb-2">Select Location *</label>
-                      <select
-                        value={selectedLocation}
-                        onChange={(e) => setSelectedLocation(e.target.value)}
-                        className="w-full px-6 py-4 bg-[var(--color-accent)] border border-[var(--color-secondary)]/20 rounded-full focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-secondary)] font-sans"
-                        required
-                      >
-                        <option value="">Choose a location...</option>
-                        {data.locations.filter(loc => loc.isActive !== false).map(loc => (
-                          <option key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </option>
-                        ))}
-                      </select>
                     </div>
                   )}
 

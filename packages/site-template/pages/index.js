@@ -1,3 +1,4 @@
+import Head from 'next/head'
 import { getSiteData } from '../lib/api'
 import { CMSProvider } from '../contexts/CMSContext'
 import { LoyaltyProvider } from '../contexts/LoyaltyContext'
@@ -75,8 +76,31 @@ export default function HomePage({ data, template, siteType }) {
     console.error('Template not found for:', { template, normalizedTemplate, availableTemplates: Object.keys(TEMPLATES) })
     return <div>Error: Template not found</div>
   }
+
+  const settings = data?.settings || {}
+  const siteName = settings.displayName || settings.restaurantName || data?.client?.name || ''
+  const siteDescription = settings.tagline || data?.client?.description || `${siteName} — Order online, view our menu, book a table and more.`
+  const domain = data?.client?.domain || ''
+  const siteUrl = domain ? (domain.startsWith('http') ? domain : `https://${domain}`) : ''
+  const logoUrl = settings.logoLight || settings.logoDark || data?.colours?.logoLight || data?.colours?.logoDark || ''
+  const homeTitle = homePage?.metaTitle || `${siteName} — Menu, Online Ordering & Reservations`
+  const homeDesc = homePage?.metaDesc || siteDescription
+  const ogImage = homePage?.ogImage || logoUrl || null
+
   return (
     <CMSProvider data={enhancedData}>
+      <Head>
+        <title>{homeTitle}</title>
+        <meta name="description" content={homeDesc} />
+        {siteUrl && <link rel="canonical" href={siteUrl} />}
+        <meta property="og:title" content={homeTitle} />
+        <meta property="og:description" content={homeDesc} />
+        {siteUrl && <meta property="og:url" content={siteUrl} />}
+        {ogImage && <meta property="og:image" content={ogImage} />}
+        <meta name="twitter:title" content={homeTitle} />
+        <meta name="twitter:description" content={homeDesc} />
+        {ogImage && <meta name="twitter:image" content={ogImage} />}
+      </Head>
       <LoyaltyProvider clientId={clientId} loyaltyConfig={loyaltyConfig}>
         <Template data={enhancedData} siteType={siteType}/>
       </LoyaltyProvider>

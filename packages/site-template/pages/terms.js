@@ -47,7 +47,7 @@ export default function TermsPage({ data, template }) {
     <CMSProvider data={data}>
       <Head>
         <title>Terms & Conditions - {siteName}</title>
-        <meta name="description" content="Terms & Conditions" />
+        <meta name="description" content={`Terms & Conditions for ${siteName}. Read our terms of service before placing an order.`} />
       </Head>
       <Header />
       <main style={{ minHeight: '60vh', padding: '80px 20px 40px' }}>

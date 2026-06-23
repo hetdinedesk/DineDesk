@@ -1330,7 +1330,7 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
                     color: hasRevenue ? C.acc : C.t3,
                     opacity: hasRevenue ? 1 : 0.5
                   }}>
-                    {hasRevenue ? `$${Math.round(day.revenue)}` : ''}
+                    {hasRevenue ? `$${day.revenue.toFixed(2)}` : ''}
                   </span>
                   
                   {/* Bar */}
@@ -2223,15 +2223,26 @@ function OrderDetailModal({ order, onClose, onStatusChange, onRefund }) {
               {order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'pickup' ? 'Pick-up' : order.orderType?.charAt(0).toUpperCase() + order.orderType?.slice(1)}
             </span>
           )}
-          {!order.tableNumber && order.orderType !== 'dine_in' && (
-            <span style={{ fontSize: 12, color: C.t2 }}>
-              · {order.pickupTime ? new Date(order.pickupTime).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'ASAP'}
-            </span>
+          {!order.pickupTime && (
+            <span style={{ fontSize: 12, color: C.t2 }}>· ASAP</span>
           )}
           <span style={{ marginLeft: 'auto', fontSize: 12, color: C.t2 }}>
             {order.paymentMethod === 'cash' ? 'Cash' : order.paymentMethod === 'stripe' ? 'Card' : order.paymentMethod}
           </span>
         </div>
+
+        {/* Scheduled Pickup Time */}
+        {order.pickupTime && (
+          <div style={{ marginBottom: 16, padding: '12px 14px', background: `${C.acc}15`, border: `1px solid ${C.acc}40`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>🕐</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.acc, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Scheduled Order</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.t0, marginTop: 2 }}>
+                {new Date(order.pickupTime).toLocaleString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Customer Info */}
         <div style={{ marginBottom: 20, padding: 16, background: C.page, borderRadius: 8 }}>

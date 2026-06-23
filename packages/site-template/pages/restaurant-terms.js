@@ -47,7 +47,7 @@ export default function RestaurantTermsPage({ data, template }) {
     <CMSProvider data={data}>
       <Head>
         <title>Restaurant Terms of Service - {siteName}</title>
-        <meta name="description" content="Restaurant Terms of Service" />
+        <meta name="description" content={`Restaurant Terms of Service for ${siteName}. Our policies on ordering, reservations and dining.`} />
       </Head>
       <Header />
       <main style={{ minHeight: '60vh', padding: '80px 20px 40px' }}>

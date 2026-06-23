@@ -103,14 +103,23 @@ export default function Page({ data, template }) {
   // Get banner if selected for this page
   const banner = page?.bannerId ? (data?.banners || []).find((b) => String(b.id) === String(page.bannerId)) : null
 
+  const domain = data?.client?.domain || ''
+  const siteUrl = domain ? (domain.startsWith('http') ? domain : `https://${domain}`) : ''
+  const canonicalUrl = siteUrl ? `${siteUrl}/menu` : ''
+
   return (
     <CMSProvider data={data}>
       <Head>
         <title>{`${sc(title)}`}</title>
         {desc && <meta name="description" content={sc(desc)} />}
+        {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
         <meta property="og:title" content={sc(title)} />
         {desc && <meta property="og:description" content={sc(desc)} />}
+        {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
         {ogImage && <meta property="og:image" content={ogImage} />}
+        <meta name="twitter:title" content={sc(title)} />
+        {desc && <meta name="twitter:description" content={sc(desc)} />}
+        {ogImage && <meta name="twitter:image" content={ogImage} />}
       </Head>
       <Suspense fallback={<div>Loading...</div>}>
         <DynamicMenuTemplate themeKey={template} data={data} page={page} banner={banner} />

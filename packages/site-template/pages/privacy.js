@@ -47,7 +47,7 @@ export default function PrivacyPage({ data, template }) {
     <CMSProvider data={data}>
       <Head>
         <title>Privacy Policy - {siteName}</title>
-        <meta name="description" content="Privacy Policy" />
+        <meta name="description" content={`Privacy Policy for ${siteName}. Learn how we collect, use and protect your personal information.`} />
       </Head>
       <Header />
       <main style={{ minHeight: '60vh', padding: '80px 20px 40px' }}>
