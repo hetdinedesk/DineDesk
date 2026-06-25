@@ -13,33 +13,35 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
-import { Settings, Palette, Code, FileText, Layout, Share2, Star, Calendar, BarChart3, Globe, ShoppingCart, CreditCard, Bell, Store, Gift, Zap } from 'lucide-react'
+import { Settings, Palette, Code, FileText, Layout, Share2, Star, Calendar, BarChart3, Globe, ShoppingCart, CreditCard, Bell, Store, Gift, Zap, Terminal, BookOpen } from 'lucide-react'
+import SectionShell from '../Components/SectionShell'
 import { C } from '../theme'
 
 const API_URL = import.meta.env.VITE_CMS_API_URL || import.meta.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
 
-// Sidebar groups — Clean 3-layer structure:
-// General (Site identity) | Design (Visual layer) | Deploy (Publishing)
+// Sidebar groups
 const SIDEBAR = [
   { group:'General', Icon: Settings, items:[
-    { key:'site-settings',  label:'Site Settings', Icon: Settings },
-    { key:'site-branding',  label:'Branding', Icon: Palette },
-    { key:'shortcodes',     label:'Shortcodes', Icon: Code },
-    { key:'site-notes',     label:'Notes', Icon: FileText },
+    { key:'site-settings',  label:'Site Settings',  Icon: Settings },
+    { key:'site-branding',  label:'Branding',        Icon: Palette  },
   ]},
   { group:'Design', Icon: Layout, items:[
-    { key:'themes',         label:'Theme', Icon: Palette },
-    { key:'header-config',  label:'Header', Icon: Layout },
-    { key:'social-links',   label:'Social Links', Icon: Share2 },
-    { key:'reviews',        label:'Reviews', Icon: Star },
-    { key:'table-management', label:'Table Management', Icon: Calendar },
+    { key:'themes',         label:'Theme',           Icon: Palette  },
+    { key:'header-config',  label:'Header & Nav',    Icon: Layout   },
+    { key:'social-links',   label:'Social Links',    Icon: Share2   },
+    { key:'reviews',        label:'Reviews',         Icon: Star     },
+    { key:'loyalty',        label:'Loyalty Program', Icon: Gift     },
   ]},
-  { group:'Loyalty', Icon: Gift, items:[
-    { key:'loyalty',        label:'Loyalty Program', Icon: Gift },
+  { group:'Operations', Icon: Calendar, items:[
+    { key:'table-management', label:'Tables & Reservations', Icon: Calendar },
   ]},
-  { group:'Deploy', Icon: Globe, items:[
-    { key:'analytics',      label:'Analytics', Icon: BarChart3 },
-    { key:'netlify',        label:'Deployment', Icon: Globe },
+  { group:'Publish', Icon: Globe, items:[
+    { key:'analytics',      label:'Analytics',       Icon: BarChart3 },
+    { key:'netlify',        label:'Deployment',      Icon: Globe     },
+  ]},
+  { group:'Developer', Icon: Terminal, items:[
+    { key:'shortcodes',     label:'Shortcodes',      Icon: Code      },
+    { key:'site-notes',     label:'Internal Notes',  Icon: BookOpen  },
   ]},
 ]
 
@@ -66,7 +68,7 @@ function SaveBtn({ onClick, saving }) {
       style={{ marginTop:20, padding:'9px 22px', background:C.acc, border:'none',
         borderRadius:8, color:'#fff', fontWeight:700, fontSize:13,
         cursor:'pointer', fontFamily:'inherit' }}>
-      {saving ? 'Saving...' : 'Save Changes'}
+      {saving ? 'Saving…' : 'Save Changes'}
     </button>
   )
 }
@@ -99,8 +101,6 @@ export default function ConfigSection({ clientId, user }) {
         ]},
         { group:'Design', Icon: Layout, items:[
           { key:'social-links',   label:'Social Links', Icon: Share2 },
-        ]},
-        { group:'Loyalty', Icon: Gift, items:[
           { key:'loyalty',        label:'Loyalty Program', Icon: Gift },
         ]},
       ]
@@ -130,7 +130,6 @@ export default function ConfigSection({ clientId, user }) {
   }
   
   const [activeKey, setActiveKey] = useState(getSubsectionFromURL)
-  const [collapsed, setCollapsed] = useState({})
   const [client,    setClient]    = useState(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState(null)
@@ -164,7 +163,8 @@ export default function ConfigSection({ clientId, user }) {
   const { data: config = {} } = useQuery({
     queryKey: ['config', clientId],
     queryFn: () => getConfig(clientId),
-    enabled: !!clientId
+    enabled: !!clientId,
+    staleTime: Infinity,
   })
 
   const handleActiveKeyChange = (key) => {
@@ -235,7 +235,7 @@ export default function ConfigSection({ clientId, user }) {
           <div>
             You don't have permission to access Config section.
           </div>
-          <div style={{ fontSize:12, marginTop:8, color:C.t4 }}>
+          <div style={{ fontSize:12, marginTop:8, color:C.t3 }}>
             Please contact your administrator for access to Site Settings, Social Links, or Loyalty Program configuration.
           </div>
         </div>
@@ -243,53 +243,30 @@ export default function ConfigSection({ clientId, user }) {
     )
   }
 
-  return (
-    <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden' }}>
-      {/* Config sidebar */}
-      <div style={{ width:210, minWidth:210, background:C.panel,
-        borderRight:`1px solid ${C.border}`, overflowY:'auto' }}>
-        {FILTERED_SIDEBAR.map(grp => {
-          const GroupIcon = grp.Icon
-          return (
-            <div key={grp.group}>
-              <button onClick={() => setCollapsed(p => ({...p, [grp.group]: !p[grp.group]}))}
-                style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                  width:'100%', padding:'10px 14px', background:'none', border:'none',
-                  borderBottom:`1px solid ${C.border}`, cursor:'pointer',
-                  color:C.t3, fontSize:11, fontWeight:700, textTransform:'uppercase',
-                  letterSpacing:'0.07em', fontFamily:'inherit' }}>
-                <span style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <GroupIcon size={14} />
-                  {grp.group}
-                </span>
-                <span style={{ fontSize:10 }}>{collapsed[grp.group] ? '▶' : '▼'}</span>
-              </button>
-              {!collapsed[grp.group] && grp.items.map(item => {
-                const ItemIcon = item.Icon
-                return (
-                  <button key={item.key} onClick={() => handleActiveKeyChange(item.key)}
-                    style={{ display:'flex', alignItems:'center', gap:10, width:'100%',
-                      padding:'8px 14px 8px 20px', border:'none',
-                      background: activeKey===item.key ? '#1F2D4A' : 'transparent',
-                      color: activeKey===item.key ? C.t0 : C.t2,
-                      fontWeight: activeKey===item.key ? 700 : 400,
-                      fontSize:13, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
-                      borderLeft:`2px solid ${activeKey===item.key ? C.acc : 'transparent'}` }}>
-                    <ItemIcon size={14} />
-                    {item.label}
-                  </button>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
+  const configRailItems = FILTERED_SIDEBAR.map(grp => ({ key: grp.group, label: grp.group, Icon: grp.Icon }))
+  const configFlyoutMap = Object.fromEntries(FILTERED_SIDEBAR.map(grp => [grp.group, grp.items]))
+  const activeRailGroup = FILTERED_SIDEBAR.find(grp => grp.items.some(i => i.key === activeKey))?.group || FILTERED_SIDEBAR[0]?.group
 
-      {/* Config content */}
-      <div style={{ flex:1, padding:'28px 36px', overflowY:'auto', background:C.page }}>
+  const handleRailChange = (groupKey) => {
+    const grp = FILTERED_SIDEBAR.find(g => g.group === groupKey)
+    if (grp && grp.items.length > 0) {
+      handleActiveKeyChange(grp.items[0].key)
+    }
+  }
+
+  return (
+    <SectionShell
+      railItems={configRailItems}
+      flyoutMap={configFlyoutMap}
+      activeRail={activeRailGroup}
+      activeFlyout={activeKey}
+      onRailChange={handleRailChange}
+      onFlyoutChange={handleActiveKeyChange}
+    >
+      <div style={{ padding:'28px 36px' }}>
         {renderConfig()}
       </div>
-    </div>
+    </SectionShell>
   )
 }
 
@@ -638,7 +615,7 @@ const handleKey = (e) => {
     {mutation.isPending ? 'Saving…' : 'Save Changes'}
   </button>
   {mutation.isSuccess && (
-    <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>
+    <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>
   )}
   {Object.keys(errors).length > 0 && (
     <span style={{ fontSize:13, color:'#EF4444' }}>
@@ -1161,7 +1138,7 @@ function SiteNotes({ clientId, config, setHasUnsavedChanges }) {
           {mutation.isPending ? 'Saving…' : 'Save Notes'}
         </button>
         {mutation.isSuccess && (
-          <span style={{ fontSize:13, color:'#22C55E', fontWeight:600 }}>✅ Saved</span>
+          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>
         )}
       </div>
     </div>
@@ -1285,10 +1262,10 @@ function AnalyticsConfig({ clientId, config, setHasUnsavedChanges }) {
           {mutation.isPending ? 'Saving…' : 'Save Changes'}
         </button>
         {mutation.isSuccess && (
-          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>
+          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>
         )}
         {Object.keys(errors).length > 0 && (
-          <span style={{ fontSize:13, color:'#EF4444' }}>Fix the errors above</span>
+          <span style={{ fontSize:13, color:C.red }}>Fix the errors above</span>
         )}
       </div>
     </div>
@@ -1691,7 +1668,7 @@ function BrandingConfig({ clientId, config, setHasUnsavedChanges }) {
           {mutation.isPending ? 'Saving…' : 'Save Changes'}
         </button>
         {mutation.isSuccess && (
-          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>
+          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>
         )}
       </div>
     </div>
@@ -1855,7 +1832,7 @@ function ShortcodesConfig({ clientId, config, client, setHasUnsavedChanges }) {
                 {`{{${c.key}}}`}
               </span>
 
-              <span style={{ fontSize:10, color:C.t4, textTransform:'uppercase', letterSpacing:'0.02em' }}>
+              <span style={{ fontSize:10, color:C.t3, textTransform:'uppercase', letterSpacing:'0.02em' }}>
                 {c.source}
               </span>
 
@@ -1904,7 +1881,7 @@ function ShortcodesConfig({ clientId, config, client, setHasUnsavedChanges }) {
           {mutation.isPending ? 'Saving…' : 'Save Shortcodes'}
         </button>
         {mutation.isSuccess && (
-          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>
+          <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>
         )}
       </div>
     </div>
@@ -2076,7 +2053,7 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
           boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
         {mutation.isPending ? 'Saving…' : label}
       </button>
-      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
     </div>
   )
 
@@ -2250,7 +2227,7 @@ function ThemesConfig({ clientId, config, setHasUnsavedChanges }) {
               Save & Customise Colours →
             </button>
             {mutation.isSuccess && (
-              <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>
+              <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>
             )}
           </div>
         </div>
@@ -2767,7 +2744,7 @@ function SocialLinksConfig({ clientId, config, setHasUnsavedChanges }) {
       </div>
 
       <SaveBtn onClick={() => mutation.mutate()} saving={mutation.isPending || mutation.isLoading} />
-      {mutation.isSuccess && <span style={{ marginLeft:12, color:C.acc, fontSize:13 }}>✅ Saved</span>}
+      {mutation.isSuccess && <span style={{ marginLeft:12, color:C.green, fontSize:13, fontWeight:600 }}>Saved!</span>}
     </div>
   )
 }
@@ -3256,7 +3233,7 @@ function HeaderConfig({ clientId, config, onNavigate, setHasUnsavedChanges }) {
                 boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
               {mutation.isPending ? 'Saving…' : 'Save Header Config'}
             </button>
-            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
           </div>
         </div>
       )}
@@ -3381,7 +3358,7 @@ function HeaderConfig({ clientId, config, onNavigate, setHasUnsavedChanges }) {
                 boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
               {mutation.isPending ? 'Saving…' : 'Save CTAs'}
             </button>
-            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
           </div>
         </div>
       )}
@@ -3626,9 +3603,9 @@ function ReviewsConfig({ clientId, config, setHasUnsavedChanges }) {
           boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
         {mutation.isPending ? 'Saving…' : 'Save'}
       </button>
-      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
+      {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
       {mutation.isError && (
-        <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Save Failed</span>
+        <span style={{ fontSize:13, color:C.red, fontWeight:600 }}>Failed to save</span>
       )}
     </div>
   )
@@ -4238,7 +4215,7 @@ function FooterConfig({ clientId, config, setHasUnsavedChanges }) {
             boxShadow: mutation.isPending ? 'none' : `0 4px 16px ${C.acc}50` }}>
           {mutation.isPending ? 'Saving…' : 'Save Footer'}
         </button>
-        {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+        {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
       </div>
     </div>
   )
@@ -4305,21 +4282,21 @@ function TableManagementConfig({ clientId, config, setHasUnsavedChanges, activeK
   const { data: locations = [] } = useQuery({
     queryKey: ['locations', clientId],
     queryFn: () => getLocations(clientId),
-    staleTime: 1000 * 60 * 5
+    staleTime: Infinity,
   })
 
   const { data: tables = [], isLoading: tablesLoading } = useQuery({
     queryKey: ['tables', clientId, selectedLocation],
     queryFn: () => getTables(clientId, selectedLocation),
     enabled: !!selectedLocation,
-    staleTime: 1000 * 30
+    staleTime: Infinity,
   })
 
   const { data: maxPartyData } = useQuery({
     queryKey: ['maxPartySize', clientId, selectedLocation],
     queryFn: () => getMaxPartySize(clientId, selectedLocation),
     enabled: !!selectedLocation && activeTab === 'reservations',
-    staleTime: 1000 * 30
+    staleTime: Infinity,
   })
 
   useEffect(() => {
@@ -4623,7 +4600,7 @@ function TableManagementConfig({ clientId, config, setHasUnsavedChanges, activeK
                     cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
                   {mutation.isPending ? 'Saving…' : 'Save Changes'}
                 </button>
-                {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved</span>}
+                {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
               </div>
             </>
           )}
@@ -5594,7 +5571,7 @@ function NetlifyConfig({ clientId, config, setHasUnsavedChanges, client }) {
                       borderRadius:6, color:'#fff', fontWeight:600, fontSize:12,
                       cursor: mutation.isPending ? 'not-allowed' : 'pointer', fontFamily:'inherit',
                       opacity: mutation.isPending ? 0.6 : 1 }}>
-                      {mutation.isPending ? 'Saving...' : 'Save'}
+                      {mutation.isPending ? 'Saving…' : 'Save Changes'}
                     </button>
                   </div>
                   {!form.buildHook && (

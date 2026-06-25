@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getWelcomeContent, updateWelcomeContent } from '../api/welcomeContent'
 import ImageUpload from '../Components/ImageUpload'
 import { C } from '../theme'
+import { SkeletonPage } from '../Components/Skeleton'
 
 const ToggleSwitch = ({ checked, onChange, label }) => (
   <div
@@ -75,10 +76,11 @@ export default function WelcomeContent({ clientId }) {
   })
   const [saveSuccess, setSaveSuccess] = useState(false)
   
-  const { data: content } = useQuery({
+  const { data: content, isLoading } = useQuery({
     queryKey: ['welcome-content', clientId],
     queryFn: () => getWelcomeContent(clientId),
-    enabled: !!clientId
+    enabled: !!clientId,
+    staleTime: Infinity,
   })
 
   useEffect(() => {
@@ -135,6 +137,8 @@ export default function WelcomeContent({ clientId }) {
       isActive: formData.isActive !== false
     })
   }
+
+  if (isLoading) return <SkeletonPage cards={3} />
 
   return (
     <div style={{ maxWidth: 800 }}>
@@ -226,16 +230,17 @@ export default function WelcomeContent({ clientId }) {
           onClick={handleSave}
           disabled={mUpdate.isPending}
           style={{
-            padding: '10px 24px', background: C.acc, border: 'none',
-            borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600,
+            padding: '9px 22px', background: C.acc, border: 'none',
+            borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600,
             cursor: mUpdate.isPending ? 'not-allowed' : 'pointer',
-            opacity: mUpdate.isPending ? 0.6 : 1
+            opacity: mUpdate.isPending ? 0.6 : 1,
+            boxShadow: mUpdate.isPending ? 'none' : `0 4px 14px ${C.acc}40`
           }}
         >
-          {mUpdate.isPending ? 'Saving...' : 'Save Changes'}
+          {mUpdate.isPending ? 'Saving…' : 'Save Changes'}
         </button>
         {mUpdate.isSuccess && (
-          <span style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>Saved</span>
+          <span style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>Saved!</span>
         )}
       </div>
     </div>

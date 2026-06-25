@@ -14,6 +14,7 @@ import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Menu, ImageIcon, PanelBottom, FileText, Plus, Trash2 } from 'lucide-react'
 import LoadingSpinner from '../Components/LoadingSpinner'
+import { SkeletonPage } from '../Components/Skeleton'
 import ImageUpload from '../Components/ImageUpload'
 import ConfirmationModal from '../Components/ConfirmationModal'
 import { getNavbar, saveNavbar as saveNavbarApi } from '../api/navbar'
@@ -191,17 +192,10 @@ export default function NavbarSection ({ clientId, subsection = 'header-sections
   const { data, isLoading } = useQuery({
     queryKey: ['navbar', clientId],
     queryFn: () => getNavbar(clientId),
-    staleTime: 30_000
+    staleTime: Infinity,
   })
 
-  if (isLoading) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center', color: C.t2 }}>
-        <LoadingSpinner />
-        <div style={{ marginTop: 16, fontSize: 13 }}>Loading navigation…</div>
-      </div>
-    )
-  }
+  if (isLoading) return <SkeletonPage cards={3} />
 
   return (
     <div style={{ maxWidth: 960 }}>
@@ -1496,13 +1490,13 @@ function PagesListPanel ({ clientId, data, qc }) {
   const { data: allPages = [], isLoading } = useQuery({
     queryKey: ['pages', clientId],
     queryFn: () => getPages(clientId),
-    staleTime: 10_000
+    staleTime: Infinity,
   })
 
   const { data: allBanners = [] } = useQuery({
     queryKey: ['banners', clientId],
     queryFn: () => getBanners(clientId),
-    staleTime: 30_000
+    staleTime: Infinity,
   })
 
   // Filter for navigation banners only
@@ -1738,7 +1732,7 @@ function PagesListPanel ({ clientId, data, qc }) {
       </p>
 
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: 32 }}><LoadingSpinner /></div>
+        <SkeletonPage cards={4} />
       ) : allPages.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48, color: C.t3, border: `1px dashed ${C.border}`, borderRadius: 12 }}>
           No pages yet — click <strong style={{ color: C.acc }}>Create Page</strong> to get started.

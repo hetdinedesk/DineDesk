@@ -123,9 +123,6 @@ function MainApp() {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const isManager = user?.role === 'MANAGER'
   const canManageAll = isSuperAdmin || isManager
-  const [buildMenu,    setBuildMenu]    = useState(false)
-  const [deploying,    setDeploying]    = useState(false)
-  const [deployStatus, setDeployStatus] = useState(null) // 'success'|'error'|null
   const [previewUrl,   setPreviewUrl]   = useState(null)
   const [globalNav,  setGlobalNav]  = useState(() => {
     const user = useAuthStore.getState().user
@@ -470,20 +467,13 @@ function MainApp() {
           activeSite={activeSite}
           siteNav={siteNav}
           setSiteNav={setSiteNav}
-          deployStatus={deployStatus}
-          setBuildMenu={setBuildMenu}
-          buildMenu={buildMenu}
-          setDeploying={setDeploying}
-          setDeployStatus={setDeployStatus}
-          deploying={deploying}
           navigate={navigate}
           previewUrl={previewUrl}
           setPreviewUrl={setPreviewUrl}
-          canDeploy={canManageAll}
         />
       )}
 
-      <Container fill>
+      <Container fill fullWidth>
         <div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column', width:'100%' }}>
           {!activeSite && globalNav === 'home' && (
             <GlobalHome key={refreshKey} onOpenSite={openSite} isSuperAdmin={isSuperAdmin} />

@@ -131,42 +131,21 @@ export function SiteActionBar({
   activeSite,
   siteNav,
   setSiteNav,
-  deployStatus,
-  setBuildMenu,
-  buildMenu,
-  setDeploying,
-  setDeployStatus,
-  deploying,
   navigate,
   previewUrl,
-  setPreviewUrl,
-  canDeploy
+  setPreviewUrl
 }) {
   const isMobile = useMediaQuery('(max-width: 768px)')
-  const [hoverTimeout, setHoverTimeout] = React.useState(null)
-  const [liveSiteUrl, setLiveSiteUrl] = React.useState(null)
 
   // Load preview URL from config on mount
   React.useEffect(() => {
     if (activeSite?.id) {
       fetch(`${API}/clients/${activeSite.id}/config`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
         .then(r => r.json())
-        .then(cfg => {
-          setPreviewUrl(cfg.netlify?.previewUrl || null)
-          setLiveSiteUrl(cfg.netlify?.customDomain ? (cfg.netlify.customDomain.startsWith('http') ? cfg.netlify.customDomain : `https://${cfg.netlify.customDomain}`) : null)
-        })
+        .then(cfg => setPreviewUrl(cfg.netlify?.previewUrl || null))
         .catch(err => console.error('Failed to load preview URL:', err))
     }
   }, [activeSite?.id, setPreviewUrl])
-
-  const handleMouseEnter = () => {
-    if (hoverTimeout) clearTimeout(hoverTimeout)
-    setBuildMenu(true)
-  }
-
-  const handleMouseLeave = () => {
-    setHoverTimeout(setTimeout(() => setBuildMenu(false), 300))
-  }
 
   return (
     <div style={{
@@ -198,7 +177,6 @@ export function SiteActionBar({
             border: `1px solid ${activeSite.status === 'live' && activeSite.indexing === 'allowed' ? '#22C55E40' : '#F59E0B40'}`,
             padding: '2px 8px', borderRadius: 4
           }}>{activeSite.status === 'live' && activeSite.indexing === 'allowed' ? 'Live' : 'Draft'}</span>
-          {canDeploy && !isMobile && deployStatus === 'success' && <span style={{ fontSize: 11, color: '#22C55E' }}>Build triggered</span>}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 8, flexShrink: 0 }}>
@@ -206,77 +184,6 @@ export function SiteActionBar({
             style={{ height: 32, padding: isMobile ? '0 8px' : '0 14px', background: 'transparent', border: `1px solid #2A3F63`, borderRadius: 6, color: previewUrl ? '#7A8BAD' : '#3A4A6A', fontSize: 12, cursor: previewUrl ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box', opacity: previewUrl ? 1 : 0.5 }}>
             {isMobile ? 'View' : 'Preview'}<span style={{ fontSize: 10, lineHeight: 1 }}>↗</span>
           </button>
-
-          {canDeploy && <div style={{ position: 'relative' }} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-            <button type="button" onClick={async () => {
-              setDeploying(true); setDeployStatus(null)
-              try {
-                const res = await fetch(`${API}/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
-                const data = await res.json(); 
-                setDeployStatus(data.success ? 'success' : 'error')
-                if (data.success && data.previewUrl) {
-                  setPreviewUrl(data.previewUrl)
-                }
-              } catch { setDeployStatus('error') }
-              finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
-            }} disabled={deploying}
-              style={{ height: 32, padding: '0 18px', background: deploying ? '#1F2D4A' : '#FF6B2B', border: `1px solid ${deploying ? '#2A3F63' : '#FF6B2B'}`, borderRadius: 7, color: '#fff', fontWeight: 700, fontSize: 12, cursor: deploying ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box', transition: 'all 0.15s' }}>
-              {deploying ? 'Building…' : 'Deploy Live'}<span style={{ fontSize: 10, opacity: 0.7, lineHeight: 1 }}>▾</span>
-            </button>
-
-            {buildMenu && (
-              <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
-                style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 99, background: '#0E1420', border: `1px solid #1E2D4A`, borderRadius: 10, boxShadow: '0 16px 48px rgba(0,0,0,0.6)', minWidth: 210, overflow: 'hidden', animation: 'fadeIn 0.1s ease' }}>
-                <div style={{ padding: '8px 14px', fontSize: 10, fontWeight: 700, color: '#445572', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid #1E2D4A' }}>Publish</div>
-                {[
-                  {
-                    label: 'Deploy Live', hint: 'Trigger a Netlify build',
-                    onClick: async () => {
-                      setBuildMenu(false); setDeploying(true); setDeployStatus(null)
-                      try {
-                        const res = await fetch(`${API}/clients/${activeSite.id}/deploy`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
-                        const data = await res.json(); 
-                        setDeployStatus(data.success ? 'success' : 'error')
-                        if (data.success && data.previewUrl) {
-                          setPreviewUrl(data.previewUrl)
-                        }
-                      } catch { setDeployStatus('error') }
-                      finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
-                    }
-                  },
-                  {
-                    label: 'Clear Cache & Build', hint: 'Deploy with cache disabled',
-                    onClick: async () => {
-                      setBuildMenu(false); setDeploying(true); setDeployStatus(null)
-                      try {
-                        const res = await fetch(`${API}/clients/${activeSite.id}/deploy?clearCache=true`, { method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('dd_token') } })
-                        const data = await res.json(); 
-                        setDeployStatus(data.success ? 'success' : 'error')
-                        if (data.success && data.previewUrl) {
-                          setPreviewUrl(data.previewUrl)
-                        }
-                      } catch { setDeployStatus('error') }
-                      finally { setDeploying(false); setTimeout(() => setDeployStatus(null), 5000) }
-                    }
-                  },
-                  { 
-                    label: 'Preview Site', 
-                    hint: previewUrl ? 'Open live preview in new tab' : 'Deploy site first to get a preview URL', 
-                    onClick: () => { if (previewUrl) window.open(previewUrl, '_blank'); else alert('No preview URL — deploy the site first or set it in Config → Deployment') }
-                  },
-                  ...(liveSiteUrl ? [{
-                    label: 'View Live Site', hint: 'Open published site with custom domain',
-                    onClick: () => window.open(liveSiteUrl, '_blank')
-                  }] : []),
-                ].map(({ label, hint, onClick }) => (
-                  <div key={label} onClick={onClick} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #1E2D4A15', transition: 'background 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = '#1A2540'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#F1F5FF' }}>{label}</div>
-                    <div style={{ fontSize: 11, color: '#445572', marginTop: 2 }}>{hint}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>}
         </div>
       </Container>
     </div>

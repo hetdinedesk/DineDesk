@@ -248,6 +248,9 @@ function adaptCMSData(data) {
     originalPrice: s.originalPrice || null,
     validFrom: s.startDate || s.validFrom || null,
     validUntil: s.endDate || s.validUntil || null,
+    activeDays: s.activeDays || null,
+    activeTimeStart: s.activeTimeStart || null,
+    activeTimeEnd: s.activeTimeEnd || null,
   }));
 
   // Flatten navigation tree (export returns hierarchical tree — flatten so children are included)
@@ -323,7 +326,7 @@ function adaptCMSData(data) {
       carouselHeading: reviews.carouselHeading || 'Customer Reviews',
       carouselSubHeading: reviews.carouselSubHeading || 'What our customers are saying',
       carouselContent: reviews.carouselContent || '',
-      showReviewsCarousel: reviews.showReviewsCarousel === true || reviews.showReviewsCarousel !== false && ((reviews.reviews && reviews.reviews.length > 0) || (reviews.googleReviews && reviews.googleReviews.length > 0)),
+      showReviewsCarousel: reviews.showReviewsCarousel !== false,
       alternateStyles: reviews.alternateStyles === true
     }
   };
@@ -359,7 +362,7 @@ function adaptCMSData(data) {
     showReviewCta: reviews.showReviewCta !== false,
     reviews: reviews.reviews || [],
     // Carousel content options
-    showReviewsCarousel: reviews.showReviewsCarousel === true || (reviews.reviews && reviews.reviews.length > 0),
+    showReviewsCarousel: reviews.showReviewsCarousel !== false,
     alternateStyles: reviews.alternateStyles === true
   };
 

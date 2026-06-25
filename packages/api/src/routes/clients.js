@@ -460,7 +460,10 @@ router.get('/:id/export', async (req, res) => {
           isActive: true,
           startDate: true,
           endDate: true,
-          showInNav: true
+          showInNav: true,
+          activeDays: true,
+          activeTimeStart: true,
+          activeTimeEnd: true
         }
       }),
       prisma.page.findMany({
@@ -745,7 +748,21 @@ const exportData = {
     })() || []
   })),
   specialsConfig: specialsConfig || { heading: null, subheading: null, showOnHomepage: false, maxItems: 2 },
-  homepageLayout: homepageLayout || { components: [] },
+  homepageLayout: (() => {
+    const defaultComponents = [
+      { id: 'welcome', type: 'welcome', visible: true, order: 0 },
+      { id: 'promos', type: 'promos', visible: true, order: 1 },
+      { id: 'specials', type: 'specials', visible: true, order: 2 },
+      { id: 'featured', type: 'featured', visible: true, order: 3 },
+      { id: 'reviews', type: 'reviews', visible: true, order: 4 }
+    ]
+    if (!homepageLayout?.components?.length) return { components: defaultComponents }
+    const existingTypes = new Set(homepageLayout.components.map(c => c.type))
+    const missing = defaultComponents.filter(d => !existingTypes.has(d.type))
+    if (missing.length === 0) return homepageLayout
+    const merged = [...homepageLayout.components, ...missing.map((c, i) => ({ ...c, order: homepageLayout.components.length + i }))]
+    return { ...homepageLayout, components: merged }
+  })(),
   customTextBlocks: customTextBlocks || [],
   settings:   cfg?.settings   || {},
   shortcodes: cfg?.shortcodes || {},
@@ -797,12 +814,16 @@ const exportData = {
     totalReviews: googlePlaceData?.totalReviews || cfg?.reviews?.totalReviews || 25,
     showFloatingWidget: cfg?.reviews?.enableFloating !== false,
     showReviewCta: cfg?.reviews?.showReviewCta !== false,
-    reviews: (finalReviews && finalReviews.length > 0) ? finalReviews : (cfg?.reviews?.googleReviews || []),
+    // Merge manual CMS reviews with Google API reviews
+    reviews: [
+      ...(cfg?.reviews?.reviews || []),
+      ...((finalReviews && finalReviews.length > 0) ? finalReviews : [])
+    ],
     // Display settings
     enableHeader: cfg?.reviews?.enableHeader !== false,
     enableFooter: cfg?.reviews?.enableFooter !== false,
     enableFloating: cfg?.reviews?.enableFloating !== false,
-    // Carousel content options - use Config settings for visibility
+    // Carousel content options - show by default unless explicitly turned off
     showReviewsCarousel: reviewsConfig.showReviewsCarousel !== false,
     carouselHeading: cfg?.reviews?.carouselHeading || '',
     carouselSubHeading: cfg?.reviews?.carouselSubHeading || '',
@@ -2310,9 +2331,21 @@ router.get('/:id/homepage-layout', async (req, res) => {
       { id: 'welcome', type: 'welcome', visible: true, order: 0 },
       { id: 'promos', type: 'promos', visible: true, order: 1 },
       { id: 'specials', type: 'specials', visible: true, order: 2 },
-      { id: 'reviews', type: 'reviews', visible: true, order: 3 }
+      { id: 'featured', type: 'featured', visible: true, order: 3 },
+      { id: 'reviews', type: 'reviews', visible: true, order: 4 }
     ]
-    res.json(layout || { components: defaultComponents })
+    if (!layout?.components?.length) {
+      return res.json({ components: defaultComponents })
+    }
+    // Merge in any missing standard components so they always appear
+    const standardTypes = ['welcome', 'promos', 'specials', 'featured', 'reviews']
+    const existingTypes = new Set(layout.components.map(c => c.type))
+    const missing = defaultComponents.filter(d => !existingTypes.has(d.type))
+    if (missing.length > 0) {
+      const merged = [...layout.components, ...missing.map((c, i) => ({ ...c, order: layout.components.length + i }))]
+      return res.json({ ...layout, components: merged })
+    }
+    res.json(layout)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

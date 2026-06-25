@@ -4,6 +4,7 @@ import { getSpecials, createSpecial, updateSpecial, deleteSpecial } from '../api
 import { getSpecialsConfig, updateSpecialsConfig } from '../api/specialsConfig'
 import ImageUpload from '../Components/ImageUpload'
 import { C } from '../theme'
+import { SkeletonPage } from '../Components/Skeleton'
 
 const ToggleSwitch = ({ checked, onChange, label }) => (
   <div
@@ -74,6 +75,11 @@ export default function Specials({ clientId }) {
     isActive: true
   })
   
+  const DAYS = [
+    { key: 'mon', label: 'Mon' }, { key: 'tue', label: 'Tue' }, { key: 'wed', label: 'Wed' },
+    { key: 'thu', label: 'Thu' }, { key: 'fri', label: 'Fri' }, { key: 'sat', label: 'Sat' }, { key: 'sun', label: 'Sun' }
+  ]
+
   // Special form state
   const [specialForm, setSpecialForm] = useState({
     title: '',
@@ -82,24 +88,28 @@ export default function Specials({ clientId }) {
     imageUrl: '',
     startDate: '',
     endDate: '',
-    isActive: true
+    isActive: true,
+    activeDays: [],
+    activeTimeStart: '',
+    activeTimeEnd: ''
   })
   const [editingId, setEditingId] = useState(null)
   const [showForm, setShowForm] = useState(false)
   
   // Fetch specials and config
-  const { data: specials = [] } = useQuery({
+  const { data: specials = [], isLoading } = useQuery({
     queryKey: ['specials', clientId],
     queryFn: () => getSpecials(clientId),
-    enabled: !!clientId
+    enabled: !!clientId,
+    staleTime: Infinity,
   })
   
   const { data: configData } = useQuery({
     queryKey: ['specials-config', clientId],
     queryFn: () => getSpecialsConfig(clientId),
     enabled: !!clientId,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   })
   
   // Initialize form from query data when it loads
@@ -150,7 +160,8 @@ export default function Specials({ clientId }) {
       setEditingId(null)
       setSpecialForm({
         title: '', description: '', price: '', imageUrl: '',
-        startDate: '', endDate: '', isActive: true
+        startDate: '', endDate: '', isActive: true,
+        activeDays: [], activeTimeStart: '', activeTimeEnd: ''
       })
     }
   })
@@ -174,7 +185,10 @@ export default function Specials({ clientId }) {
       ...specialForm,
       price: specialForm.price ? parseFloat(specialForm.price) : null,
       startDate: specialForm.startDate ? new Date(specialForm.startDate) : null,
-      endDate: specialForm.endDate ? new Date(specialForm.endDate) : null
+      endDate: specialForm.endDate ? new Date(specialForm.endDate) : null,
+      activeDays: specialForm.activeDays?.length ? specialForm.activeDays : null,
+      activeTimeStart: specialForm.activeTimeStart || null,
+      activeTimeEnd: specialForm.activeTimeEnd || null
     })
   }
   
@@ -186,8 +200,12 @@ export default function Specials({ clientId }) {
       imageUrl: special.imageUrl || '',
       startDate: special.startDate ? special.startDate.split('T')[0] : '',
       endDate: special.endDate ? special.endDate.split('T')[0] : '',
-      isActive: special.isActive !== false
+      isActive: special.isActive !== false,
+      activeDays: Array.isArray(special.activeDays) ? special.activeDays : [],
+      activeTimeStart: special.activeTimeStart || '',
+      activeTimeEnd: special.activeTimeEnd || ''
     })
+    setEditingId(special.id)
     setShowForm(true)
   }
   
@@ -197,6 +215,8 @@ export default function Specials({ clientId }) {
     }
   }
   
+  if (isLoading) return <SkeletonPage cards={2} />
+
   return (
     <div style={{ maxWidth: 900 }}>
       {/* Section Header */}
@@ -269,16 +289,17 @@ export default function Specials({ clientId }) {
               onClick={handleSaveConfig}
               disabled={mUpdateConfig.isPending}
               style={{
-                padding: '8px 16px', background: C.acc, border: 'none',
+                padding: '9px 22px', background: C.acc, border: 'none',
                 borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600,
                 cursor: mUpdateConfig.isPending ? 'not-allowed' : 'pointer',
-                opacity: mUpdateConfig.isPending ? 0.6 : 1
+                opacity: mUpdateConfig.isPending ? 0.6 : 1,
+                boxShadow: mUpdateConfig.isPending ? 'none' : `0 4px 14px ${C.acc}40`
               }}
             >
-              {mUpdateConfig.isPending ? 'Saving...' : 'Save Config'}
+              {mUpdateConfig.isPending ? 'Saving…' : 'Save Changes'}
             </button>
             {mUpdateConfig.isSuccess && (
-              <span style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>Saved</span>
+              <span style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>Saved!</span>
             )}
           </div>
         </div>
@@ -344,10 +365,59 @@ export default function Specials({ clientId }) {
               type="date"
             />
 
+            {/* Scheduling */}
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, marginTop: 4, marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Active Days</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {DAYS.map(d => {
+                  const on = (specialForm.activeDays || []).includes(d.key)
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => {
+                        const curr = specialForm.activeDays || []
+                        setSpecialForm({ ...specialForm, activeDays: on ? curr.filter(x => x !== d.key) : [...curr, d.key] })
+                      }}
+                      style={{
+                        padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                        background: on ? C.acc + '22' : C.input,
+                        border: `1px solid ${on ? C.acc : C.border}`,
+                        color: on ? C.acc : C.t2
+                      }}
+                    >{d.label}</button>
+                  )
+                })}
+              </div>
+              <div style={{ fontSize: 11, color: C.t3, marginTop: 6 }}>Leave empty to show every day</div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Active From</label>
+                <input
+                  type="time"
+                  value={specialForm.activeTimeStart}
+                  onChange={(e) => setSpecialForm({ ...specialForm, activeTimeStart: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', background: C.input, border: `1px solid ${C.border}`, borderRadius: 8, color: C.t0, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Active Until</label>
+                <input
+                  type="time"
+                  value={specialForm.activeTimeEnd}
+                  onChange={(e) => setSpecialForm({ ...specialForm, activeTimeEnd: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', background: C.input, border: `1px solid ${C.border}`, borderRadius: 8, color: C.t0, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: C.t3, marginBottom: 16 }}>Leave time empty to show all day</div>
+
             <div style={{ marginTop: 20, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => { setShowForm(false); setEditingId(null) }}
-                style={{ padding: '8px 16px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, color: C.t1, fontSize: 13, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, color: C.t2, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 Cancel
               </button>
@@ -355,13 +425,14 @@ export default function Specials({ clientId }) {
                 onClick={handleSaveSpecial}
                 disabled={mSaveSpecial.isPending}
                 style={{
-                  padding: '8px 16px', background: C.acc, border: 'none',
+                  padding: '9px 22px', background: C.acc, border: 'none',
                   borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600,
                   cursor: mSaveSpecial.isPending ? 'not-allowed' : 'pointer',
-                  opacity: mSaveSpecial.isPending ? 0.6 : 1
+                  opacity: mSaveSpecial.isPending ? 0.6 : 1,
+                  boxShadow: mSaveSpecial.isPending ? 'none' : `0 4px 14px ${C.acc}40`
                 }}
               >
-                {mSaveSpecial.isPending ? 'Saving...' : 'Save'}
+                {mSaveSpecial.isPending ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>
@@ -395,9 +466,19 @@ export default function Specials({ clientId }) {
                 <div style={{ fontWeight: 700, color: special.isActive !== false ? C.t0 : C.t3, fontSize: 14 }}>
                   {special.title}
                 </div>
-                <div style={{ fontSize: 12, color: C.t2, marginTop: 4 }}>
-                  {special.price ? `$${special.price}` : 'No price'}
-                  {special.endDate && ` · Until ${new Date(special.endDate).toLocaleDateString()}`}
+                <div style={{ fontSize: 12, color: C.t2, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {special.price && <span>${special.price}</span>}
+                  {special.endDate && <span>Until {new Date(special.endDate).toLocaleDateString()}</span>}
+                  {Array.isArray(special.activeDays) && special.activeDays.length > 0 && (
+                    <span style={{ background: C.acc+'18', color: C.acc, borderRadius: 4, padding: '1px 6px', fontWeight: 600, fontSize: 11 }}>
+                      {special.activeDays.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(' · ')}
+                    </span>
+                  )}
+                  {special.activeTimeStart && (
+                    <span style={{ background: C.amber+'18', color: C.amber, borderRadius: 4, padding: '1px 6px', fontWeight: 600, fontSize: 11 }}>
+                      {special.activeTimeStart}{special.activeTimeEnd ? ` – ${special.activeTimeEnd}` : ''}
+                    </span>
+                  )}
                 </div>
               </div>
               <ToggleSwitch
@@ -406,13 +487,13 @@ export default function Specials({ clientId }) {
               />
               <button
                 onClick={() => handleEdit(special)}
-                style={{ padding: '6px 12px', background: C.acc + '20', border: `1px solid ${C.acc}40`, borderRadius: 6, color: C.acc, fontSize: 12, cursor: 'pointer' }}
+                style={{ padding: '6px 12px', background: C.acc+'18', border: `1px solid ${C.acc}35`, borderRadius: 7, color: C.acc, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 Edit
               </button>
               <button
                 onClick={() => handleDelete(special.id)}
-                style={{ padding: '6px 12px', background: C.red + '15', border: `1px solid ${C.red}40`, borderRadius: 6, color: C.red, fontSize: 12, cursor: 'pointer' }}
+                style={{ padding: '6px 12px', background: C.red+'14', border: `1px solid ${C.red}35`, borderRadius: 7, color: C.red, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 Delete
               </button>

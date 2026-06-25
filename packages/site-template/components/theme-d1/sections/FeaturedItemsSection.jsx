@@ -44,10 +44,10 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
               className="group"
             >
               <div className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-                {item.image && (
+                {(item.imageUrl || item.image) && (
                   <div className="h-64 overflow-hidden">
                     <img
-                      src={item.image}
+                      src={item.imageUrl || item.image}
                       alt={item.name}
                       className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
                     />
@@ -62,7 +62,7 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
                     <span className="text-2xl font-bold text-[var(--color-secondary)]">
                       ${item.price.toFixed(2)}
                     </span>
-                    {item.dietary.length > 0 && (
+                    {(item.dietary?.length > 0) && (
                       <div className="flex flex-wrap gap-1">
                         {item.dietary.slice(0, 2).map((diet) => (
                           <span

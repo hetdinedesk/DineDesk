@@ -14,6 +14,57 @@ router.use((req, res, next) => {
   next()
 })
 
+// ── Public: "Also ordered with" suggestions (no auth needed) ──────────────────
+router.get('/:clientId/menu-items/suggestions', async (req, res) => {
+  try {
+    const { clientId } = req.params
+    const itemIds = (req.query.itemIds || '').split(',').map(s => s.trim()).filter(Boolean)
+    if (itemIds.length === 0) return res.json([])
+
+    // Fetch last 500 completed orders for this client
+    const orders = await prisma.order.findMany({
+      where: { clientId, status: { in: ['completed', 'ready'] } },
+      select: { items: true },
+      orderBy: { createdAt: 'desc' },
+      take: 500
+    })
+
+    // Build co-occurrence map: for each item in cart, count how often other items appear in same order
+    const coCount = {}
+    const cartSet = new Set(itemIds)
+    orders.forEach(order => {
+      const orderItemIds = (order.items || []).map(i => i.id).filter(Boolean)
+      const hasCartItem = orderItemIds.some(id => cartSet.has(id))
+      if (!hasCartItem) return
+      orderItemIds.forEach(id => {
+        if (!cartSet.has(id)) {
+          coCount[id] = (coCount[id] || 0) + 1
+        }
+      })
+    })
+
+    // Get top 4 co-occurring item IDs
+    const topIds = Object.entries(coCount)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 4)
+      .map(([id]) => id)
+
+    if (topIds.length === 0) return res.json([])
+
+    // Fetch full item details
+    const items = await prisma.menuItem.findMany({
+      where: { id: { in: topIds }, clientId, isAvailable: true },
+      select: { id: true, name: true, price: true, imageUrl: true, description: true, categoryName: true }
+    })
+
+    // Return in co-occurrence order
+    const ordered = topIds.map(id => items.find(i => i.id === id)).filter(Boolean)
+    res.json(ordered)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 router.use(authenticateToken)
 
 router.get('/:clientId/menu-categories', async (req, res) => {

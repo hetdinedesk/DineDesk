@@ -13,32 +13,7 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
   // Use passed items or fetch from CMS
   const featuredItems = items || menuItems?.filter((item) => item.isFeatured && item.isAvailable).slice(0, 6) || [];
 
-  // If no featured items, show placeholder
-  if (featuredItems.length === 0) {
-    return (
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2
-              className="text-4xl md:text-5xl font-bold text-[var(--color-primary)] mb-4"
-              style={{ fontFamily: 'var(--font-heading, inherit)' }}
-            >
-              {title}
-            </h2>
-            {subtitle && <p className="text-xl text-gray-600">{subtitle}</p>}
-          </motion.div>
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">Featured items coming soon...</p>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (featuredItems.length === 0) return null;
 
   return (
     <section className="py-20 bg-white">
@@ -69,10 +44,10 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
               className="group"
             >
               <div className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-                {item.image && (
+                {(item.imageUrl || item.image) && (
                   <div className="h-64 overflow-hidden">
                     <img
-                      src={item.image}
+                      src={item.imageUrl || item.image}
                       alt={item.name}
                       className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
                     />
@@ -87,7 +62,7 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
                     <span className="text-2xl font-bold text-[var(--color-secondary)]">
                       ${item.price.toFixed(2)}
                     </span>
-                    {item.dietary.length > 0 && (
+                    {(item.dietary?.length > 0) && (
                       <div className="flex flex-wrap gap-1">
                         {item.dietary.slice(0, 2).map((diet) => (
                           <span

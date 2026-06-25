@@ -1,17 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, X, Plus, Minus, Trash2, ArrowRight } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Sparkles } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
+import { useCMS } from '../../contexts/CMSContext';
+
+const API_BASE = process.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/api'
+
+function useAlsoOrderedWith(clientId, cartItemIds) {
+  const [suggestions, setSuggestions] = useState([])
+  useEffect(() => {
+    if (!clientId || cartItemIds.length === 0) { setSuggestions([]); return }
+    const ids = cartItemIds.join(',')
+    fetch(`${API_BASE}/clients/${clientId}/menu-items/suggestions?itemIds=${ids}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setSuggestions(Array.isArray(data) ? data : []))
+      .catch(() => setSuggestions([]))
+  }, [clientId, cartItemIds.join(',')])
+  return suggestions
+}
 
 export default function CartDrawer() {
   const router = useRouter()
   const {
     items, isOpen, closeCart, totalItems,
     subtotal, taxAmount, taxRate, taxLabel, total,
-    updateQuantity, removeItem, ordering,
+    updateQuantity, removeItem, addItem, ordering,
     tableInfo, isTableOrdering, orderType, paymentPreference
   } = useCart();
+
+  const { restaurant } = useCMS();
+  const clientId = restaurant?.id || ''
+  const cartItemIds = items.map(i => i.id).filter(Boolean)
+  const suggestions = useAlsoOrderedWith(clientId, cartItemIds)
+  const cartIdSet = new Set(items.map(i => i.id))
+  const filteredSuggestions = suggestions.filter(s => !cartIdSet.has(s.id)).slice(0, 3)
 
   const handleCheckout = () => {
     closeCart()
@@ -146,6 +169,36 @@ export default function CartDrawer() {
                 </div>
               )}
             </div>
+
+            {/* Also Ordered With */}
+            {items.length > 0 && filteredSuggestions.length > 0 && (
+              <div className="px-6 py-4 border-t border-[var(--color-secondary)]/10 bg-amber-50/50">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Customers also ordered</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {filteredSuggestions.map(s => (
+                    <div key={s.id} className="flex items-center gap-3 bg-white rounded-2xl p-2.5 border border-amber-100">
+                      {s.imageUrl
+                        ? <img src={s.imageUrl} alt={s.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
+                        : <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-serif font-bold text-[var(--color-secondary)] truncate">{s.name}</div>
+                        <div className="text-xs text-[var(--color-primary)] font-bold">${parseFloat(s.price).toFixed(2)}</div>
+                      </div>
+                      <button
+                        onClick={() => addItem({ id: s.id, name: s.name, price: parseFloat(s.price), imageUrl: s.imageUrl })}
+                        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
+                        style={{ background: 'var(--color-primary)' }}
+                      >
+                        <Plus className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Footer - Order Summary */}
             {items.length > 0 && (

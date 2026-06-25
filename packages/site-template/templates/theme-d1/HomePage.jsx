@@ -95,6 +95,7 @@ function HomePageContent() {
         subtitle={replaceShortcodes(specialsConfig?.subheading || 'Limited time offerings', shortcodes)}
       />
     ),
+    featured: () => <FeaturedItemsSection title="Best Selling Dishes" subtitle="Our most popular items" items={featuredItems} />,
     loyalty: () => <LoyaltyBannerSection />,
     reviews: () => <ReviewsSection />,
     custom: (blockId) => {
@@ -534,8 +535,20 @@ function isPromoVisible(promo) {
 }
 
 function isSpecialValid(special) {
-  if (!special.validUntil) return true;
-  return new Date(special.validUntil) >= new Date();
+  const now = new Date();
+  if (special.validFrom && now < new Date(special.validFrom)) return false;
+  if (special.validUntil && now > new Date(special.validUntil)) return false;
+  if (Array.isArray(special.activeDays) && special.activeDays.length > 0) {
+    const dayMap = ['sun','mon','tue','wed','thu','fri','sat'];
+    if (!special.activeDays.includes(dayMap[now.getDay()])) return false;
+  }
+  if (special.activeTimeStart || special.activeTimeEnd) {
+    const toMins = t => { const [h,m] = t.split(':').map(Number); return h*60+(m||0); };
+    const cur = now.getHours()*60 + now.getMinutes();
+    if (special.activeTimeStart && cur < toMins(special.activeTimeStart)) return false;
+    if (special.activeTimeEnd && cur > toMins(special.activeTimeEnd)) return false;
+  }
+  return true;
 }
 
 function formatDate(dateString) {

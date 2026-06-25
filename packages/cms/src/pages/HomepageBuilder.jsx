@@ -290,14 +290,14 @@ export default function HomepageBuilder({ clientId }) {
     queryKey: ['homepage-layout', clientId],
     queryFn: () => getHomepageLayout(clientId),
     enabled: !!clientId,
-    staleTime: 10000
+    staleTime: Infinity,
   })
 
   const { data: customBlocks = [] } = useQuery({
     queryKey: ['custom-text-blocks', clientId],
     queryFn: () => getCustomTextBlocks(clientId),
     enabled: !!clientId,
-    staleTime: 10000
+    staleTime: Infinity,
   })
 
   const mUpdateLayout = useMutation({

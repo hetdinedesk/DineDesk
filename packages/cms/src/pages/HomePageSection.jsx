@@ -1460,7 +1460,7 @@ function FeaturedTab({ clientId }) {
               opacity: mUpdateConfig.isLoading ? 0.6 : 1
             }}
           >
-            {mUpdateConfig.isLoading ? 'Saving...' : 'Save Configuration'}
+            {mUpdateConfig.isLoading ? 'Saving…' : 'Save Configuration'}
           </button>
         </div>
       </div>

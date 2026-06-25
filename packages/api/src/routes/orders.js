@@ -61,9 +61,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Customer name, email, and phone are required' })
     }
 
-    // Validate dine-in order requirements
-    if (orderType === 'dine_in' && !tableId) {
-      return res.status(400).json({ error: 'Table ID is required for dine-in orders' })
+    // Validate dine-in order requirements — tableNumber alone is enough if tableId not resolved
+    if (orderType === 'dine_in' && !tableId && !tableNumber) {
+      return res.status(400).json({ error: 'Table information is required for dine-in orders' })
     }
 
     // Get client config to check if ordering is enabled
@@ -426,6 +426,28 @@ router.get('/', authenticateToken, async (req, res) => {
       tableNumber: o.table?.tableNumber || null
     }))
     res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET - Check if customer is first-time (public endpoint for checkout)
+router.get('/check-first-time/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params
+    const { phone } = req.query
+
+    if (!phone) {
+      return res.json({ isFirstTime: true })
+    }
+
+    const customer = await prisma.customer.findUnique({
+      where: { clientId_phone: { clientId, phone } },
+      select: { totalOrders: true }
+    })
+
+    const isFirstTime = !customer || customer.totalOrders === 0
+    res.json({ isFirstTime })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

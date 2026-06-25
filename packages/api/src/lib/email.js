@@ -169,8 +169,9 @@ function generateRestaurantNotificationHtml(order, clientName) {
           </div>
           
           <div class="info-box">
-            <strong>Order Type:</strong> ${order.orderType}<br>
-            <strong>Pickup:</strong> ${order.pickupTime ? new Date(order.pickupTime).toLocaleString() : 'ASAP'}<br>
+            <strong>Order Type:</strong> ${order.orderType === 'dine_in' ? 'Dine-in' : order.orderType === 'delivery' ? 'Delivery' : 'Pick-up'}<br>
+            ${order.tableNumber ? `<strong>Table:</strong> ${order.tableNumber}<br>` : ''}
+            ${order.pickupTime ? `<strong>Pickup:</strong> ${new Date(order.pickupTime).toLocaleString()}<br>` : ''}
             <strong>Payment:</strong> ${order.paymentMethod === 'stripe' ? 'Card' : order.paymentMethod}
           </div>
           

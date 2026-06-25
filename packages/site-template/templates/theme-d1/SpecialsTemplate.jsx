@@ -27,11 +27,19 @@ export default function SpecialsPage({ data, page, banner }) {
   const activeSpecials = specials.filter((special) => {
     if (!special.isActive) return false;
     const now = new Date();
-    const validFrom = special.validFrom ? new Date(special.validFrom) : null;
-    const validUntil = special.validUntil ? new Date(special.validUntil) : null;
-    const afterStart = !validFrom || now >= validFrom;
-    const beforeEnd = !validUntil || now <= validUntil;
-    return afterStart && beforeEnd;
+    if (special.validFrom && now < new Date(special.validFrom)) return false;
+    if (special.validUntil && now > new Date(special.validUntil)) return false;
+    if (Array.isArray(special.activeDays) && special.activeDays.length > 0) {
+      const dayMap = ['sun','mon','tue','wed','thu','fri','sat'];
+      if (!special.activeDays.includes(dayMap[now.getDay()])) return false;
+    }
+    if (special.activeTimeStart || special.activeTimeEnd) {
+      const toMins = t => { const [h,m] = t.split(':').map(Number); return h*60+(m||0); };
+      const cur = now.getHours()*60 + now.getMinutes();
+      if (special.activeTimeStart && cur < toMins(special.activeTimeStart)) return false;
+      if (special.activeTimeEnd && cur > toMins(special.activeTimeEnd)) return false;
+    }
+    return true;
   });
 
   const handleAddItem = (special) => {

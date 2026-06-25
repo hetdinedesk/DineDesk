@@ -41,7 +41,7 @@ export const FloatingReviewWidget = () => {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg border border-gray-200 p-2 flex items-center space-x-1.5 hover:shadow-xl transition-shadow duration-300 relative max-w-fit">
+    <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg border border-gray-200 p-2 flex items-center space-x-1.5 hover:shadow-xl transition-shadow duration-300 max-w-fit">
       {/* Google Icon */}
       <Google size={18} className="text-blue-600 flex-shrink-0" />
       

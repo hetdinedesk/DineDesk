@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle, CheckCircle, ExternalLink, Unlink, RefreshCw } from 'lucide-react'
+import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle, CheckCircle, ExternalLink, Unlink, RefreshCw, Percent, Sparkles } from 'lucide-react'
 import { getConfig, saveConfig } from '../api/config'
 import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe, getApplePayStatus, enableApplePay, getGooglePayStatus, setGooglePay } from '../api/payments'
 import { C } from '../theme'
@@ -36,13 +36,15 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   const { data: config = {} } = useQuery({
     queryKey: ['config', clientId],
     queryFn: () => getConfig(clientId),
-    enabled: !!clientId
+    enabled: !!clientId,
+    staleTime: Infinity,
   })
 
   const { data: paymentConfig = {} } = useQuery({
     queryKey: ['payments', clientId],
     queryFn: () => getPayments(clientId),
-    enabled: !!clientId
+    enabled: !!clientId,
+    staleTime: Infinity,
   })
 
   const defaultForm = {
@@ -61,6 +63,8 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
     notificationEmail: '',
     checkoutMessage: '',
     successMessage: 'Thank you for your order! We will notify you when it is ready.',
+    discounts: [],
+    firstOrderDiscount: { enabled: false, discountPercent: 10, discountAmount: 0 },
   }
 
   const [form, setForm] = useState({ ...defaultForm, ...(config.ordering || {}) })
@@ -210,7 +214,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
   const hasNotificationChanges = JSON.stringify(notificationsForm) !== JSON.stringify(notificationsSavedRef.current)
 
   return (
-    <div>
+    <div style={{ maxWidth: 900 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
         <div>
           <h2 style={{ margin:'0 0 4px', fontSize:17, fontWeight:700, color:C.t0 }}>
@@ -388,6 +392,129 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
                 <ToggleSwitch label='Require Phone Number' checked={form.requirePhone !== false} onChange={() => update('requirePhone', !form.requirePhone)} />
                 <ToggleSwitch label='Require Email' checked={form.requireEmail !== false} onChange={() => update('requireEmail', !form.requireEmail)} />
               </div>
+
+              <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                  <Percent size={16} style={{ color:C.acc }} />
+                  <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>Minimum Order Discounts</span>
+                </div>
+
+                <p style={{ fontSize:12, color:C.t3, marginBottom:12 }}>
+                  Create discounts that apply when customers spend a minimum amount. Example: "Spend $50, get 10% off"
+                </p>
+
+                {(form.discounts || []).map((discount, idx) => (
+                  <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8, padding:12, background:C.input, borderRadius:8 }}>
+                    <div style={{ flex:1 }}>
+                      <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Min Spend ($)</label>
+                      <input
+                        type='number'
+                        min='0'
+                        step='0.01'
+                        value={discount.minAmount || ''}
+                        onChange={e => {
+                          const newDiscounts = [...(form.discounts || [])]
+                          newDiscounts[idx] = { ...discount, minAmount: parseFloat(e.target.value) || 0 }
+                          update('discounts', newDiscounts)
+                        }}
+                        style={{ width:'100%', padding:'8px 10px', background:C.panel, border:`1px solid ${C.border}`, borderRadius:6, color:C.t0, fontSize:13, outline:'none' }}
+                      />
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Discount (%)</label>
+                      <input
+                        type='number'
+                        min='0'
+                        max='100'
+                        step='1'
+                        value={discount.discountPercent || ''}
+                        onChange={e => {
+                          const newDiscounts = [...(form.discounts || [])]
+                          newDiscounts[idx] = { ...discount, discountPercent: parseInt(e.target.value) || 0 }
+                          update('discounts', newDiscounts)
+                        }}
+                        style={{ width:'100%', padding:'8px 10px', background:C.panel, border:`1px solid ${C.border}`, borderRadius:6, color:C.t0, fontSize:13, outline:'none' }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newDiscounts = (form.discounts || []).filter((_, i) => i !== idx)
+                        update('discounts', newDiscounts)
+                      }}
+                      style={{ padding:'8px', background:C.red+'18', border:`1px solid ${C.red}35`, borderRadius:6, color:C.red, cursor:'pointer', marginTop:16 }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => {
+                    const newDiscounts = [...(form.discounts || []), { minAmount: 50, discountPercent: 10 }]
+                    update('discounts', newDiscounts)
+                  }}
+                  style={{ width:'100%', padding:'10px', background:C.acc+'18', border:`1px dashed ${C.acc}50`, borderRadius:8, color:C.acc, fontWeight:600, fontSize:13, cursor:'pointer', marginTop:8 }}
+                >
+                  + Add Discount Rule
+                </button>
+              </div>
+
+              <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'16px 20px', marginBottom:16 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                  <Sparkles size={16} style={{ color:C.acc }} />
+                  <span style={{ fontSize:14, fontWeight:700, color:C.t0 }}>First-Time Customer Discount</span>
+                </div>
+
+                <p style={{ fontSize:12, color:C.t3, marginBottom:12 }}>
+                  Automatically apply a discount to new customers on their first order.
+                </p>
+
+                <ToggleSwitch
+                  label='Enable First-Time Discount'
+                  checked={form.firstOrderDiscount?.enabled || false}
+                  onChange={() => update('firstOrderDiscount', { ...(form.firstOrderDiscount || { enabled: false, discountPercent: 10, discountAmount: 0 }), enabled: !form.firstOrderDiscount?.enabled })}
+                />
+
+                {form.firstOrderDiscount?.enabled && (
+                  <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Discount Type</label>
+                      <select
+                        value={form.firstOrderDiscount?.discountAmount > 0 ? 'fixed' : 'percentage'}
+                        onChange={e => {
+                          const isFixed = e.target.value === 'fixed'
+                          update('firstOrderDiscount', { ...(form.firstOrderDiscount || {}), discountPercent: isFixed ? 0 : (form.firstOrderDiscount?.discountPercent || 10), discountAmount: isFixed ? (form.firstOrderDiscount?.discountAmount || 5) : 0 })
+                        }}
+                        style={{ width:'100%', padding:'8px 10px', background:C.panel, border:`1px solid ${C.border}`, borderRadius:6, color:C.t0, fontSize:13, outline:'none' }}
+                      >
+                        <option value='percentage'>Percentage (%)</option>
+                        <option value='fixed'>Fixed Amount ($)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:700, color:C.t3, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>
+                        {form.firstOrderDiscount?.discountAmount > 0 ? 'Amount ($)' : 'Percent (%)'}
+                      </label>
+                      <input
+                        type='number'
+                        min='0'
+                        max={form.firstOrderDiscount?.discountAmount > 0 ? undefined : 100}
+                        step={form.firstOrderDiscount?.discountAmount > 0 ? 0.01 : 1}
+                        value={form.firstOrderDiscount?.discountAmount > 0 ? form.firstOrderDiscount.discountAmount : form.firstOrderDiscount?.discountPercent || 10}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0
+                          if (form.firstOrderDiscount?.discountAmount > 0) {
+                            update('firstOrderDiscount', { ...(form.firstOrderDiscount || {}), discountAmount: val })
+                          } else {
+                            update('firstOrderDiscount', { ...(form.firstOrderDiscount || {}), discountPercent: val })
+                          }
+                        }}
+                        style={{ width:'100%', padding:'8px 10px', background:C.panel, border:`1px solid ${C.border}`, borderRadius:6, color:C.t0, fontSize:13, outline:'none' }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
 
@@ -399,10 +526,10 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
                 cursor: (mutation.isPending || !hasChanges) ? 'not-allowed' : 'pointer', fontFamily:'inherit',
                 boxShadow: (mutation.isPending || !hasChanges) ? 'none' : `0 4px 16px ${C.acc}50`
               }}>
-              {mutation.isPending ? 'Saving…' : 'Save'}
+              {mutation.isPending ? 'Saving…' : 'Save Changes'}
             </button>
-            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
-            {mutation.isError && <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Failed</span>}
+            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
+            {mutation.isError && <span style={{ fontSize:13, color:C.red, fontWeight:600 }}>Failed to save</span>}
           </div>
         </>
       )}
@@ -563,10 +690,10 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
                 cursor: (mutation.isPending || !hasNotificationChanges) ? 'not-allowed' : 'pointer', fontFamily:'inherit',
                 boxShadow: (mutation.isPending || !hasNotificationChanges) ? 'none' : `0 4px 16px ${C.acc}50`
               }}>
-              {mutation.isPending ? 'Saving…' : 'Save Notification Settings'}
+              {mutation.isPending ? 'Saving…' : 'Save Changes'}
             </button>
-            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>✅ Saved</span>}
-            {mutation.isError && <span style={{ fontSize:13, color:'#EF4444', fontWeight:600 }}>❌ Failed</span>}
+            {mutation.isSuccess && <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Saved!</span>}
+            {mutation.isError && <span style={{ fontSize:13, color:C.red, fontWeight:600 }}>Failed to save</span>}
           </div>
         </>
       )}

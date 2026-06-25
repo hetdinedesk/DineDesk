@@ -1515,23 +1515,26 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
   const revenueDelta = getDelta(periodRevenue, prevRevenue)
   const customerDelta = getDelta(uniqueCustomers, prevUniqueCustomers)
 
-  // Calculate top selling items
-  const itemCounts = {}
+  // Calculate top selling items with revenue
+  const itemStats = {}
   filteredOrders.forEach(order => {
     if (order.items && Array.isArray(order.items)) {
       order.items.forEach(item => {
         if (!item) return
         const itemName = item.name || 'Unknown Item'
         const quantity = parseInt(item.quantity) || 1
-        itemCounts[itemName] = (itemCounts[itemName] || 0) + quantity
+        const price = parseFloat(item.price) || 0
+        if (!itemStats[itemName]) itemStats[itemName] = { count: 0, revenue: 0 }
+        itemStats[itemName].count += quantity
+        itemStats[itemName].revenue += price * quantity
       })
     }
   })
 
-  const topItems = Object.entries(itemCounts)
-    .sort(([,a], [,b]) => b - a)
+  const topItems = Object.entries(itemStats)
+    .sort(([,a], [,b]) => b.revenue - a.revenue)
     .slice(0, 5)
-    .map(([name, count]) => ({ name, count }))
+    .map(([name, s]) => ({ name, count: s.count, revenue: s.revenue }))
 
   // Calculate daily/hourly revenue based on selected time period
   const getDailyRevenue = () => {
@@ -1753,25 +1756,35 @@ function AnalyticsSection({ liveOrders, historyOrders }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         {/* Top Selling Items */}
         <div style={{ background: C.card, borderRadius: 10, padding: 16 }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: C.t0, display: 'block', marginBottom: 12 }}>Top selling items</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: C.t0 }}>Top selling items</span>
+            <span style={{ fontSize: 11, color: C.t3 }}>by revenue</span>
+          </div>
           {topItems.length === 0 ? (
             <div style={{ textAlign: 'center', color: C.t3, padding: '24px 0', fontSize: 13 }}>
               No items sold this period
             </div>
-          ) : (
-            <div>
-              {topItems.map((item, i) => (
-                <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '8px 0',
-                  borderBottom: i < topItems.length - 1 ? `0.5px solid ${C.border}40` : 'none'
-                }}>
-                  <span style={{ fontSize: 13, color: C.t0 }}>{item.name}</span>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>{item.count} sold</span>
-                </div>
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            const maxRev = Math.max(...topItems.map(i => i.revenue), 1)
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {topItems.map((item, i) => (
+                  <div key={i}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: C.t0, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{item.name}</span>
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: C.t3 }}>{item.count}×</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#D85A30' }}>${item.revenue.toFixed(0)}</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${(item.revenue / maxRev) * 100}%`, background: '#D85A30', borderRadius: 3, opacity: 0.75 + (0.25 * (1 - i / topItems.length)), transition: 'width 0.4s ease' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Orders by Hour */}

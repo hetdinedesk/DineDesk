@@ -185,16 +185,6 @@ export default function CheckoutPage({ data, template }) {
   // Pickup info
   const [pickupType, setPickupType] = useState('asap') // asap | scheduled
   const [scheduledTime, setScheduledTime] = useState('')
-  const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine-in
-  const [selectedLocation, setSelectedLocation] = useState('')
-
-  // Auto-select first location if only one active location exists
-  useEffect(() => {
-    const activeLocations = data?.locations?.filter(loc => loc.isActive !== false) || []
-    if (activeLocations.length === 1) {
-      setSelectedLocation(activeLocations[0].id)
-    }
-  }, [data?.locations])
 
   // Payment
   const [paymentMethod, setPaymentMethod] = useState('cash') // stripe | cash
@@ -434,6 +424,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const [orderType, setOrderType] = useState('pickup') // pickup | delivery | dine_in
   const [selectedLocation, setSelectedLocation] = useState('')
 
+
   // Check if selected location is currently open
   const selectedLocationData = data?.locations?.find(loc => loc.id === selectedLocation)
   const isRestaurantCurrentlyOpen = isRestaurantOpen(selectedLocationData?.hours, selectedLocationData?.timezone)
@@ -596,6 +587,67 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   const [redeemedReward, setRedeemedReward] = useState(null)
   const [discountAmount, setDiscountAmount] = useState(0)
   const [scheduledTimeError, setScheduledTimeError] = useState('')
+
+  // Auto-calculate minimum order discount
+  useEffect(() => {
+    const discounts = data?.siteConfig?.ordering?.discounts || []
+    if (!Array.isArray(discounts) || discounts.length === 0) {
+      setDiscountAmount(0)
+      return
+    }
+
+    // Find the highest applicable discount
+    let bestDiscount = 0
+    for (const discount of discounts) {
+      if (discount.minAmount && discount.discountPercent && subtotal >= discount.minAmount) {
+        const discountValue = subtotal * (discount.discountPercent / 100)
+        if (discountValue > bestDiscount) {
+          bestDiscount = discountValue
+        }
+      }
+    }
+
+    // Don't override loyalty discount if already applied
+    if (!redeemedReward) {
+      setDiscountAmount(bestDiscount)
+    }
+  }, [subtotal, data?.siteConfig?.ordering?.discounts, redeemedReward])
+
+  // Check first-time customer discount
+  const [isFirstTimeCustomer, setIsFirstTimeCustomer] = useState(false)
+  const [firstTimeDiscount, setFirstTimeDiscount] = useState(0)
+
+  useEffect(() => {
+    const checkFirstTime = async () => {
+      const firstOrderConfig = data?.siteConfig?.ordering?.firstOrderDiscount
+      if (!firstOrderConfig?.enabled || !customerInfo.phone) {
+        setIsFirstTimeCustomer(false)
+        setFirstTimeDiscount(0)
+        return
+      }
+
+      try {
+        const response = await fetch(`${CMS_API_URL}/clients/${clientId}/orders/check-first-time/${clientId}?phone=${encodeURIComponent(customerInfo.phone)}`)
+        if (response.ok) {
+          const { isFirstTime } = await response.json()
+          setIsFirstTimeCustomer(isFirstTime)
+          if (isFirstTime && !redeemedReward) {
+            const discount = firstOrderConfig.discountAmount > 0
+              ? firstOrderConfig.discountAmount
+              : subtotal * (firstOrderConfig.discountPercent / 100)
+            setFirstTimeDiscount(discount)
+            setDiscountAmount(discount)
+          } else {
+            setFirstTimeDiscount(0)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check first-time customer:', err)
+      }
+    }
+
+    checkFirstTime()
+  }, [customerInfo.phone, clientId, data?.siteConfig?.ordering?.firstOrderDiscount, redeemedReward, subtotal, CMS_API_URL])
 
   const handlePlaceOrder = async () => {
     setLoading(true)
@@ -1585,6 +1637,14 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
                   <div className="flex justify-between">
                     <span className={`text-xs font-sans font-bold tracking-widest uppercase ${normalizedTemplate === 'theme-d1' ? 'text-gray-500' : normalizedTemplate === 'theme-d2' ? 'text-gray-500' : 'text-[var(--color-secondary)]/60'}`}>Delivery Fee</span>
                     <span className={`font-sans font-bold ${normalizedTemplate === 'theme-d1' ? 'text-gray-900' : normalizedTemplate === 'theme-d2' ? 'text-gray-900' : 'text-[var(--color-secondary)]'}`}>${ordering.deliveryFee.toFixed(2)}</span>
+                  </div>
+                )}
+                {discountAmount > 0 && !redeemedReward && (
+                  <div className="flex justify-between">
+                    <span className="text-xs font-sans font-bold tracking-widest text-green-600 uppercase">
+                      {isFirstTimeCustomer ? 'First-Time Discount' : 'Volume Discount'}
+                    </span>
+                    <span className="text-xs font-sans font-bold tracking-widest text-green-600 uppercase">-${discountAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {redeemedReward && (

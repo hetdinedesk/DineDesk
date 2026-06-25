@@ -4,7 +4,8 @@ import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Users, Building2 } from 'lucide-react'
-import LoadingSpinner from '../Components/LoadingSpinner'
+import { btnEdit, btnDelete } from '../ui.jsx'
+import { SkeletonPage } from '../Components/Skeleton'
 import ImageUpload from '../Components/ImageUpload'
 import { getHomeSections, createHomeSection, updateHomeSection, deleteHomeSection, getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../api/homepage.js'
 import { C } from '../theme'
@@ -24,8 +25,8 @@ const SortableItem = memo(({ id, children, onEdit, onDelete, onToggle, isActive 
       </div>
       <div style={{ flex: 1 }}>{children}</div>
       <ToggleSwitch checked={isActive} onChange={onToggle} />
-      <button onClick={onEdit} style={{ padding: '6px 12px', background: C.cyan, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Edit</button>
-      <button onClick={onDelete} style={{ padding: '6px 12px', background: 'transparent', border: `1px solid ${C.red}40`, borderRadius: 6, color: C.red, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
+      <button onClick={onEdit} style={btnEdit}>Edit</button>
+      <button onClick={onDelete} style={btnDelete}>Delete</button>
     </div>
   )
 })
@@ -35,12 +36,14 @@ export default function TeamSection({ clientId, subsection = 'team-members' }) {
 
   const { data: sections, isLoading } = useQuery({
     queryKey: ['homepage', clientId],
-    queryFn: () => getHomeSections(clientId)
+    queryFn: () => getHomeSections(clientId),
+    staleTime: Infinity,
   })
 
   const { data: departments } = useQuery({
     queryKey: ['departments', clientId],
-    queryFn: () => getDepartments(clientId)
+    queryFn: () => getDepartments(clientId),
+    staleTime: Infinity,
   })
 
   const teamMembers = useMemo(() =>
@@ -160,7 +163,7 @@ export default function TeamSection({ clientId, subsection = 'team-members' }) {
 
   // ── Render ──────────────────────────────────────────────────────
 
-  if (isLoading) return <LoadingSpinner />
+  if (isLoading) return <SkeletonPage cards={3} />
 
   if (subsection === 'team-members') {
     return (
@@ -171,7 +174,7 @@ export default function TeamSection({ clientId, subsection = 'team-members' }) {
             <span style={{ fontSize: 13, fontWeight: 700, color: C.t2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Team Members</span>
             {teamMembers.length > 0 && <span style={{ fontSize: 11, color: C.t3, background: C.card, padding: '2px 8px', borderRadius: 99, border: `1px solid ${C.border}` }}>{teamMembers.length}</span>}
           </div>
-          <button onClick={handleAdd} style={{ padding: '6px 14px', background: C.acc, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add Member</button>
+          <button onClick={handleAdd} style={{ padding: '6px 14px', background: C.acc, border: 'none', borderRadius: 7, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add Member</button>
         </div>
 
         {teamMembers.length === 0 ? (
@@ -217,7 +220,7 @@ export default function TeamSection({ clientId, subsection = 'team-members' }) {
             <Building2 size={16} style={{ color: C.t2 }} />
             <span style={{ fontSize: 13, fontWeight: 700, color: C.t2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Departments</span>
           </div>
-          <button onClick={handleAddDept} style={{ padding: '6px 14px', background: C.acc, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add Department</button>
+          <button onClick={handleAddDept} style={{ padding: '6px 14px', background: C.acc, border: 'none', borderRadius: 7, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add Department</button>
         </div>
         <p style={{ fontSize: 13, color: C.t2, marginBottom: 20 }}>Departments group your team members on the site. Assign members to departments in the member edit form.</p>
 
@@ -231,8 +234,8 @@ export default function TeamSection({ clientId, subsection = 'team-members' }) {
               <div key={dept.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1, fontWeight: 600, color: dept.isActive ? C.t0 : C.t3 }}>{dept.name}</div>
                 <ToggleSwitch checked={dept.isActive !== false} onChange={() => handleToggleDept(dept)} />
-                <button onClick={() => { setEditingDept({ ...dept }); setDeptModalOpen(true) }} style={{ padding: '6px 12px', background: C.cyan, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Edit</button>
-                <button onClick={() => handleDeleteDept(dept.id)} style={{ padding: '6px 12px', background: 'transparent', border: `1px solid ${C.red}40`, borderRadius: 6, color: C.red, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
+                <button onClick={() => { setEditingDept({ ...dept }); setDeptModalOpen(true) }} style={btnEdit}>Edit</button>
+                <button onClick={() => handleDeleteDept(dept.id)} style={btnDelete}>Delete</button>
               </div>
             ))}
           </div>
@@ -340,5 +343,5 @@ function Field({ label, children }) {
 }
 
 const inputStyle = { width: '100%', padding: '10px 12px', background: C.input, border: `1px solid ${C.border}`, borderRadius: 8, color: C.t0, fontSize: 14, boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }
-const btnCancel = { padding: '10px 20px', background: 'transparent', border: `1px solid ${C.border2}`, borderRadius: 8, color: C.t2, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }
-const btnSave = { padding: '10px 24px', background: C.green, border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
+const btnCancel = { padding: '10px 20px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, color: C.t2, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }
+const btnSave = { padding: '10px 24px', background: C.acc, border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: `0 4px 14px ${C.acc}40` }

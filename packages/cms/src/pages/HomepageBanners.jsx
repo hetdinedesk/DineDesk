@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { DndContext, closestCenter } from '@dnd-kit/core'
+import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
 import { getBanners, createBanner, updateBanner, deleteBanner, reorderBanners } from '../api/banners'
 import ImageUpload from '../Components/ImageUpload'
 import ConfirmationModal from '../Components/ConfirmationModal'
@@ -49,17 +53,53 @@ const InputField = ({ label, value, onChange, placeholder, type = 'text', requir
   </div>
 )
 
-const btnCyan = { padding: '6px 14px', background: C.acc, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
-const btnDanger = { padding: '6px 14px', background: C.red, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
+const btnCyan = { padding: '6px 12px', background: C.acc+'18', border: `1px solid ${C.acc}35`, borderRadius: 7, color: C.acc, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display:'inline-flex', alignItems:'center' }
+const btnDanger = { padding: '6px 12px', background: C.red+'14', border: `1px solid ${C.red}35`, borderRadius: 7, color: C.red, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display:'inline-flex', alignItems:'center' }
+
+function SortableBannerRow({ b, onEdit, onDelete, onToggle }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: b.id })
+  return (
+    <div ref={setNodeRef} style={{
+      transform: CSS.Transform.toString(transform), transition,
+      opacity: isDragging ? 0.4 : (b.isActive === false ? 0.65 : 1),
+      display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px',
+      background: C.panel, border: `1px solid ${isDragging ? C.acc : C.border}`,
+      borderRadius: 12, boxShadow: isDragging ? '0 8px 24px rgba(0,0,0,0.3)' : 'none',
+    }}>
+      <span {...attributes} {...listeners} style={{ cursor: 'grab', color: C.t3, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+        <GripVertical size={16} />
+      </span>
+      {b.imageUrl
+        ? <img src={b.imageUrl} alt="" style={{ width: 110, height: 52, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+        : <div style={{ width: 110, height: 52, borderRadius: 8, background: C.card, border: `1px solid ${C.border}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 11, color: C.t3 }}>No image</span>
+          </div>
+      }
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, color: C.t0, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {b.title || <em style={{ color: C.t3, fontWeight: 400 }}>Untitled</em>}
+        </div>
+        {b.subtitle && <div style={{ fontSize: 12, color: C.t2, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.subtitle}</div>}
+        <div style={{ fontSize: 11, color: C.t3, marginTop: 4, display: 'flex', gap: 10 }}>
+          {b.buttonText && <span style={{ color: C.acc }}>→ {b.buttonText}</span>}
+          {b.buttonUrl && <span style={{ color: b.isExternal ? C.red : C.green }}>{b.isExternal ? 'External link' : 'Internal link'}</span>}
+        </div>
+      </div>
+      <ToggleSwitch checked={b.isActive !== false} onChange={() => onToggle(b)} />
+      <button type="button" onClick={() => onEdit(b)} style={btnCyan}>Edit</button>
+      <button type="button" onClick={() => onDelete(b.id)} style={btnDanger}>Delete</button>
+    </div>
+  )
+}
 
 export default function HomepageBanners({ clientId }) {
   const [modal, setModal] = useState(null)
   const [delId, setDelId] = useState(null)
-  const [draggedIndex, setDraggedIndex] = useState(null)
 
   const { data: banners = [] } = useQuery({
     queryKey: ['banners', clientId],
-    queryFn: () => getBanners(clientId)
+    queryFn: () => getBanners(clientId),
+    staleTime: Infinity,
   })
 
   // Filter for homepage banners only and sort by sortOrder
@@ -81,40 +121,16 @@ export default function HomepageBanners({ clientId }) {
     mutationFn: (id) => deleteBanner(clientId, id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['banners', clientId] }); qc.invalidateQueries({ queryKey: ['navbar', clientId] }) }
   })
-  const mReorder = useMutation({
-    mutationFn: (bannerIds) => reorderBanners(clientId, bannerIds),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['banners', clientId] }) }
-  })
-
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
-
-  const handleDragEnter = (e) => {
-    e.preventDefault()
-  }
-
-  const handleDrop = (e, dropIndex) => {
-    e.preventDefault()
-    if (draggedIndex === null || draggedIndex === dropIndex) return
-
-    const newOrder = [...homepageBanners]
-    const [draggedBanner] = newOrder.splice(draggedIndex, 1)
-    newOrder.splice(dropIndex, 0, draggedBanner)
-
-    const bannerIds = newOrder.map(b => b.id)
-    mReorder.mutate(bannerIds)
-    setDraggedIndex(null)
-  }
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null)
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const all = qc.getQueryData(['banners', clientId]) || []
+    const fromIdx = all.findIndex(b => b.id === active.id)
+    const toIdx   = all.findIndex(b => b.id === over.id)
+    const reordered = arrayMove(all, fromIdx, toIdx)
+    qc.setQueryData(['banners', clientId], reordered)
+    reorderBanners(clientId, reordered.map(b => b.id)).catch(() => {
+      qc.setQueryData(['banners', clientId], all)
+    })
   }
 
   const openAdd = () => setModal({
@@ -155,7 +171,7 @@ export default function HomepageBanners({ clientId }) {
 
   return (
     <div style={{ maxWidth: 960 }}>
-      <h2 style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 700, color: C.t0 }}>
+      <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: C.t0 }}>
         Homepage Banners
       </h2>
       <p style={{ margin: '0 0 24px', fontSize: 13, color: C.t2 }}>
@@ -178,81 +194,24 @@ export default function HomepageBanners({ clientId }) {
 
       {homepageBanners.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: C.t3, border: `1px dashed ${C.border}`, borderRadius: 12 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🖼️</div>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No homepage banners yet</div>
           <div style={{ fontSize: 13 }}>Add your first banner to appear in the homepage carousel</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
-          {homepageBanners.map((b, index) => (
-            <div
-              key={b.id}
-              onDragOver={handleDragOver}
-              onDragEnter={handleDragEnter}
-              onDrop={(e) => handleDrop(e, index)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: C.panel,
-                border: `1px solid ${draggedIndex === index ? C.acc : (b.isActive === false ? C.border2 : C.border)}`,
-                borderRadius: 12,
-                opacity: b.isActive === false ? 0.7 : 1,
-                transition: draggedIndex === index ? 'transform 0.2s, box-shadow 0.2s' : 'none',
-                transform: draggedIndex === index ? 'scale(1.02)' : 'none',
-                boxShadow: draggedIndex === index ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
-              }}
-            >
-              <div
-                draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragEnd={handleDragEnd}
-                title="Drag to reorder"
-                style={{
-                  cursor: 'grab',
-                  padding: '12px 8px',
-                  color: C.t3,
-                  fontSize: 24,
-                  userSelect: 'none',
-                  lineHeight: 1,
-                  minWidth: 40,
-                  textAlign: 'center',
-                  background: draggedIndex === index ? C.acc : 'transparent',
-                  borderRadius: 6,
-                  transition: 'background 0.2s'
-                }}
-              >
-                ⋮⋮
-              </div>
-              {b.imageUrl && (
-                <img src={b.imageUrl} alt="" style={{ width: 160, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, color: C.t0, fontSize: 15 }}>
-                  {b.title || <em style={{ color: C.t3 }}>Untitled</em>}
-                </div>
-                {b.subtitle && (
-                  <div style={{ fontSize: 13, color: C.t2, marginTop: 4 }}>{b.subtitle}</div>
-                )}
-                <div style={{ fontSize: 12, color: C.t3, marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {b.buttonText && (
-                    <span style={{ color: C.acc }}>
-                      → {b.buttonText}
-                    </span>
-                  )}
-                  {b.buttonUrl && (
-                    <span style={{ color: b.isExternal ? C.red : C.green }}>
-                      {b.isExternal ? '🔗 External' : '🔗 Internal'}
-                    </span>
-                  )}
-                  {b.widthPx && b.heightPx && (
-                    <span>{b.widthPx}×{b.heightPx}px</span>
-                  )}
-                </div>
-              </div>
-              <ToggleSwitch checked={b.isActive !== false} onChange={() => mUpdate.mutate({ id: b.id, body: { isActive: !b.isActive } })} />
-              <button type="button" onClick={() => openEdit(b)} style={btnCyan}>Edit</button>
-              <button type="button" onClick={() => setDelId(b.id)} style={btnDanger}>Delete</button>
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={homepageBanners.map(b => b.id)} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {homepageBanners.map(b => (
+                <SortableBannerRow
+                  key={b.id} b={b}
+                  onEdit={openEdit}
+                  onDelete={(id) => setDelId(id)}
+                  onToggle={(b) => mUpdate.mutate({ id: b.id, body: { isActive: !b.isActive } })}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Edit/Add Modal */}

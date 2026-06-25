@@ -6,9 +6,9 @@ import { C } from '../theme'
 import LocationForm from './LocationForm'
 
 // Button styles
-const btnBase = { padding:'6px 12px', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:600, transition:'all 0.15s' }
-const btnCyan = { ...btnBase, background:C.cyan+'20', color:C.cyan, border:`1px solid ${C.cyan}40` }
-const btnDanger = { ...btnBase, background:C.red+'15', color:C.red, border:`1px solid ${C.red}40` }
+const btnBase = { padding:'6px 12px', border:'none', borderRadius:7, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:600, transition:'all 0.15s', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }
+const btnCyan = { ...btnBase, background:C.acc+'18', color:C.acc, border:`1px solid ${C.acc}35` }
+const btnDanger = { ...btnBase, background:C.red+'14', color:C.red, border:`1px solid ${C.red}35` }
 const btnGhost = { ...btnBase, background:'transparent', color:C.t2, border:`1px solid ${C.border}` }
 
 // Small toggle switch component
@@ -34,7 +34,7 @@ function SmallToggle({ checked, onChange }) {
 
 export default function LocationsList({ clientId }) {
   const qc = useQueryClient()
-  const { data: rawLocations = [] } = useQuery({ queryKey: ['locations', clientId], queryFn: () => getLocations(clientId), enabled: !!clientId })
+  const { data: rawLocations = [] } = useQuery({ queryKey: ['locations', clientId], queryFn: () => getLocations(clientId), enabled: !!clientId, staleTime: Infinity })
 
   // Sort locations by name to maintain stable order
   const locations = useMemo(() => {
@@ -86,7 +86,7 @@ export default function LocationsList({ clientId }) {
   }
 
   return (
-    <div>
+    <div style={{ maxWidth: 900 }}>
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
         <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:C.t0 }}>Locations ({locations.length})</h2>

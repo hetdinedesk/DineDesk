@@ -4,6 +4,7 @@ import { getPromoTiles, createPromoTile, updatePromoTile, deletePromoTile, getPr
 import ImageUpload from '../Components/ImageUpload'
 import ConfirmationModal from '../Components/ConfirmationModal'
 import { C } from '../theme'
+import { SkeletonPage } from '../Components/Skeleton'
 
 const ToggleSwitch = ({ checked, onChange, label }) => (
   <div
@@ -49,22 +50,24 @@ const InputField = ({ label, value, onChange, placeholder, type = 'text', requir
   </div>
 )
 
-const btnCyan = { padding: '6px 14px', background: C.acc, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
-const btnDanger = { padding: '6px 14px', background: C.red, border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
+const btnCyan = { padding: '6px 12px', background: C.acc+'18', border: `1px solid ${C.acc}35`, borderRadius: 7, color: C.acc, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display:'inline-flex', alignItems:'center' }
+const btnDanger = { padding: '6px 12px', background: C.red+'14', border: `1px solid ${C.red}35`, borderRadius: 7, color: C.red, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display:'inline-flex', alignItems:'center' }
 
 export default function PromoTiles({ clientId }) {
   const [configModal, setConfigModal] = useState(null)
   const [tileModal, setTileModal] = useState(null)
   const [delId, setDelId] = useState(null)
   
-  const { data: config = {} } = useQuery({
+  const { data: config = {}, isLoading } = useQuery({
     queryKey: ['promo-config', clientId],
-    queryFn: () => getPromoConfig(clientId)
+    queryFn: () => getPromoConfig(clientId),
+    staleTime: Infinity,
   })
   
   const { data: tiles = [] } = useQuery({
     queryKey: ['promo-tiles', clientId],
-    queryFn: () => getPromoTiles(clientId)
+    queryFn: () => getPromoTiles(clientId),
+    staleTime: Infinity,
   })
   
   const qc = useQueryClient()
@@ -132,6 +135,8 @@ export default function PromoTiles({ clientId }) {
   }
 
   const activeTiles = tiles.filter(t => t.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
+
+  if (isLoading) return <SkeletonPage cards={3} />
 
   return (
     <div style={{ maxWidth: 960 }}>

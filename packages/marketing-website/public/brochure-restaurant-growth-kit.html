@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DineDesk – Restaurant Growth Kit</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <!-- Real DineDesk data: email=dinedesk.support@gmail.com | site=dinedesk.com.au | ig=@dine.desk | setup=$249 | plans=$79/$149/$249 -->
+  <style>
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Brand tokens ──────────────────────────────────────── */
+    :root {
+      --orange:  #FF6B35;
+      --orange2: #FFB347;
+      --coral:   #FF8C69;
+      --dark:    #1A1A2E;
+      --navy:    #16213E;
+      --purple:  #533483;
+      --cream:   #FFF8F0;
+      --white:   #FFFFFF;
+      --text-body: #2d2d2d;
+      --text-muted: #555;
+    }
+
+    /* ── Page setup ────────────────────────────────────────── */
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11pt;
+      color: var(--text-body);
+      background: #f0f0f0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* ── Sheet = one A4 page ───────────────────────────────── */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      background: white;
+      margin: 0 auto 12mm;
+      position: relative;
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /* ── Print: hide gaps between pages ───────────────────── */
+    @media print {
+      body { background: none; }
+      .page { margin: 0; box-shadow: none; }
+    }
+
+    /* ── Typography helpers ────────────────────────────────── */
+    h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', Inter, sans-serif; font-weight: 800; line-height: 1.15; }
+    .gradient-text {
+      background: linear-gradient(135deg, var(--orange) 0%, var(--orange2) 60%, var(--coral) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE 1 — FRONT COVER
+    ═══════════════════════════════════════════════════════════ */
+    .cover {
+      background: linear-gradient(160deg, var(--dark) 0%, var(--navy) 55%, var(--purple) 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18mm 16mm;
+      color: white;
+      text-align: center;
+    }
+
+    .cover-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14mm;
+    }
+
+    .cover-logo-icon {
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 6px 24px rgba(255,107,53,0.45);
+    }
+
+    .cover-logo-text {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 28pt;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+    }
+
+    .cover-tagline-badge {
+      display: inline-block;
+      background: rgba(255,107,53,0.18);
+      border: 1px solid rgba(255,107,53,0.5);
+      border-radius: 50px;
+      padding: 5px 18px;
+      font-size: 9.5pt;
+      font-weight: 600;
+      color: var(--orange2);
+      letter-spacing: 0.5px;
+      margin-bottom: 10mm;
+      text-transform: uppercase;
+    }
+
+    .cover-headline {
+      font-size: 34pt;
+      font-weight: 900;
+      margin-bottom: 6mm;
+      line-height: 1.1;
+    }
+
+    .cover-headline span {
+      display: block;
+      font-size: 16pt;
+      font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      margin-top: 4mm;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .cover-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin: 10mm 0 12mm;
+    }
+
+    .cover-pill {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 50px;
+      padding: 6px 18px;
+      font-size: 9.5pt;
+      font-weight: 600;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .cover-pill .dot {
+      width: 7px; height: 7px;
+      background: var(--orange);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .cover-mockup {
+      width: 100%;
+      max-width: 150mm;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 18px;
+      margin: 0 auto;
+    }
+
+    .mockup-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .mockup-dot.r { background: #FF5F57; }
+    .mockup-dot.y { background: #FEBC2E; }
+    .mockup-dot.g { background: #28C840; }
+
+    .mockup-body {
+      background: var(--dark);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .mockup-header {
+      background: linear-gradient(90deg, var(--orange), var(--purple));
+      padding: 14px 18px;
+    }
+
+    .mockup-header h3 { color: white; font-size: 11pt; font-weight: 700; margin-bottom: 2px; }
+    .mockup-header p  { color: rgba(255,255,255,0.7); font-size: 8pt; }
+
+    .mockup-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: rgba(255,255,255,0.05);
+      padding: 12px;
+    }
+
+    .mockup-stat {
+      text-align: center;
+      padding: 8px;
+    }
+    .mockup-stat .val { font-size: 14pt; font-weight: 800; color: var(--orange); }
+    .mockup-stat .lbl { font-size: 7pt; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+    .mockup-orders {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mockup-order-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255,255,255,0.04);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 8pt;
+      color: rgba(255,255,255,0.75);
+    }
+
+    .mockup-order-row .badge {
+      background: rgba(255,107,53,0.2);
+      color: var(--orange2);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 7pt;
+      font-weight: 600;
+    }
+
+    .cover-footer {
+      margin-top: 10mm;
+      font-size: 8.5pt;
+      color: rgba(255,255,255,0.45);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE 2 — THE PROBLEM
+    ═══════════════════════════════════════════════════════════ */
+    .inner-page {
+      padding: 14mm 16mm;
+    }
+
+    .page-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--orange);
+      margin-bottom: 6mm;
+    }
+
+    .page-label::before {
+      content: '';
+      width: 24px; height: 3px;
+      background: var(--orange);
+      border-radius: 2px;
+    }
+
+    .section-title {
+      font-size: 24pt;
+      font-weight: 900;
+      color: var(--dark);
+      margin-bottom: 3mm;
+      line-height: 1.1;
+    }
+
+    .section-subtitle {
+      font-size: 11pt;
+      color: var(--text-muted);
+      margin-bottom: 8mm;
+      font-weight: 400;
+    }
+
+    /* Problem cards */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5mm;
+      margin-bottom: 8mm;
+    }
+
+    .problem-card {
+      background: #FFF5F2;
+      border: 1.5px solid #FFD3C4;
+      border-left: 4px solid #FF4444;
+      border-radius: 10px;
+      padding: 11px 13px;
+    }
+
+    .problem-card .icon { font-size: 16pt; margin-bottom: 4px; }
+    .problem-card h4 {
+      font-size: 10pt;
+      font-weight: 700;
+      color: #CC2200;
+      margin-bottom: 4px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .problem-card p {
+      font-size: 8.5pt;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .callout-box {
+      background: linear-gradient(135deg, var(--dark), var(--navy));
+      border-radius: 14px;
+      padding: 13px 16px;
+      color: white;
+      margin-top: 2mm;
+    }
+
+    .callout-box p {
+      font-size: 10pt;
+      line-height: 1.6;
+      color: rgba(255,255,255,0.85);
+    }
+
+    .callout-box strong { color: var(--orange2); }
+
+    .stat-highlight-row {
+      display: flex;
+      gap: 4mm;
+      margin-top: 5mm;
+    }
+
+    .stat-highlight {
+      flex: 1;
+      background: rgba(255,107,53,0.12);
+      border: 1px solid rgba(255,107,53,0.3);
+      border-radius: 10px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .stat-highlight .big { font-size: 20pt; font-weight: 900; color: var(--orange); }
+    .stat-highlight .desc { font-size: 8pt; color: rgba(255,255,255,0.65); margin-top: 2px; }
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE 3 — WHAT DINEDESK DOES
+    ═══════════════════════════════════════════════════════════ */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4.5mm;
+      margin-bottom: 8mm;
+    }
+
+    .feature-card {
+      background: var(--cream);
+      border: 1.5px solid #FFD8C4;
+      border-radius: 12px;
+      padding: 11px 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .feature-card .check-icon {
+      width: 28px; height: 28px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      color: white;
+      font-weight: 700;
+      box-shadow: 0 3px 10px rgba(255,107,53,0.3);
+    }
+
+    .feature-card .fc-body h4 {
+      font-size: 9.5pt;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 2px;
+    }
+
+    .feature-card .fc-body p {
+      font-size: 8pt;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .screenshots-box {
+      background: linear-gradient(135deg, var(--dark), var(--navy));
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: white;
+    }
+
+    .screenshots-box h3 {
+      font-size: 11pt;
+      color: var(--orange2);
+      margin-bottom: 10px;
+    }
+
+    .screenshots-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .screenshot-item {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+
+    .screenshot-item .si-icon { font-size: 22pt; margin-bottom: 6px; }
+    .screenshot-item .si-label { font-size: 8pt; color: rgba(255,255,255,0.7); font-weight: 500; }
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE 4 — REAL RESTAURANT JOURNEY
+    ═══════════════════════════════════════════════════════════ */
+    .journey-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 8mm;
+    }
+
+    .journey-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      position: relative;
+    }
+
+    .journey-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 18px;
+      top: 40px;
+      width: 2px;
+      height: 24px;
+      background: linear-gradient(to bottom, var(--orange), rgba(255,107,53,0.2));
+    }
+
+    .journey-step-num {
+      width: 36px; height: 36px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800;
+      font-size: 11pt;
+      color: white;
+      box-shadow: 0 4px 14px rgba(255,107,53,0.4);
+    }
+
+    .journey-step-body {
+      flex: 1;
+      padding-bottom: 14px;
+    }
+
+    .journey-step-body h4 {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 2px;
+    }
+
+    .journey-step-body p {
+      font-size: 8.5pt;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .journey-step-body .tag {
+      display: inline-block;
+      background: rgba(255,107,53,0.1);
+      border: 1px solid rgba(255,107,53,0.3);
+      border-radius: 4px;
+      padding: 1px 8px;
+      font-size: 7.5pt;
+      font-weight: 600;
+      color: var(--orange);
+      margin-top: 4px;
+    }
+
+    .no-middleman-box {
+      background: linear-gradient(135deg, var(--orange), var(--purple));
+      border-radius: 14px;
+      padding: 14px 18px;
+      text-align: center;
+      color: white;
+      margin-bottom: 5mm;
+    }
+
+    .no-middleman-box h3 {
+      font-size: 13pt;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+
+    .no-middleman-box p {
+      font-size: 9pt;
+      opacity: 0.85;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE 5 — WHY RESTAURANTS CHOOSE DINEDESK
+    ═══════════════════════════════════════════════════════════ */
+    .reason-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4mm;
+      margin-bottom: 7mm;
+    }
+
+    .reason-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--cream);
+      border: 1px solid #FFD8C4;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .reason-item .tick {
+      width: 22px; height: 22px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: white; font-weight: 900;
+    }
+
+    .reason-item .ri-body h5 {
+      font-size: 9.5pt;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 1px;
+    }
+
+    .reason-item .ri-body p {
+      font-size: 7.5pt;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .hiw-title {
+      font-size: 14pt;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 5mm;
+    }
+
+    .hiw-steps {
+      display: flex;
+      gap: 0;
+      align-items: flex-start;
+    }
+
+    .hiw-step {
+      flex: 1;
+      text-align: center;
+      position: relative;
+    }
+
+    .hiw-step:not(:last-child)::after {
+      content: '→';
+      position: absolute;
+      right: -10px;
+      top: 16px;
+      font-size: 14pt;
+      color: var(--orange);
+      font-weight: 700;
+    }
+
+    .hiw-step-num {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12pt; font-weight: 900; color: white;
+      margin: 0 auto 6px;
+      box-shadow: 0 4px 14px rgba(255,107,53,0.35);
+    }
+
+    .hiw-step h5 {
+      font-size: 9pt;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 3px;
+    }
+
+    .hiw-step p {
+      font-size: 7.5pt;
+      color: var(--text-muted);
+      line-height: 1.4;
+      padding: 0 4px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE 6 — BACK COVER
+    ═══════════════════════════════════════════════════════════ */
+    .back-cover {
+      background: linear-gradient(160deg, var(--dark) 0%, var(--navy) 60%, var(--purple) 100%);
+      padding: 16mm;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      min-height: 297mm;
+    }
+
+    .bc-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .bc-badge {
+      display: inline-block;
+      background: rgba(255,107,53,0.18);
+      border: 1px solid rgba(255,107,53,0.5);
+      border-radius: 50px;
+      padding: 5px 18px;
+      font-size: 9pt;
+      font-weight: 600;
+      color: var(--orange2);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6mm;
+    }
+
+    .bc-headline {
+      font-size: 28pt;
+      font-weight: 900;
+      margin-bottom: 3mm;
+      line-height: 1.1;
+    }
+
+    .bc-sub {
+      font-size: 11pt;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 9mm;
+      max-width: 130mm;
+      line-height: 1.6;
+    }
+
+    .bc-cta-btn {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      border-radius: 50px;
+      padding: 12px 32px;
+      font-size: 12pt;
+      font-weight: 800;
+      color: white;
+      text-decoration: none;
+      margin-bottom: 10mm;
+      box-shadow: 0 8px 28px rgba(255,107,53,0.45);
+    }
+
+    .bc-links {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10mm;
+    }
+
+    .bc-link {
+      font-size: 9.5pt;
+      color: rgba(255,255,255,0.75);
+    }
+
+    .bc-link strong { color: white; }
+
+    .bc-testimonial {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 14px 18px;
+      max-width: 140mm;
+      text-align: left;
+    }
+
+    .bc-testimonial p {
+      font-size: 10pt;
+      font-style: italic;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .bc-testimonial .attr {
+      font-size: 8.5pt;
+      color: var(--orange2);
+      font-weight: 600;
+    }
+
+    .bc-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 6mm;
+      font-size: 8pt;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .bc-footer-logo {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 13pt;
+      color: white;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1.5px solid #ECEAFF;
+      margin: 6mm 0;
+    }
+
+    .orange-divider {
+      border: none;
+      border-top: 3px solid var(--orange);
+      width: 40px;
+      margin: 0 0 5mm;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ PAGE 1: FRONT COVER ════════════════════ -->
+<div class="page cover">
+  <div class="cover-logo-row">
+    <img src="logo-icon.png" alt="DineDesk" style="width:52px;height:52px;border-radius:14px;box-shadow:0 6px 24px rgba(255,107,53,0.45);" onerror="this.style.display='none'" />
+    <span style="font-family:'Plus Jakarta Sans',sans-serif;font-size:30pt;font-weight:900;letter-spacing:-1px;">
+      <span style="color:#FFFFFF;">Dine</span><span style="background:linear-gradient(135deg,#FF6B35,#FF8C69);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Desk</span>
+    </span>
+  </div>
+
+  <div class="cover-tagline-badge">🇦🇺 Built for Australian Restaurants</div>
+
+  <h1 class="cover-headline">
+    <span style="font-size:13pt;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:3mm;font-family:Inter,sans-serif;text-transform:uppercase;letter-spacing:1.5px;">Restaurant Growth Kit</span>
+    Your Restaurant.<br>Online in 7 Days.
+    <span>Website • Online Ordering • Reservations • Loyalty Program</span>
+  </h1>
+
+  <div class="cover-pill-row">
+    <div class="cover-pill"><span class="dot"></span> 0% Commission</div>
+    <div class="cover-pill"><span class="dot"></span> Live in 7 Days</div>
+    <div class="cover-pill"><span class="dot"></span> No Lock-in Contract</div>
+    <div class="cover-pill"><span class="dot"></span> Local Support</div>
+  </div>
+
+  <!-- Mockup restaurant dashboard -->
+  <div class="cover-mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot r"></div>
+      <div class="mockup-dot y"></div>
+      <div class="mockup-dot g"></div>
+    </div>
+    <div class="mockup-body">
+      <div class="mockup-header">
+        <h3>The Harbour Kitchen — Dashboard</h3>
+        <p>Today, Thursday 26 Jun 2025</p>
+      </div>
+      <div class="mockup-stats">
+        <div class="mockup-stat"><div class="val">$2,840</div><div class="lbl">Today's Revenue</div></div>
+        <div class="mockup-stat"><div class="val">47</div><div class="lbl">Orders</div></div>
+        <div class="mockup-stat"><div class="val">$0</div><div class="lbl">Commission Paid</div></div>
+      </div>
+      <div class="mockup-orders">
+        <div class="mockup-order-row"><span>Table 4 — Wagyu Burger x2, Fries</span><span class="badge">Direct Order</span></div>
+        <div class="mockup-order-row"><span>Online — Chicken Parmigiana, Wine</span><span class="badge">0% Fee</span></div>
+        <div class="mockup-order-row"><span>Reservation — 7:30pm, 6 guests</span><span class="badge">Confirmed</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cover-footer" style="display:flex;align-items:center;gap:10px;justify-content:center;">
+    <span>dinedesk.com.au</span>
+    <span>|</span>
+    <span>dinedesk.support@gmail.com</span>
+    <span>|</span>
+    <span style="display:flex;align-items:center;gap:4px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+      @dine.desk
+    </span>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE 2: THE PROBLEM ════════════════════ -->
+<div class="page inner-page">
+  <div class="page-label">The Problem</div>
+  <h2 class="section-title">Most restaurants lose money<br>in ways they don't notice</h2>
+  <p class="section-subtitle">Every order through a delivery app chips away at your margin — silently.</p>
+
+  <div class="problem-grid">
+    <div class="problem-card">
+      <div class="icon">💸</div>
+      <h4>30–35% Commission Per Order</h4>
+      <p>UberEats and Menulog take nearly a third of every order — before you've paid rent, wages or ingredients.</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon">📞</div>
+      <h4>Missed Bookings After Hours</h4>
+      <p>No one answers the phone at 10pm. Customers book elsewhere — or don't book at all.</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon">🚫</div>
+      <h4>No Customer Database</h4>
+      <p>You don't know who ordered from you last week. Delivery apps own that data — not you.</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon">🔄</div>
+      <h4>No Loyalty System</h4>
+      <p>Regulars have no reason to choose you over the next restaurant. Every visit feels like the first.</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon">🌐</div>
+      <h4>Outdated Website</h4>
+      <p>Your website doesn't generate bookings or sales. It just sits there while customers go elsewhere.</p>
+    </div>
+    <div class="problem-card" style="background:#F0F8FF;border-color:#C4DEFF;border-left-color:#3399FF;">
+      <div class="icon">📊</div>
+      <h4 style="color:#003399;">No Visibility Into Performance</h4>
+      <p>No analytics, no order trends, no data to make smarter decisions about your menu or marketing.</p>
+    </div>
+  </div>
+
+  <div class="callout-box">
+    <p>You're paying to acquire the same customer again and again — and handing <strong>a third of every order</strong> to a delivery app that owns the relationship, the data, and the loyalty. <strong>There's a better way.</strong></p>
+    <div class="stat-highlight-row">
+      <div class="stat-highlight">
+        <div class="big">30%</div>
+        <div class="desc">Avg. UberEats commission</div>
+      </div>
+      <div class="stat-highlight">
+        <div class="big">$1,800</div>
+        <div class="desc">Lost on 5 orders/day (avg. $40)</div>
+      </div>
+      <div class="stat-highlight">
+        <div class="big">$0</div>
+        <div class="desc">Commission with DineDesk</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ PAGE 3: WHAT DINEDESK DOES ════════════ -->
+<div class="page inner-page">
+  <div class="page-label">The Solution</div>
+  <h2 class="section-title">One Platform.<br>Everything Included.</h2>
+  <p class="section-subtitle">Everything a modern restaurant needs to take control of its ordering, reservations, and customer relationships.</p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>Professional Restaurant Website</h4>
+        <p>Custom-designed, mobile-friendly, fast-loading — built to convert visitors into customers.</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>Direct Online Ordering — 0% Commission</h4>
+        <p>Every dollar of every order goes straight to you. No middlemen, no hidden fees.</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>Table Reservations</h4>
+        <p>24/7 online bookings — no phone calls, no missed reservations, even at 11pm.</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>QR Table Ordering</h4>
+        <p>Guests scan a QR code and order directly from their table. Faster service, bigger spend.</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>Loyalty Program</h4>
+        <p>Automatic points on every order. No app download required. Regulars have a reason to return.</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>Customer Database — You Own It</h4>
+        <p>Build your own customer list. Email, re-market, and grow — without paying for the same customer twice.</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>Analytics Dashboard</h4>
+        <p>Revenue, top dishes, busy periods, customer return rate — all in one clear view.</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="check-icon">✓</div>
+      <div class="fc-body">
+        <h4>POS Integration</h4>
+        <p>Connects with Square, Clover, Toast, Lightspeed and more — orders flow directly to your existing system.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="screenshots-box">
+    <h3>What you get — at a glance</h3>
+    <div class="screenshots-row">
+      <div class="screenshot-item">
+        <div class="si-icon">🌐</div>
+        <div class="si-label">Your Restaurant Website</div>
+      </div>
+      <div class="screenshot-item">
+        <div class="si-icon">📱</div>
+        <div class="si-label">Mobile Ordering & QR Menus</div>
+      </div>
+      <div class="screenshot-item">
+        <div class="si-icon">📊</div>
+        <div class="si-label">Analytics & Order Dashboard</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ PAGE 4: RESTAURANT JOURNEY ════════════ -->
+<div class="page inner-page">
+  <div class="page-label">The Customer Journey</div>
+  <h2 class="section-title">Real Restaurant Journey</h2>
+  <p class="section-subtitle">From stranger to regular — entirely on your platform, not someone else's.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-bottom:7mm;">
+    <div class="journey-flow">
+      <div class="journey-step">
+        <div class="journey-step-num">1</div>
+        <div class="journey-step-body">
+          <h4>Customer Discovers You</h4>
+          <p>Google search, social media, word of mouth — they land on your website, not a delivery app listing.</p>
+          <span class="tag">Your website. Your brand.</span>
+        </div>
+      </div>
+      <div class="journey-step">
+        <div class="journey-step-num">2</div>
+        <div class="journey-step-body">
+          <h4>Professional First Impression</h4>
+          <p>Fast, mobile-friendly, beautiful — your menu, story, and booking button front and centre.</p>
+          <span class="tag">Converts visitors into customers</span>
+        </div>
+      </div>
+      <div class="journey-step">
+        <div class="journey-step-num">3</div>
+        <div class="journey-step-body">
+          <h4>Orders Directly — No Commission</h4>
+          <p>Full order value goes straight to you. Zero platform cut. Zero middleman.</p>
+          <span class="tag">100% of every order</span>
+        </div>
+      </div>
+    </div>
+    <div class="journey-flow">
+      <div class="journey-step">
+        <div class="journey-step-num">4</div>
+        <div class="journey-step-body">
+          <h4>Earns Loyalty Points Automatically</h4>
+          <p>No app download needed. Points accumulate with every order — driving them back to you, not a competitor.</p>
+          <span class="tag">Your loyalty, your customers</span>
+        </div>
+      </div>
+      <div class="journey-step">
+        <div class="journey-step-num">5</div>
+        <div class="journey-step-body">
+          <h4>Books a Table Online — Even at 11pm</h4>
+          <p>Instant confirmations, no missed calls. Reservations accepted 24/7.</p>
+          <span class="tag">No missed reservations</span>
+        </div>
+      </div>
+      <div class="journey-step">
+        <div class="journey-step-num">6</div>
+        <div class="journey-step-body">
+          <h4>Returns Again and Again</h4>
+          <p>You have their details, order history, and preferences. They have a reason — and a reward — to come back.</p>
+          <span class="tag">You own the relationship</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="no-middleman-box">
+    <h3>No middleman. No commission. You own the customer relationship.</h3>
+    <p>Every interaction, every order, every reservation — on your platform, in your database, building your business.</p>
+  </div>
+</div>
+
+<!-- ════════════════════ PAGE 5: WHY DINEDESK ═════════════════ -->
+<div class="page inner-page">
+  <div class="page-label">Why DineDesk</div>
+  <h2 class="section-title">Built For Australian<br>Restaurants</h2>
+  <p class="section-subtitle">Everything restaurants actually need — without the complexity or lock-in.</p>
+
+  <div class="reason-list">
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>Live in 7 Days</h5>
+        <p>Website, ordering, reservations, and loyalty — all fully set up and launched within a week.</p>
+      </div>
+    </div>
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>No Technical Knowledge Required</h5>
+        <p>We build and configure everything. You just approve the design and go live.</p>
+      </div>
+    </div>
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>You Approve, We Launch</h5>
+        <p>Full control over your site and menu. Zero stress, zero guesswork.</p>
+      </div>
+    </div>
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>Cancel Anytime</h5>
+        <p>No lock-in contracts. No penalty. If it's not working for you, you walk away — simple.</p>
+      </div>
+    </div>
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>Australian Payment Gateways</h5>
+        <p>Stripe & Square, GST-compliant invoicing — built for how Australian businesses operate.</p>
+      </div>
+    </div>
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>Local Support</h5>
+        <p>Phone & email support during Australian business hours (AEST) — real people, not bots.</p>
+      </div>
+    </div>
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>POS Integration</h5>
+        <p>Square, Clover, Toast, Lightspeed & more — orders flow directly into your existing system.</p>
+      </div>
+    </div>
+    <div class="reason-item">
+      <div class="tick">✓</div>
+      <div class="ri-body">
+        <h5>Price Never Changes With Volume</h5>
+        <p>Flat monthly fee — 10 orders or 1,000, you pay exactly the same. No surprises.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <p class="hiw-title">How It Works</p>
+  <div class="hiw-steps">
+    <div class="hiw-step">
+      <div class="hiw-step-num">1</div>
+      <h5>Book a Free Demo</h5>
+      <p>We show you your restaurant online within 24 hours. No cost, no obligation.</p>
+    </div>
+    <div class="hiw-step">
+      <div class="hiw-step-num">2</div>
+      <h5>You Approve the Design</h5>
+      <p>We handle all setup — website, menu, reservations, loyalty, everything.</p>
+    </div>
+    <div class="hiw-step">
+      <div class="hiw-step-num">3</div>
+      <h5>Go Live in 7 Days</h5>
+      <p>Start taking direct orders immediately — commission-free from day one.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE 6: BACK COVER ════════════════════ -->
+<div class="page back-cover">
+  <div class="bc-main">
+    <div class="bc-badge">🎯 Free Demo — No Commitment</div>
+
+    <h2 class="bc-headline">Ready to see your<br>restaurant online?</h2>
+
+    <p class="bc-sub">Book a free 20-minute demo — no commitment, no technical knowledge needed. We'll show you exactly how your restaurant could look online within 24 hours.</p>
+
+    <a class="bc-cta-btn" href="https://dinedesk.com.au/contact">👉 Book Your Free Demo</a>
+
+    <div class="bc-testimonial">
+      <p>"Before DineDesk we had no online ordering at all. They set up our whole site, customers can now skip the queue and order ahead — it saves us so much time at the counter and our staff can focus on making the food."</p>
+      <div class="attr">— Pratik Patel, Owner &nbsp;·&nbsp; Captain Cons Fish &amp; Chips, Pakenham</div>
+    </div>
+
+    <div class="bc-links">
+      <div class="bc-link" style="display:flex;align-items:center;gap:7px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <strong>dinedesk.com.au</strong>
+      </div>
+      <div class="bc-link" style="display:flex;align-items:center;gap:7px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <strong>dinedesk.support@gmail.com</strong>
+      </div>
+      <div class="bc-link" style="display:flex;align-items:center;gap:7px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        <strong>@dine.desk</strong>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="bc-footer">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <img src="logo-icon.png" alt="" style="width:22px;height:22px;border-radius:5px;" onerror="this.style.display='none'" />
+      <span style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13pt;font-weight:900;">
+        <span style="color:white;">Dine</span><span style="background:linear-gradient(135deg,#FF6B35,#FF8C69);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Desk</span>
+      </span>
+    </div>
+    <div>© 2026 DineDesk. All rights reserved.</div>
+    <div>dinedesk.com.au</div>
+  </div>
+</div>
+
+</body>
+</html>
