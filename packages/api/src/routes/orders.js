@@ -7,6 +7,9 @@ const OrderRouter = require('../pos-adapters')
 const { enqueueOrderPush } = require('../jobs/orderPushWorker')
 const router = express.Router({ mergeParams: true })
 
+// Lazy-load io to avoid circular dependency at module init time
+const getIO = () => { try { return require('../index').io } catch { return null } }
+
 const getClientId = (req) => req.params.clientId || req.params.id
 
 // Helper to generate next order number for a client+location combo
@@ -312,6 +315,10 @@ router.post('/', async (req, res) => {
       if (table) tableData = table
     }
 
+    // Broadcast new order to all CMS tabs open for this client
+    const io = getIO()
+    if (io) io.to(`client-${clientId}`).emit('order:new', { ...order, tableNumber: tableData?.tableNumber || null })
+
     // If Stripe payment, return order + table info so frontend can proceed to payment
     if (paymentMethod === 'stripe') {
       return res.json({
@@ -371,6 +378,12 @@ router.patch('/:orderId/status', authenticateToken, async (req, res) => {
       where: { id: req.params.orderId },
       data: updateData
     })
+
+    // Broadcast status change so all open CMS tabs update instantly
+    const clientId = getClientId(req)
+    const io = getIO()
+    if (io) io.to(`client-${clientId}`).emit('order:updated', order)
+
     res.json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })

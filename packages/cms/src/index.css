@@ -50,15 +50,12 @@
   }
 }
 
-html {
-  height: 100%;
-  height: 100dvh;
-}
-
+html,
 body {
   margin: 0;
+  padding: 0;
+  width: 100%;
   height: 100%;
-  overflow: hidden;
 }
 
 #root {
@@ -67,12 +64,16 @@ body {
   margin: 0;
   text-align: left;
   border-inline: none;
-  height: 100%;
+  /* iOS Safari: fill-available prevents white bar from browser chrome */
+  height: 100vh;
+  height: -webkit-fill-available;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
+  /* Respect safe area on iPads with home bar */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 #root > * {

@@ -162,7 +162,7 @@ function SAShell({ user, onLogout }) {
   ]
 
   return (
-    <div style={{ height:'100%', minHeight:'100dvh', background:C.page,
+    <div style={{ height:'100%', background:C.page,
       fontFamily:"'DM Sans',system-ui,sans-serif",
       display:'flex', flexDirection:'column', color:C.t0, overflow:'hidden' }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800;900&display=swap" rel="stylesheet"/>

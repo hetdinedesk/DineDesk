@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { getOrders } from '../api/orders'
+import { useSocket } from '../hooks/useSocket'
 
 const OrderContext = createContext()
 
@@ -8,10 +9,8 @@ export function OrderProvider({ clientId, children }) {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Fetch orders periodically
   const fetchOrders = async () => {
     if (!clientId) return
-    
     setIsLoading(true)
     try {
       const allOrders = await getOrders(clientId, null)
@@ -24,18 +23,26 @@ export function OrderProvider({ clientId, children }) {
     }
   }
 
-  // Initial fetch and periodic updates
+  // Initial fetch only — WebSocket handles subsequent updates
   useEffect(() => {
     if (!clientId) return
-
-    // Initial fetch
     fetchOrders()
-
-    // Set up polling every 15 seconds for background updates
-    const interval = setInterval(fetchOrders, 15000)
-
-    return () => clearInterval(interval)
   }, [clientId])
+
+  // Real-time order updates via WebSocket (replaces 15s polling)
+  useSocket(clientId, {
+    onNewOrder: (order) => {
+      setOrders(prev => {
+        if (prev.find(o => o.id === order.id)) return prev
+        return [order, ...prev]
+      })
+      setLastUpdated(new Date())
+    },
+    onOrderUpdated: (order) => {
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...order } : o))
+      setLastUpdated(new Date())
+    }
+  })
 
   // Helper functions to get filtered orders
   const getOrdersByStatus = (status) => {

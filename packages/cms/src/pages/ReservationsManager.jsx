@@ -29,7 +29,7 @@ export default function ReservationsManager({ clientId, selectedLocation, client
     queryKey: ['tables', clientId, selectedLocation],
     queryFn: () => getTables(clientId, selectedLocation),
     enabled: !!selectedLocation,
-    refetchInterval: 10000
+    refetchInterval: 60000
   })
 
   // Fetch bookings
@@ -39,7 +39,7 @@ export default function ReservationsManager({ clientId, selectedLocation, client
       data.filter(b => !selectedLocation || b.locationId === selectedLocation)
     ),
     enabled: !!selectedLocation,
-    refetchInterval: 30000
+    refetchInterval: 60000
   })
 
   // Update booking status mutation

@@ -380,12 +380,11 @@ router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
 
-    // TEMPORARILY DISABLED CACHE TO DEBUG SIZES/ADDONS ISSUE
-    // Check cache first
-    // const cached = getCachedExport(id)
-    // if (cached) {
-    //   return res.json(cached)
-    // }
+    // Check cache first (60s TTL — cleared on any CMS save)
+    const cached = getCachedExport(id)
+    if (cached) {
+      return res.json(cached)
+    }
 
     const [client, menuCategories, menuItems, specials, pages, banners, footerSections, unassignedFooterLinks, cfg, navigationItems, homeSections, promoTiles, promoConfig, featuredConfig, welcomeContent, teamDepartments, specialsConfig, homepageLayout, customTextBlocks, paymentGateway, legalDocs, loyaltyConfig] = await Promise.all([
       prisma.client.findUnique({

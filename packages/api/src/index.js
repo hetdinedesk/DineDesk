@@ -3,11 +3,39 @@ process.on('unhandledRejection', (err) => { console.error('UNHANDLED REJECTION:'
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') })
 const express = require('express')
 const cors = require('cors')
+const compression = require('compression')
+const http = require('http')
+const { Server: SocketIOServer } = require('socket.io')
 const path = require('path')
 const { prisma } = require('./lib/prisma')
 
 const app = express()
+const httpServer = http.createServer(app)
 const PORT = process.env.PORT || 3001
+
+// ── Socket.io setup ─────────────────────────────────────────────
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: process.env.NODE_ENV === 'production'
+      ? (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()) : /\.netlify\.app$/)
+      : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
+})
+
+io.on('connection', (socket) => {
+  // Client joins a room scoped to their clientId
+  socket.on('join-client', (clientId) => {
+    socket.join(`client-${clientId}`)
+  })
+  socket.on('leave-client', (clientId) => {
+    socket.leave(`client-${clientId}`)
+  })
+})
+
+// Export io so routes can broadcast events
+module.exports.io = io
 
 // Trust proxy only in production (Railway deployment)
 // Required for rate limiting behind proxy, but not needed in local development
@@ -54,6 +82,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
+app.use(compression())
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
@@ -120,9 +149,10 @@ async function startServer() {
     process.exit(1)
   }
 
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`🚀 API Server running on http://localhost:${PORT}`)
     console.log(`📱 Health: http://localhost:${PORT}/health`)
+    console.log(`🔌 WebSocket ready on ws://localhost:${PORT}`)
   })
 }
 

@@ -323,7 +323,7 @@ function adaptCMSData(data) {
       carouselHeading: reviews.carouselHeading || 'Customer Reviews',
       carouselSubHeading: reviews.carouselSubHeading || 'What our customers are saying',
       carouselContent: reviews.carouselContent || '',
-      showReviewsCarousel: reviews.showReviewsCarousel === true || (reviews.reviews && reviews.reviews.length > 0) || (reviews.googleReviews && reviews.googleReviews.length > 0),
+      showReviewsCarousel: reviews.showReviewsCarousel === true || reviews.showReviewsCarousel !== false && ((reviews.reviews && reviews.reviews.length > 0) || (reviews.googleReviews && reviews.googleReviews.length > 0)),
       alternateStyles: reviews.alternateStyles === true
     }
   };

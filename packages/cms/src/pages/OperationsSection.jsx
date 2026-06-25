@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSocket } from '../hooks/useSocket'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { ShoppingCart, Bell, MapPin, Power, Clock, User, Phone, DollarSign, X, Check, ChefHat, Package, CheckCircle, XCircle, Table, Calendar, RotateCcw } from 'lucide-react'
 import { getOrders, updateOrderStatus } from '../api/orders'
@@ -120,16 +121,39 @@ export default function OperationsSection({ clientId, user: userProp }) {
     }
   }, [locations])
 
-  // Fetch live orders (new, accepted, preparing, ready)
+  // Fetch live orders (initial load only — WebSocket handles live updates)
   const { data: liveOrders = [], isLoading: liveLoading } = useQuery({
     queryKey: ['orders', clientId, selectedLocation, 'live'],
     queryFn: () => getOrders(clientId, null, selectedLocation).then(orders =>
       orders.filter(o => ['new', 'accepted', 'preparing', 'ready'].includes(o.status))
     ),
-    refetchInterval: 5000, // Poll every 5 seconds for faster updates
+    refetchInterval: false, // Replaced by WebSocket
     enabled: !!selectedLocation,
-    staleTime: 10 * 1000, // 10 seconds for live orders
-    gcTime: 5 * 60 * 1000 // Keep for 5 minutes
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000
+  })
+
+  // Real-time order updates via WebSocket — updates query cache directly
+  useSocket(clientId, {
+    onNewOrder: (order) => {
+      if (selectedLocation && order.locationId !== selectedLocation) return
+      if (!['new', 'accepted', 'preparing', 'ready'].includes(order.status)) return
+      queryClient.setQueryData(['orders', clientId, selectedLocation, 'live'], (prev = []) => {
+        if (prev.find(o => o.id === order.id)) return prev
+        return [order, ...prev]
+      })
+    },
+    onOrderUpdated: (order) => {
+      queryClient.setQueryData(['orders', clientId, selectedLocation, 'live'], (prev = []) =>
+        ['new', 'accepted', 'preparing', 'ready'].includes(order.status)
+          ? prev.map(o => o.id === order.id ? { ...o, ...order } : o)
+          : prev.filter(o => o.id !== order.id) // remove completed/cancelled from live
+      )
+      // Also refresh history if completed/cancelled
+      if (['completed', 'cancelled'].includes(order.status)) {
+        queryClient.invalidateQueries(['orders', clientId, selectedLocation, 'history'])
+      }
+    }
   })
 
   // Check for new orders and play notification sound
@@ -341,7 +365,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
       data.filter(b => !selectedLocation || b.locationId === selectedLocation)
     ),
     enabled: !!selectedLocation,
-    refetchInterval: 30000, // Poll every 30 seconds
+    refetchInterval: 60000, // Poll every 60 seconds (bookings change rarely)
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000
   })
@@ -2655,7 +2679,7 @@ function TablesTab({ clientId, selectedLocation, bookings, queryClient }) {
     queryKey: ['tables', clientId, selectedLocation],
     queryFn: () => getTables(clientId, selectedLocation),
     enabled: !!selectedLocation,
-    refetchInterval: 10000
+    refetchInterval: 60000 // Poll every 60 seconds (tables change rarely)
   })
 
   const updateBookingMutation = useMutation({
