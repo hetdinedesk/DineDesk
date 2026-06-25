@@ -41,20 +41,20 @@ export const FloatingReviewWidget = () => {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg border border-gray-200 p-3 flex items-center space-x-2 hover:shadow-xl transition-shadow duration-300">
+    <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg border border-gray-200 p-2 flex items-center space-x-1.5 hover:shadow-xl transition-shadow duration-300 relative max-w-fit">
       {/* Google Icon */}
-      <Google size={20} className="text-blue-600" />
+      <Google size={18} className="text-blue-600 flex-shrink-0" />
       
       {/* Rating */}
-      <div className="flex items-center space-x-1">
-        <span className="font-bold text-sm text-gray-900">
+      <div className="flex items-center space-x-0.5">
+        <span className="font-bold text-xs text-gray-900">
           {rating.toFixed(1)}
         </span>
         <div className="flex items-center">
           {[...Array(5)].map((_, i) => (
             <Star
               key={i}
-              size={12}
+              size={10}
               className={i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}
             />
           ))}
@@ -69,10 +69,10 @@ export const FloatingReviewWidget = () => {
       {/* Close Button */}
       <button
         onClick={(e) => { e.stopPropagation(); handleClose(); }}
-        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors relative z-10"
+        className="ml-1 text-gray-400 hover:text-gray-600 transition-colors relative z-10 flex-shrink-0"
         aria-label="Close review widget"
       >
-        <X size={14} />
+        <X size={12} />
       </button>
       
       {/* Review Link */}

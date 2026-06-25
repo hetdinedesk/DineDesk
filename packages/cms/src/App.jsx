@@ -434,7 +434,7 @@ function MainApp() {
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:C.page,
+    <div style={{ height:'100%', background:C.page,
       fontFamily:"'DM Sans',system-ui,sans-serif", color:C.t0,
       display:'flex', flexDirection:'column', width:'100%', overflow:'hidden' }}>
 

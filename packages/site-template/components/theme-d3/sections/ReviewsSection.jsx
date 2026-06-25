@@ -22,8 +22,9 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
   // Reviews are in siteConfig.reviews.googleReviews or siteConfig.reviews.reviews
   const googleReviews = reviewsConfig?.googleReviews || [];
   const hasReviews = reviews.length > 0 || googleReviews.length > 0;
-  // Check both the section content flag AND the siteConfig reviews setting
-  const showReviewsCarousel = (content?.showGoogleReviews !== false || reviewsConfig?.showReviewsCarousel !== false) && hasValidPlaceId && hasReviews;
+  // Show carousel if: enabled in CMS AND has reviews (placeId only required if no other reviews exist)
+  const isCarouselEnabled = content?.showGoogleReviews !== false && reviewsConfig?.showReviewsCarousel !== false;
+  const showReviewsCarousel = isCarouselEnabled && hasReviews && (hasValidPlaceId || reviews.length > 0 || googleReviews.length > 0);
   // Use site config CTA first, then fallback to section content CTA
   const ctaConfig = reviewsConfig?.ctas?.[0] || content?.cta || null;
 

@@ -411,7 +411,17 @@ export default function HomepageBuilder({ clientId }) {
           block={activeBlock?.id ? activeBlock : null}
           clientId={clientId}
           onClose={() => setActiveBlock(null)}
-          onSaved={() => setActiveBlock(null)}
+          onSaved={(saved) => {
+            // If this was a new block (not an edit), add it to the layout components
+            const isEdit = !!(activeBlock?.id)
+            if (!isEdit && saved?.id) {
+              const newComponent = { id: saved.id, type: 'custom', visible: true, order: components.length }
+              const newComponents = [...components, newComponent]
+              newComponents.forEach((c, i) => c.order = i)
+              mUpdateLayout.mutate({ components: newComponents })
+            }
+            setActiveBlock(null)
+          }}
         />
       ) : (
         <button

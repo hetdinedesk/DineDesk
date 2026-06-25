@@ -323,14 +323,14 @@ function adaptCMSData(data) {
       carouselHeading: reviews.carouselHeading || 'Customer Reviews',
       carouselSubHeading: reviews.carouselSubHeading || 'What our customers are saying',
       carouselContent: reviews.carouselContent || '',
-      showReviewsCarousel: reviews.showReviewsCarousel === true || (reviews.reviews && reviews.reviews.length > 0),
+      showReviewsCarousel: reviews.showReviewsCarousel === true || (reviews.reviews && reviews.reviews.length > 0) || (reviews.googleReviews && reviews.googleReviews.length > 0),
       alternateStyles: reviews.alternateStyles === true
     }
   };
 
   // Map reviews - handle both Google API reviews and manual reviews
   const googleReviews = reviews.googleReviews || [];
-  const mappedReviews = (reviews.reviews || []).map((r, i) => ({
+  const mappedManualReviews = (reviews.reviews || []).map((r, i) => ({
     id: r.id || `rev-${i}`,
     author: r.name || r.author || 'Guest',
     rating: r.stars || r.rating || 5,
@@ -339,6 +339,16 @@ function adaptCMSData(data) {
     platform: r.platform || 'Google',
     isActive: r.isActive !== false,
   }));
+  const mappedGoogleReviews = googleReviews.map((r, i) => ({
+    id: r.id || `google-${i}`,
+    author: r.name || r.author || 'Google User',
+    rating: r.stars || r.rating || 5,
+    content: r.text || r.content || '',
+    date: r.date || new Date().toISOString(),
+    platform: 'Google',
+    isActive: true,
+  }));
+  const mappedReviews = [...mappedManualReviews, ...mappedGoogleReviews];
 
   // Add Google reviews to siteConfig
   siteConfig.googleReviews = {
