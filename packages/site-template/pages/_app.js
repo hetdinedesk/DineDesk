@@ -2,6 +2,7 @@ import Head from 'next/head'
 import { buildThemeCSS } from '../lib/theme'
 import { CartProvider } from '../contexts/CartContext'
 import { WishlistProvider } from '../contexts/WishlistContext'
+import { CMSProvider } from '../contexts/CMSContext'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import '../styles/theme-d1/index.css'
@@ -215,19 +216,21 @@ export default function App({ Component, pageProps }) {
       {css && <style dangerouslySetInnerHTML={{ __html: css }}/>}
 
       <ErrorBoundary>
-        <CartProvider ordering={data.ordering} siteId={data.id} query={router.query}>
-          <WishlistProvider>
-            <ThemeLoader themeKey={themeKey}>
-              {(CartDrawer, FloatingCartIcon) => (
-                <>
-                  <Component {...pageProps}/>
-                  {CartDrawer && <CartDrawer />}
-                  {FloatingCartIcon && showFloatingCart && <FloatingCartIcon />}
-                </>
-              )}
-            </ThemeLoader>
-          </WishlistProvider>
-        </CartProvider>
+        <CMSProvider data={data}>
+          <CartProvider ordering={data.ordering} siteId={data.id} query={router.query}>
+            <WishlistProvider>
+              <ThemeLoader themeKey={themeKey}>
+                {(CartDrawer, FloatingCartIcon) => (
+                  <>
+                    <Component {...pageProps}/>
+                    {CartDrawer && <CartDrawer />}
+                    {FloatingCartIcon && showFloatingCart && <FloatingCartIcon />}
+                  </>
+                )}
+              </ThemeLoader>
+            </WishlistProvider>
+          </CartProvider>
+        </CMSProvider>
       </ErrorBoundary>
     </>
   )
