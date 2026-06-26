@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, X, Plus, Minus, Trash2, MapPin, Clock, Sparkles } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, Trash, MapPin, Clock, Sparkles } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useCMS } from '../../contexts/CMSContext';
 import { formatTableDisplay } from '../../lib/tableDetection';
@@ -17,7 +17,7 @@ function useAlsoOrderedWith(clientId, cartItemIds) {
       .then(r => r.ok ? r.json() : [])
       .then(data => setSuggestions(Array.isArray(data) ? data : []))
       .catch(() => setSuggestions([]))
-  }, [clientId, cartItemIds.join(',')])
+  }, [clientId, cartItemIds])
   return suggestions
 }
 
@@ -172,7 +172,7 @@ export default function CartDrawer() {
                             <Plus className="w-3 h-3" />
                           </button>
                           <button onClick={() => removeItem(item._cartKey || item.id)} className="ml-auto p-1 hover:bg-red-50 text-red-400 hover:text-red-500 rounded transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>

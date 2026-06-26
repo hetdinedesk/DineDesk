@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Sparkles } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, Trash, ArrowRight, Sparkles } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useCMS } from '../../contexts/CMSContext';
 
@@ -16,7 +16,7 @@ function useAlsoOrderedWith(clientId, cartItemIds) {
       .then(r => r.ok ? r.json() : [])
       .then(data => setSuggestions(Array.isArray(data) ? data : []))
       .catch(() => setSuggestions([]))
-  }, [clientId, cartItemIds.join(',')])
+  }, [clientId, cartItemIds])
   return suggestions
 }
 
@@ -156,7 +156,7 @@ export default function CartDrawer() {
                               className="ml-auto w-10 h-10 rounded-full bg-[var(--color-secondary)]/5 text-[var(--color-secondary)]/40 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors"
                               aria-label="Remove item"
                             >
-                              <Trash2 width={16} height={16} strokeWidth={2} />
+                              <Trash width={16} height={16} strokeWidth={2} />
                             </button>
                           </div>
                         </div>
