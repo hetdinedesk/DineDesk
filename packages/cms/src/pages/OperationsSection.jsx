@@ -1040,11 +1040,48 @@ export default function OperationsSection({ clientId, user: userProp }) {
                 </div>
               ) : (
                 <>
+                  {/* Regular Pipeline Columns - only show if there are visible live orders */}
+                  {visibleLive.length > 0 || completedToday.length > 0 ? (
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
+                      <PipelineColumn stage="new" icon={<Bell size={14} color="#BA7517" />} label="New" orders={regularNew} scheduledOrders={scheduledAccepted} emptyText="No new orders" />
+                      <PipelineColumn stage="preparing" icon={<ChefHat size={14} color="#185FA5" />} label="Preparing" orders={inProgressOrders} emptyText="Nothing preparing" cardProps={{ actionLabel: 'Mark ready', actionColor: '#3B6D11', nextStatus: 'ready' }} />
+                      <PipelineColumn stage="ready" icon={<CheckCircle size={14} color="#3B6D11" />} label="Ready" orders={readyOrders} emptyText="Nothing ready yet" cardProps={{ actionLabel: 'Collected ✓', actionColor: '#3B6D11', nextStatus: 'completed' }} />
+                    </div>
+                  ) : null}
+
+                  {/* Completed Today */}
+                  {completedToday.length > 0 && (
+                    <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+                      <div style={{ padding: '10px 16px', background: C.page, borderBottom: `0.5px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>Completed today</span>
+                        <span style={{ fontSize: 12, color: C.t2 }}>${todayRevenue.toFixed(2)} revenue</span>
+                      </div>
+                      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                        {completedToday.slice(0, 20).map((o, i) => (
+                          <div key={o.id} onClick={() => setSelectedOrder(o)} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '10px 16px', borderBottom: `0.5px solid ${C.border}40`, cursor: 'pointer'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span style={{ fontSize: 12, color: C.t2 }}>#{o.orderNumber}</span>
+                              <span style={{ fontSize: 13, color: C.t0 }}>{o.customerName}</span>
+                              <span style={{ fontSize: 12, color: C.t3 }}>{o.items?.map(it => `${it.quantity}x ${it.name}`).join(', ')}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>${(o.total || 0).toFixed(2)}</span>
+                              <span style={{ fontSize: 11, color: C.t3 }}>{new Date(o.createdAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Future Scheduled Orders - show even if no live orders today */}
                   {(() => {
                     return futureScheduled.length > 0
                   })() && (
-                    <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+                    <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
                       <div style={{ padding: '10px 16px', background: C.page, borderBottom: `0.5px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 13, fontWeight: 500, color: C.t0, display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Calendar size={14} color="#8B5CF6" />
@@ -1081,43 +1118,6 @@ export default function OperationsSection({ clientId, user: userProp }) {
                             </div>
                           )
                         })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Regular Pipeline Columns - only show if there are visible live orders */}
-                  {visibleLive.length > 0 || completedToday.length > 0 ? (
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
-                      <PipelineColumn stage="new" icon={<Bell size={14} color="#BA7517" />} label="New" orders={regularNew} scheduledOrders={scheduledAccepted} emptyText="No new orders" />
-                      <PipelineColumn stage="preparing" icon={<ChefHat size={14} color="#185FA5" />} label="Preparing" orders={inProgressOrders} emptyText="Nothing preparing" cardProps={{ actionLabel: 'Mark ready', actionColor: '#3B6D11', nextStatus: 'ready' }} />
-                      <PipelineColumn stage="ready" icon={<CheckCircle size={14} color="#3B6D11" />} label="Ready" orders={readyOrders} emptyText="Nothing ready yet" cardProps={{ actionLabel: 'Collected ✓', actionColor: '#3B6D11', nextStatus: 'completed' }} />
-                    </div>
-                  ) : null}
-
-                  {/* Completed Today */}
-                  {completedToday.length > 0 && (
-                    <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-                      <div style={{ padding: '10px 16px', background: C.page, borderBottom: `0.5px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>Completed today</span>
-                        <span style={{ fontSize: 12, color: C.t2 }}>${todayRevenue.toFixed(2)} revenue</span>
-                      </div>
-                      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                        {completedToday.slice(0, 20).map((o, i) => (
-                          <div key={o.id} onClick={() => setSelectedOrder(o)} style={{
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            padding: '10px 16px', borderBottom: `0.5px solid ${C.border}40`, cursor: 'pointer'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <span style={{ fontSize: 12, color: C.t2 }}>#{o.orderNumber}</span>
-                              <span style={{ fontSize: 13, color: C.t0 }}>{o.customerName}</span>
-                              <span style={{ fontSize: 12, color: C.t3 }}>{o.items?.map(it => `${it.quantity}x ${it.name}`).join(', ')}</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>${(o.total || 0).toFixed(2)}</span>
-                              <span style={{ fontSize: 11, color: C.t3 }}>{new Date(o.createdAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                          </div>
-                        ))}
                       </div>
                     </div>
                   )}
