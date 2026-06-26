@@ -187,7 +187,7 @@ export default function MenuPage({ data, page, banner }) {
             >
               All
             </button>
-            {activeCategories.map((category) => (
+            {categoriesWithItems.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
@@ -207,7 +207,7 @@ export default function MenuPage({ data, page, banner }) {
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--color-secondary)]/20" width={16} height={16} />
             <input
               type="text"
-              placeholder="FIND IN THE GARDEN..."
+              placeholder="SEARCH MENU..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[var(--color-secondary)]/5 border border-transparent rounded-full px-14 py-4 text-[10px] font-sans font-bold tracking-widest text-[var(--color-secondary)] focus:outline-none focus:bg-white focus:border-[var(--color-primary)]/20 transition-all duration-500"

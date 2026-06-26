@@ -70,6 +70,17 @@ export default function App({ Component, pageProps }) {
   const currentPath = router.asPath?.split('?')[0] || '/'
   const canonicalUrl = siteUrl ? `${siteUrl}${currentPath === '/' ? '' : currentPath}` : ''
 
+  // Scroll to top on route change
+  useEffect(() => {
+    const handleRouteChange = () => {
+      window.scrollTo(0, 0)
+    }
+    router.events.on('routeChangeComplete', handleRouteChange)
+    return () => {
+      router.events.off('routeChangeComplete', handleRouteChange)
+    }
+  }, [router])
+
   // Build JSON-LD structured data
   const jsonLd = siteUrl ? {
     '@context': 'https://schema.org',

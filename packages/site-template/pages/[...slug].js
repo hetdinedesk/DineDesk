@@ -166,58 +166,58 @@ export default function DynamicPage({ data, slug, template }) {
   // Hardcoded page types ALWAYS use their own templates (toggles don't affect them)
   if (isMenu) {
     return (
-      <CMSProvider data={data}>
+      <>
         {headTags}
         <Suspense fallback={<div>Loading...</div>}>
           <DynamicTemplateLoader themeKey={template} templateName="MenuTemplate" data={data} page={effectivePage} banner={banner} />
         </Suspense>
-      </CMSProvider>
+      </>
     )
   }
 
   if (isSpecials) {
     return (
-      <CMSProvider data={data}>
+      <>
         {headTags}
         <Suspense fallback={<div>Loading...</div>}>
           <DynamicTemplateLoader themeKey={template} templateName="SpecialsTemplate" data={data} page={effectivePage} banner={banner} />
         </Suspense>
-      </CMSProvider>
+      </>
     )
   }
 
   if (isTeam) {
     return (
-      <CMSProvider data={data}>
+      <>
         {headTags}
         <Suspense fallback={<div>Loading...</div>}>
           <DynamicTemplateLoader themeKey={template} templateName="TeamTemplate" data={data} page={effectivePage} banner={banner} />
         </Suspense>
-      </CMSProvider>
+      </>
     )
   }
 
   if (isLocations) {
     return (
-      <CMSProvider data={data}>
+      <>
         {headTags}
         <Suspense fallback={<div>Loading...</div>}>
           <DynamicTemplateLoader themeKey={template} templateName="LocationsTemplate" data={data} page={effectivePage} banner={banner} />
         </Suspense>
-      </CMSProvider>
+      </>
     )
   }
 
   if (!page) {
     return (
-      <CMSProvider data={data}>
+      <>
         <Head>
           <title>{siteName ? `${siteName} — Not Found` : 'Not Found'}</title>
         </Head>
         <Suspense fallback={<div>Loading...</div>}>
           <DynamicTemplateLoader themeKey={template} templateName="MenuTemplate" data={data} page={page} banner={banner} />
         </Suspense>
-      </CMSProvider>
+      </>
     )
   }
 
@@ -227,12 +227,12 @@ export default function DynamicPage({ data, slug, template }) {
 
   if (!isHardcoded && (showEnquiryForm || showLocationMap)) {
     return (
-      <CMSProvider data={data}>
+      <>
         {headTags}
         <Suspense fallback={<div>Loading...</div>}>
           <DynamicTemplateLoader themeKey={template} templateName="CustomTemplate" data={data} page={effectivePage} banner={banner} />
         </Suspense>
-      </CMSProvider>
+      </>
     )
   }
 
@@ -240,12 +240,12 @@ export default function DynamicPage({ data, slug, template }) {
   const bannerImg = banner?.imageUrl || effectivePage?.ogImage || null
 
   return (
-    <CMSProvider data={data}>
+    <>
       {headTags}
       <Suspense fallback={<div>Loading...</div>}>
         <DynamicTemplateLoader themeKey={template} templateName="CustomTemplate" data={data} page={effectivePage} banner={banner} />
       </Suspense>
-    </CMSProvider>
+    </>
   )
 }
 

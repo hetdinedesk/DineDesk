@@ -851,7 +851,7 @@ const btnSmDanger = { ...btnDanger, padding: '4px 10px', fontSize: 11 }
 function BannersPanel ({ clientId, data, qc }) {
   const [modal, setModal] = useState(null)
   const [delId, setDelId] = useState(null)
-  const banners = (data?.banners || []).filter(b => b.location === 'pages' || !b.location)
+  const banners = (data?.banners || []).filter(b => b.location === 'pages' || b.location === 'both' || !b.location)
 
   const mCreate = useMutation({
     mutationFn: (body) => createBanner(clientId, body),
@@ -1502,7 +1502,7 @@ function PagesListPanel ({ clientId, data, qc }) {
   })
 
   // Filter for navigation banners only
-  const navBanners = allBanners.filter(b => b.location === 'pages' || b.location === 'both')
+  const navBanners = allBanners.filter(b => b.location === 'pages' || b.location === 'both' || !b.location)
 
   const [modal, setModal] = useState(null)
   const [saving, setSaving] = useState(false)
