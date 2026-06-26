@@ -122,9 +122,9 @@ setInterval(async () => {
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/users', require('./routes/users'))
 app.use('/api/clients/:clientId/connect', require('./routes/stripeConnect')) // Stripe Connect onboarding (must be before generic /api/clients)
-app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories (must be before clients for public suggestions endpoint)
-app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings (must be before clients for public availability endpoint)
 app.use('/api/clients', require('./routes/clients'))
+app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories
+app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
 app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
 app.use('/api/clients', require('./routes/tables')) // Handles /api/clients/:clientId/locations/:locationId/tables
 app.use('/api', require('./routes/tables')) // Handles /api/qr/:clientId/:locationId/:tableNumber (public QR lookup)
