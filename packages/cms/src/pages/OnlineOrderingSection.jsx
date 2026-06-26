@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle, CheckCircle, ExternalLink, Unlink, RefreshCw, Percent, Sparkles, Trash } from 'lucide-react'
+import { ShoppingCart, Settings, DollarSign, Truck, Clock, CreditCard, Mail, Server, Zap, AlertTriangle, CheckCircle, ExternalLink, Unlink, RefreshCw, Percent, Sparkles, Trash2 } from 'lucide-react'
 import { getConfig, saveConfig } from '../api/config'
 import { getPayments, savePayments, getStripeConnectStatus, createStripeConnectLink, createStripeLoginLink, disconnectStripe, getApplePayStatus, enableApplePay, getGooglePayStatus, setGooglePay } from '../api/payments'
 import { C } from '../theme'
@@ -443,7 +443,7 @@ export default function OnlineOrderingSection({ clientId, subsection = 'ordering
                       }}
                       style={{ padding:'8px', background:C.red+'18', border:`1px solid ${C.red}35`, borderRadius:6, color:C.red, cursor:'pointer', marginTop:16 }}
                     >
-                      <Trash size={16} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 ))}

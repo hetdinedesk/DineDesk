@@ -307,7 +307,7 @@ export default function TablesManager({ clientId, selectedLocation, liveOrders }
       </div>
 
       {/* Table Detail Modal */}
-      {selectedTable && createPortal(
+      {selectedTable && typeof document !== 'undefined' && document.body && createPortal(
         <div style={{
           position: 'fixed',
           inset: 0,
