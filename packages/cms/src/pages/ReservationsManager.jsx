@@ -499,7 +499,7 @@ function BookingListView({ bookings, onBookingClick }) {
         const bookingDateOnly = getDateOnly(booking.bookingDate)
         const showDate = bookingDateOnly !== lastDate
         lastDate = bookingDateOnly
-        const table = booking.tableId ? { tableNumber: booking.tableNumber || '?' } : null
+        const table = booking.tableId ? { tableNumber: booking.tableNumber || booking.table?.tableNumber || '?' } : null
         const colors = STATUS_COLORS[booking.status] || STATUS_COLORS.confirmed
 
         return (
@@ -600,8 +600,8 @@ function TableGrid({ tables, bookings, onTableClick, onBookingClick }) {
             onMouseEnter={(e) => e.currentTarget.style.borderColor = C.border}
             onMouseLeave={(e) => e.currentTarget.style.borderColor = colors.border}
           >
-            <div style={{ fontSize: 14, fontWeight: 500, color: C.t0 }}>{table.tableNumber}</div>
-            <div style={{ fontSize: 11, color: C.t2, marginTop: 2 }}>{table.capacity} seats</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: occupied ? colors.text : C.t0 }}>{table.tableNumber}</div>
+            <div style={{ fontSize: 11, color: occupied ? colors.text : C.t2, marginTop: 2 }}>{table.capacity} seats</div>
             <div style={{ fontSize: 10, marginTop: 3, fontWeight: 500, color: occupied ? colors.text : C.t2 }}>
               {occupied ? booking?.bookingTime || 'Occupied' : 'Free'}
             </div>
@@ -635,7 +635,7 @@ function UpcomingList({ bookings, onBookingClick }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {upcoming.map(booking => {
-        const table = booking.tableId ? { tableNumber: booking.tableNumber || '?' } : null
+        const table = booking.tableId ? { tableNumber: booking.tableNumber || booking.table?.tableNumber || '?' } : null
         const colors = STATUS_COLORS[booking.status] || STATUS_COLORS.confirmed
 
         return (
