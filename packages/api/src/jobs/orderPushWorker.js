@@ -15,11 +15,9 @@ function retryDelayMs(attemptNumber) {
  */
 async function handleConnectionError(err) {
   if (err.code === 'P1017' || err.message?.includes('closed the connection')) {
-    console.log('[OrderPushWorker] Database connection closed, reconnecting...')
     try {
       await prisma.$disconnect()
       await prisma.$connect()
-      console.log('[OrderPushWorker] Reconnected successfully')
       return true
     } catch (reconnectErr) {
       console.error('[OrderPushWorker] Reconnect failed:', reconnectErr.message)
@@ -132,8 +130,6 @@ async function processSingleJob(job) {
         data: { lastOrderPushAt: new Date() }
       })
     ])
-
-    console.log(`[OrderPushWorker] Order ${order.orderNumber} pushed to ${pos.posType}: ${result.posOrderId}`)
   } catch (err) {
     console.error(`[OrderPushWorker] Job ${job.id} attempt ${job.attemptNumber} failed:`, err.message)
 
@@ -195,7 +191,6 @@ async function enqueueOrderPush(orderId, clientId) {
         nextRetryAt: new Date()
       }
     })
-    console.log(`[OrderPushWorker] Enqueued order ${orderId} for POS push (${pos.posType})`)
     return job
   } catch (err) {
     console.error('[OrderPushWorker] Enqueue error:', err)

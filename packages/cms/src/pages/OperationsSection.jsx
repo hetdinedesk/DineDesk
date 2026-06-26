@@ -10,6 +10,7 @@ import { getTables, updateTableBookingStatus } from '../api/tables'
 import { getBookings, updateBookingStatus, deleteBooking } from '../api/bookings'
 import { C } from '../theme'
 import ReservationsManager from './ReservationsManager'
+import TablesManager from './TablesManager'
 
 const STATUS_COLORS = {
   new: '#00D4FF',
@@ -232,13 +233,11 @@ export default function OperationsSection({ clientId, user: userProp }) {
           osc2.stop(audioContext.currentTime + 0.4)
         }
         
-        console.log('Audio initialized with Web Audio API')
       } catch (err) {
-        console.log('Web Audio API failed, falling back to Audio element:', err)
         // Fallback to simple Audio element
         audioRef.current = () => {
           const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHm8tiJOQgZqLvt52hEAw')
-          audio.play().catch(e => console.log('Audio play failed:', e))
+          audio.play().catch(() => {})
         }
       }
     }
@@ -297,8 +296,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().then(permission => {
-        console.log('Notification permission:', permission)
-      })
+        })
     }
   }, [])
 
@@ -443,10 +441,8 @@ export default function OperationsSection({ clientId, user: userProp }) {
     mutationFn: (enabled) => toggleOrdering(clientId, enabled, selectedLocation),
     onSuccess: (data) => {
       setOrderingEnabled(prev => !prev)
-      console.log('Ordering toggle successful:', data)
     },
     onError: (error) => {
-      console.error('Ordering toggle failed:', error)
       alert('Failed to update ordering: ' + error.message)
     }
   })
@@ -457,7 +453,6 @@ export default function OperationsSection({ clientId, user: userProp }) {
   }
 
   const handleToggleOrdering = () => {
-    console.log('Toggle ordering clicked, current state:', orderingEnabled, 'new state:', !orderingEnabled)
     toggleOrderingMutation.mutate(!orderingEnabled)
   }
 
@@ -576,7 +571,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
         display: 'flex',
         flexShrink: 0
       }}>
-        {['live', 'history', 'tables', 'analytics', 'customers'].map(tab => (
+        {['live', 'history', 'reservations', 'tables', 'analytics', 'customers'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -595,6 +590,7 @@ export default function OperationsSection({ clientId, user: userProp }) {
           >
             {tab === 'live' && `Live Orders (${liveOrders.length})`}
             {tab === 'history' && `Order History (${historyOrders.length})`}
+            {tab === 'reservations' && 'Reservations'}
             {tab === 'tables' && 'Tables'}
             {tab === 'analytics' && 'Analytics'}
             {tab === 'customers' && 'Customers'}
@@ -729,12 +725,10 @@ export default function OperationsSection({ clientId, user: userProp }) {
             .sort((a, b) => new Date(a.pickupTime) - new Date(b.pickupTime))
 
           // Future scheduled orders: accepted orders scheduled for future days (not today)
-          const futureScheduled = liveOrders.filter(o => 
-            o.status === 'accepted' && 
-            isScheduled(o) && 
-            !isPickupToday(o) && 
-            new Date(o.pickupTime) >= now
-          ).sort((a, b) => new Date(a.pickupTime) - new Date(b.pickupTime))
+          const futureScheduled = liveOrders.filter(o => {
+            const isFuture = o.status === 'accepted' && isScheduled(o) && !isPickupToday(o) && new Date(o.pickupTime) >= now
+            return isFuture
+          }).sort((a, b) => new Date(a.pickupTime) - new Date(b.pickupTime))
 
           const preparingOrders = visibleLive.filter(o => o.status === 'preparing')
           const readyOrders = visibleLive.filter(o => o.status === 'ready')
@@ -1040,20 +1034,16 @@ export default function OperationsSection({ clientId, user: userProp }) {
               {/* Pipeline Columns */}
               {liveLoading ? (
                 <div style={{ textAlign: 'center', padding: 40, color: C.t3 }}>Loading orders...</div>
-              ) : visibleLive.length === 0 && completedToday.length === 0 ? (
+              ) : visibleLive.length === 0 && completedToday.length === 0 && futureScheduled.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 40, color: C.t3, fontSize: 14 }}>
                   {isClient ? 'No orders yet. New orders will appear here in real-time!' : 'No live orders'}
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
-                    <PipelineColumn stage="new" icon={<Bell size={14} color="#BA7517" />} label="New" orders={regularNew} scheduledOrders={scheduledAccepted} emptyText="No new orders" />
-                    <PipelineColumn stage="preparing" icon={<ChefHat size={14} color="#185FA5" />} label="Preparing" orders={inProgressOrders} emptyText="Nothing preparing" cardProps={{ actionLabel: 'Mark ready', actionColor: '#3B6D11', nextStatus: 'ready' }} />
-                    <PipelineColumn stage="ready" icon={<CheckCircle size={14} color="#3B6D11" />} label="Ready" orders={readyOrders} emptyText="Nothing ready yet" cardProps={{ actionLabel: 'Collected ✓', actionColor: '#3B6D11', nextStatus: 'completed' }} />
-                  </div>
-
-                  {/* Future Scheduled Orders */}
-                  {futureScheduled.length > 0 && (
+                  {/* Future Scheduled Orders - show even if no live orders today */}
+                  {(() => {
+                    return futureScheduled.length > 0
+                  })() && (
                     <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
                       <div style={{ padding: '10px 16px', background: C.page, borderBottom: `0.5px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 13, fontWeight: 500, color: C.t0, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1066,11 +1056,11 @@ export default function OperationsSection({ clientId, user: userProp }) {
                         {futureScheduled.map((o) => {
                           const pickupDate = new Date(o.pickupTime)
                           const isTomorrow = pickupDate.toDateString() === new Date(todayEnd).toDateString()
-                          const dateLabel = isTomorrow 
-                            ? 'Tomorrow' 
+                          const dateLabel = isTomorrow
+                            ? 'Tomorrow'
                             : pickupDate.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
                           const timeLabel = pickupDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
-                          
+
                           return (
                             <div key={o.id} onClick={() => setSelectedOrder(o)} style={{
                               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1094,6 +1084,15 @@ export default function OperationsSection({ clientId, user: userProp }) {
                       </div>
                     </div>
                   )}
+
+                  {/* Regular Pipeline Columns - only show if there are visible live orders */}
+                  {visibleLive.length > 0 || completedToday.length > 0 ? (
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 20 }}>
+                      <PipelineColumn stage="new" icon={<Bell size={14} color="#BA7517" />} label="New" orders={regularNew} scheduledOrders={scheduledAccepted} emptyText="No new orders" />
+                      <PipelineColumn stage="preparing" icon={<ChefHat size={14} color="#185FA5" />} label="Preparing" orders={inProgressOrders} emptyText="Nothing preparing" cardProps={{ actionLabel: 'Mark ready', actionColor: '#3B6D11', nextStatus: 'ready' }} />
+                      <PipelineColumn stage="ready" icon={<CheckCircle size={14} color="#3B6D11" />} label="Ready" orders={readyOrders} emptyText="Nothing ready yet" cardProps={{ actionLabel: 'Collected ✓', actionColor: '#3B6D11', nextStatus: 'completed' }} />
+                    </div>
+                  ) : null}
 
                   {/* Completed Today */}
                   {completedToday.length > 0 && (
@@ -1138,12 +1137,21 @@ export default function OperationsSection({ clientId, user: userProp }) {
           />
         )}
 
-        {/* Tables with Bookings - Reservations Manager */}
-        {activeTab === 'tables' && (
+        {/* Reservations - Future bookings and table reservations */}
+        {activeTab === 'reservations' && (
           <ReservationsManager
             clientId={clientId}
             selectedLocation={selectedLocation}
             clientData={{ name: 'Restaurant' }}
+          />
+        )}
+
+        {/* Tables - Table status, orders, and billing */}
+        {activeTab === 'tables' && (
+          <TablesManager
+            clientId={clientId}
+            selectedLocation={selectedLocation}
+            liveOrders={liveOrders}
           />
         )}
 

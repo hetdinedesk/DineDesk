@@ -90,12 +90,10 @@ app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 app.get('/health', (req, res) => {
-  console.log('[HEALTH] Health check called from:', req.ip)
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
 app.get('/test', (req, res) => {
-  console.log('[TEST] Test endpoint called from:', req.ip)
   res.json({ 
     message: 'API is working', 
     timestamp: new Date().toISOString(),
@@ -124,9 +122,9 @@ setInterval(async () => {
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/users', require('./routes/users'))
 app.use('/api/clients/:clientId/connect', require('./routes/stripeConnect')) // Stripe Connect onboarding (must be before generic /api/clients)
+app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories (must be before clients for public suggestions endpoint)
+app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings (must be before clients for public availability endpoint)
 app.use('/api/clients', require('./routes/clients'))
-app.use('/api/clients', require('./routes/menuItems')) // Handles /api/clients/:clientId/menu-items and menu-categories
-app.use('/api/clients', require('./routes/bookings')) // Handles /api/clients/:clientId/bookings
 app.use('/api/clients', require('./routes/orders')) // Handles /api/clients/:clientId/orders
 app.use('/api/clients', require('./routes/tables')) // Handles /api/clients/:clientId/locations/:locationId/tables
 app.use('/api', require('./routes/tables')) // Handles /api/qr/:clientId/:locationId/:tableNumber (public QR lookup)
@@ -158,24 +156,13 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     await prisma.$connect()
-    console.log('📦 Database connected')
   } catch (err) {
-    console.error('❌ Failed to connect to database:', err.message)
+    console.error('Failed to connect to database:', err.message)
     process.exit(1)
   }
 
-  console.log('[STARTUP] Environment check:', {
-    NODE_ENV: process.env.NODE_ENV,
-    PORT: process.env.PORT,
-    hasGooglePlacesKey: !!process.env.GOOGLE_PLACES_API_KEY,
-    googlePlacesKeyPrefix: process.env.GOOGLE_PLACES_API_KEY ? `${process.env.GOOGLE_PLACES_API_KEY.substring(0, 10)}...` : 'not set',
-    CORS_ORIGINS: process.env.CORS_ORIGINS
-  })
-
   httpServer.listen(PORT, () => {
-    console.log(`🚀 API Server running on http://localhost:${PORT}`)
-    console.log(`📱 Health: http://localhost:${PORT}/health`)
-    console.log(`🔌 WebSocket ready on ws://localhost:${PORT}`)
+    console.log(`API Server running on http://localhost:${PORT}`)
   })
 }
 

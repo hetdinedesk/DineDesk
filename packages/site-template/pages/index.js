@@ -34,9 +34,7 @@ export async function getServerSideProps({ query, req }) {
   const isPreview = Boolean(isValidSite)
   const siteId = isValidSite ? rawSite : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
 
-  console.log('[SSR index.js] Fetching data for siteId:', siteId, 'isPreview:', isPreview)
   const data = await getSiteData(siteId)
-  console.log('[SSR index.js] Data received, has reviews:', !!data.reviews, 'googleReviews count:', data.reviews?.googleReviews?.length || 0)
 
   const template = data.colours?.theme
     || process.env.SITE_TEMPLATE
@@ -49,8 +47,6 @@ export async function getServerSideProps({ query, req }) {
 }
 
 export default function HomePage({ data, template, siteType }) {
-  console.log('HomePage props:', { template, siteType, hasData: !!data })
-
   // Find Home page record to get its banner/settings
   const pages = data?.pages || []
   const homePage = pages.find((p) => p.pageType === 'home' || p.slug === '' || p.slug === '/')
@@ -71,11 +67,8 @@ export default function HomePage({ data, template, siteType }) {
   // Default to theme-d1 if template not found
   const normalizedTemplate = template?.replace(/\s+/g, '-') || 'theme-d1'
   const Template = TEMPLATES[normalizedTemplate] || TEMPLATES['theme-d1'] || ThemeD1Home
-  
-  console.log('Template selected:', { normalizedTemplate, templateFound: !!Template })
 
   if (!Template) {
-    console.error('Template not found for:', { template, normalizedTemplate, availableTemplates: Object.keys(TEMPLATES) })
     return <div>Error: Template not found</div>
   }
 

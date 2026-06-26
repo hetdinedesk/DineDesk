@@ -58,20 +58,15 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError, paymentGateway }
     setLoading(true)
     setError(null)
 
-    console.log('🔵 Submitting payment...')
-
     try {
       // Submit the elements first (required by Stripe)
       const { error: submitError } = await elements.submit()
       if (submitError) {
-        console.error('❌ Elements submit error:', submitError)
         setError(submitError.message)
         setLoading(false)
         onError(submitError.message)
         return
       }
-
-      console.log('✅ Elements submitted successfully')
 
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
@@ -82,20 +77,15 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError, paymentGateway }
         redirect: 'if_required'
       })
 
-      console.log('🔵 Payment response:', { stripeError, paymentIntent })
-
       if (stripeError) {
-        console.error('❌ Payment error:', stripeError)
         setError(stripeError.message)
         setLoading(false)
         onError(stripeError.message)
       } else {
-        console.log('✅ Payment successful:', paymentIntent)
         setLoading(false)
         onSuccess(paymentIntent)
       }
     } catch (err) {
-      console.error('❌ Payment submission error:', err)
       setError('Payment failed. Please try again.')
       setLoading(false)
       onError(err.message)
@@ -120,11 +110,9 @@ function StripeCheckoutForm({ clientSecret, onSuccess, onError, paymentGateway }
             paymentMethodOrder: ['card', 'applepay', 'googlepay']
           }}
           onReady={() => {
-            console.log('✅ PaymentElement ready')
             setElementsReady(true)
           }}
           onLoadError={(error) => {
-            console.error('❌ PaymentElement load error:', error)
             setError('Failed to load payment form. Please try again or use cash payment.')
           }}
         />
@@ -270,6 +258,7 @@ function CheckoutContentWrapper({ data, siteName, router, Header, Footer, normal
 function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, lookupCustomer, upsertCustomer, redeemReward, canRedeemReward, getPointsToNextReward, isLoyaltyEnabled, Header, Footer, normalizedTemplate }) {
   const { items, totalItems, subtotal, taxAmount, taxRate, taxLabel, total, clearCart, ordering } = useCart()
   const paymentGateway = data?.paymentGateway || {}
+  const clientId = data?.client?.id
 
   // Check if ordering is enabled
   const isOrderingEnabled = data?.ordering?.enabled !== false
@@ -290,22 +279,18 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       // If Stripe Connect is connected, use platform publishable key
       if (paymentGateway.stripeConnectStatus === 'connected') {
         publishableKey = paymentGateway.platformPublishableKey
-        console.log('🔑 Using Stripe Connect with platform key:', publishableKey?.substring(0, 10) + '...')
         
         // Fallback to manual keys if platform key is missing
         if (!publishableKey) {
-          console.warn('⚠️ Platform publishable key missing, falling back to manual keys')
           publishableKey = paymentGateway.testMode
             ? paymentGateway.testPublishableKey
             : paymentGateway.livePublishableKey
-          console.log('🔑 Using manual Stripe keys as fallback:', publishableKey?.substring(0, 10) + '...')
         }
       } else {
         // Legacy manual keys path
         publishableKey = paymentGateway.testMode
           ? paymentGateway.testPublishableKey
           : paymentGateway.livePublishableKey
-        console.log('🔑 Using manual Stripe keys:', publishableKey?.substring(0, 10) + '...')
       }
       
       if (publishableKey) {
@@ -313,7 +298,6 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         
         // Add timeout to detect if Stripe fails to load
         const timeoutId = setTimeout(() => {
-          console.error('❌ Stripe loading timeout')
           setStripeLoadError('Payment system is taking too long to load. Please try again or use cash payment.')
         }, 10000) // 10 second timeout
         
@@ -321,20 +305,16 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
           .then(stripe => {
             clearTimeout(timeoutId)
             if (stripe) {
-              console.log('✅ Stripe loaded successfully')
               setStripePromise(stripe)
             } else {
-              console.error('❌ Stripe returned null')
               setStripeLoadError('Payment system failed to load. Please try again or use cash payment.')
             }
           })
           .catch(err => {
             clearTimeout(timeoutId)
-            console.error('❌ Stripe load error:', err)
             setStripeLoadError('Payment system failed to load. Please try again or use cash payment.')
           })
       } else {
-        console.error('❌ No Stripe publishable key found')
         setStripeLoadError('Payment gateway is not configured properly. Please contact support.')
       }
     }
@@ -812,9 +792,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'cancelled' })
         })
-        console.log('✅ Order cancelled due to payment failure')
       } catch (err) {
-        console.error('❌ Failed to cancel order:', err)
       }
     }
   }

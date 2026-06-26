@@ -681,11 +681,8 @@ function generateBookingConfirmationHtml(booking, clientName, clientData = {}, l
 
 async function sendBookingConfirmation(booking, clientName, notificationConfig, clientData = {}, locationData = {}) {
   if (!booking.customerEmail) {
-    console.log('[Email] Booking confirmation skipped - no customer email provided')
     return { success: false, message: 'No customer email provided' }
   }
-
-  console.log('[Email] Sending booking confirmation to:', booking.customerEmail, 'via SendGrid:', !!notificationConfig.sendgridApiKey)
 
   try {
     // Try SendGrid first
@@ -716,15 +713,12 @@ async function sendBookingConfirmation(booking, clientName, notificationConfig, 
       }
 
       await sgMail.send(msg)
-      console.log('[Email] Booking confirmation sent successfully via SendGrid')
       return { success: true, message: 'Booking confirmation sent via SendGrid' }
     }
 
     // Fallback to SMTP
     const emailTransporter = getTransporter(notificationConfig)
     if (!emailTransporter) {
-      // Log the failure but don't fail the booking
-      console.log('[Email] No email provider configured for booking confirmation')
       return { success: false, message: 'No email provider configured' }
     }
 

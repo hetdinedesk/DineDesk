@@ -31,15 +31,10 @@ export default function BookingForm({ clientId, config, locations = [], onSucces
       const locationParam = formData.locationId ? `&locationId=${formData.locationId}` : ''
       const url = `${API_URL}/clients/${clientId}/bookings/availability?date=${formData.bookingDate}${formData.bookingTime ? `&time=${formData.bookingTime}` : ''}${locationParam}`
       
-      console.log('[BookingForm] Checking availability:', { API_URL, clientId, url })
-      
       const response = await fetch(url)
-      
-      console.log('[BookingForm] Response status:', response.status)
       
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('[BookingForm] Response error:', errorText)
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
       

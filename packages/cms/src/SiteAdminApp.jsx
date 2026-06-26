@@ -150,7 +150,6 @@ function SALogin({ onLogin }) {
 
 // ── Main Site Admin Shell ───────────────────────────────────────
 function SAShell({ user, onLogout }) {
-  console.log('SAShell mounted with user:', user)
   const [tab, setTab] = useState('dashboard')
   const isSuperAdmin = user.role === 'SUPER_ADMIN'
 
@@ -1246,12 +1245,10 @@ export default function SiteAdminApp() {
   const [user, setUser] = useState(null)
 
   const logout = () => {
-    console.log('Logout called')
     localStorage.removeItem(SA_TOKEN_KEY)
     setUser(null)
   }
 
-  console.log('SiteAdminApp render - user:', !!user)
   if (!user) return <SALogin onLogin={setUser} />
   return <SAShell user={user} onLogout={logout} />
 }

@@ -83,14 +83,6 @@ const isR2Configured = () => {
 
 // Initialize R2 client only if configured
 let r2 = null
-console.log('[R2 INIT] Checking env vars:', {
-  ENDPOINT:   !!process.env.CLOUDFLARE_R2_ENDPOINT,
-  ACCESS_KEY: !!process.env.CLOUDFLARE_R2_ACCESS_KEY,
-  SECRET_KEY: !!process.env.CLOUDFLARE_R2_SECRET_KEY,
-  BUCKET:     process.env.CLOUDFLARE_R2_BUCKET || '(not set)',
-  PUBLIC_URL: process.env.CLOUDFLARE_R2_PUBLIC_URL || '(not set)',
-  isConfigured: isR2Configured()
-})
 if (isR2Configured()) {
   r2 = new S3Client({
     region: 'auto',
@@ -100,7 +92,6 @@ if (isR2Configured()) {
       secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY
     }
   })
-  console.log('[R2 INIT] ✓ R2 client initialized — endpoint:', process.env.CLOUDFLARE_R2_ENDPOINT)
 } else {
   console.warn('[R2 INIT] ✗ R2 NOT configured — uploads will use local storage (ephemeral on Railway!)')
 }
@@ -379,15 +370,12 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
-    console.log('[EXPORT] Export endpoint called for client:', id, 'from IP:', req.ip)
 
     // Check cache first (60s TTL — cleared on any CMS save)
     const cached = getCachedExport(id)
     if (cached) {
-      console.log('[EXPORT] Returning cached data for client:', id)
       return res.json(cached)
     }
-    console.log('[EXPORT] Cache miss, fetching fresh data for client:', id)
 
     const [client, menuCategories, menuItems, specials, pages, banners, footerSections, unassignedFooterLinks, cfg, navigationItems, homeSections, promoTiles, promoConfig, featuredConfig, welcomeContent, teamDepartments, specialsConfig, homepageLayout, customTextBlocks, paymentGateway, legalDocs, loyaltyConfig] = await Promise.all([
       prisma.client.findUnique({
@@ -689,27 +677,12 @@ const reviewsConfig = cfg?.reviews || {}
                                 isValidPlaceId(placeId) &&
                                 process.env.GOOGLE_PLACES_API_KEY
 
-  console.log('[GOOGLE REVIEWS] Debug info:', {
-    hasPlaceId: !!placeId,
-    placeId: placeId ? `${placeId.substring(0, 10)}...` : null,
-    isValidPlaceId: placeId ? isValidPlaceId(placeId) : false,
-    hasApiKey: !!process.env.GOOGLE_PLACES_API_KEY,
-    apiKeyPrefix: process.env.GOOGLE_PLACES_API_KEY ? `${process.env.GOOGLE_PLACES_API_KEY.substring(0, 10)}...` : null,
-    shouldFetch: shouldFetchGoogleReviews
-  })
-
   if (shouldFetchGoogleReviews) {
   try {
     const gRes = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,reviews&key=${process.env.GOOGLE_PLACES_API_KEY}`
     )
     const gData = await gRes.json()
-    console.log('[GOOGLE REVIEWS] API response:', {
-      status: gData.status,
-      hasResult: !!gData.result,
-      resultKeys: gData.result ? Object.keys(gData.result) : [],
-      error: gData.error_message
-    })
     if (gData.result) {
       googlePlaceData = {
         rating:       gData.result.rating,
@@ -729,25 +702,10 @@ const reviewsConfig = cfg?.reviews || {}
         }))
         .slice(0, 10) // Limit to max 10 reviews
       finalReviews = googleReviews;
-      console.log('[GOOGLE REVIEWS] Fetched reviews:', {
-        total: rawReviews.length,
-        filtered: googleReviews.length,
-        rating: googlePlaceData.rating,
-        totalReviews: googlePlaceData.totalReviews
-      })
     }
   } catch (err) {
     console.error('[GOOGLE API] Error fetching Google reviews:', err)
   }
-} else if (placeId && !isValidPlaceId(placeId)) {
-  console.log('[GOOGLE REVIEWS] Invalid Place ID format:', placeId)
-  // Invalid Place ID format
-} else {
-  console.log('[GOOGLE REVIEWS] Not fetching - missing requirements:', {
-    hasPlaceId: !!placeId,
-    hasValidPlaceId: placeId ? isValidPlaceId(placeId) : false,
-    hasApiKey: !!process.env.GOOGLE_PLACES_API_KEY
-  })
 }
 
 const exportData = {
@@ -2640,9 +2598,6 @@ router.patch('/:id/config/ordering', authenticateToken, async (req, res) => {
   }
 })
 
-// Log R2 configuration status at startup
-console.log(`[images] R2 configured: ${isR2Configured()}, PUBLIC_URL: ${process.env.CLOUDFLARE_R2_PUBLIC_URL || '(not set)'}`)
-
 // ── Image Upload to R2 (with local fallback for dev only) ──────────────────
 router.post('/:clientId/images', upload.single('file'), async (req, res) => {
   try {
@@ -2669,7 +2624,6 @@ router.post('/:clientId/images', upload.single('file'), async (req, res) => {
 
       const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/+$/, '')
       const url = `${publicUrl}/${key}`
-      console.log(`[images] Uploaded to R2: ${url} (${(optimized.length / 1024).toFixed(1)} KB)`)
       return res.json({ url, storage: 'r2' })
     }
 
@@ -2692,7 +2646,6 @@ router.post('/:clientId/images', upload.single('file'), async (req, res) => {
 
     const apiUrl = process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`
     const url = `${apiUrl}/uploads/${key}`
-    console.log(`[images] Saved locally: ${url} (dev only — will not persist on deploy)`)
     res.json({ url, storage: 'local', warning: 'Using local storage — images will not persist on deploy' })
 
   } catch (err) {
@@ -2896,11 +2849,6 @@ router.post('/:id/netlify/create', async (req, res) => {
     // 2 — Set env vars so the build knows which client/template to use
     let envVarsSet = false
     try {
-      console.log(`🔧 Setting env vars for site ${netlifyData.id}:`)
-      console.log(`   NEXT_PUBLIC_SITE_ID: ${client.id}`)
-      console.log(`   SITE_TEMPLATE: ${template}`)
-      console.log(`   NEXT_PUBLIC_CMS_API_URL: ${apiUrl}`)
-      
       await netlifyService.setEnvVars(netlifyData.id, {
         // Note: SITE_ID is reserved by Netlify, so we only set NEXT_PUBLIC_SITE_ID
         // The site-template code checks for both and will use NEXT_PUBLIC_SITE_ID as fallback
@@ -2909,16 +2857,7 @@ router.post('/:id/netlify/create', async (req, res) => {
         NEXT_PUBLIC_CMS_API_URL:    apiUrl,
       })
       envVarsSet = true
-      console.log('✅ Env vars set successfully')
     } catch (err) {
-      console.warn('⚠️  Environment variables could not be set automatically:', err.message)
-      console.warn('   This usually means your Netlify token needs "env:write" scope')
-      console.warn('   You can set them manually in Netlify dashboard:')
-      console.warn(`   1. Go to https://app.netlify.com/sites/${netlifyData.id}/settings/environment-variables`)
-      console.warn('   2. Add these variables (NOTE: Do NOT use SITE_ID - it\'s reserved by Netlify):')
-      console.warn(`      - NEXT_PUBLIC_SITE_ID: ${client.id}`)
-      console.warn(`      - SITE_TEMPLATE: ${template}`)
-      console.warn(`      - NEXT_PUBLIC_CMS_API_URL: ${apiUrl}`)
     }
 
     // 3 — Add custom domain to the site
@@ -3183,10 +3122,6 @@ router.post('/:id/netlify/rebuild', async (req, res) => {
     const buildHook = config?.netlify?.buildHook
     const siteId = config?.netlify?.siteId
     
-    console.log(`🔨 Rebuild triggered for client ${client.id} (${client.name})`)
-    console.log(`   Site ID: ${siteId}`)
-    console.log(`   Build Hook: ${buildHook}`)
-    
     if (!buildHook) {
       return res.status(400).json({ error: 'No build hook configured. Please recreate the site.' })
     }
@@ -3210,12 +3145,6 @@ router.post('/:id/netlify/rebuild', async (req, res) => {
       timestamp: new Date().toISOString()
     })
   } catch (err) {
-    console.error('❌ Rebuild error:', err.message)
-    
-    if (err.response) {
-      console.error('   Status:', err.response.status)
-      console.error('   Response:', JSON.stringify(err.response.data, null, 2))
-    }
     
     res.status(500).json({ 
       error: 'Failed to trigger rebuild',

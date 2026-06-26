@@ -41,14 +41,11 @@ export default function OrderNotifications({ clientId }) {
           osc1.stop(audioContext.currentTime + 0.3)
           osc2.stop(audioContext.currentTime + 0.4)
         }
-        
-        console.log('Order notifications audio initialized')
       } catch (err) {
-        console.log('Web Audio API failed, falling back to Audio element:', err)
         // Fallback to simple Audio element
         audioRef.current = () => {
           const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHm8tiJOQgZqLvt52hEAw')
-          audio.play().catch(e => console.log('Audio play failed:', e))
+          audio.play().catch(() => {})
         }
       }
     }
