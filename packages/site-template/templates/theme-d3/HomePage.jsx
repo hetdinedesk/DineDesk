@@ -97,6 +97,13 @@ function HomePageContent() {
         subtitle={replaceShortcodes(specialsConfig?.subheading || 'Limited time offerings', shortcodes)}
       />
     ),
+    featured: (index) => featuredConfig?.isActive !== false && featuredItems.length > 0 && (
+      <FeaturedItemsSection 
+        items={featuredItems}
+        title={replaceShortcodes(featuredConfig?.heading || 'Featured Items', shortcodes)}
+        subtitle={replaceShortcodes(featuredConfig?.subheading || 'Chef\'s Selection', shortcodes)}
+      />
+    ),
     loyalty: (index) => <LoyaltyBannerSection />,
     reviews: (index) => <ReviewsSection />,
     custom: (blockId) => {
