@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Utensils, Trash2, Upload, Loader2, Plus, Search, Pencil, Star, GripVertical, X, ChevronDown } from 'lucide-react'
+import { Utensils, Trash, Upload, Loader2, Plus, Search, Pencil, Star, GripVertical, X, ChevronDown } from 'lucide-react'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -122,7 +122,7 @@ function SortableCard({ item, onEdit, onDelete, onToggle, isPendingToggle, onTog
           style={{ padding:'5px 10px', background:C.red+'14', border:`1px solid ${C.red}35`,
             borderRadius:7, color:C.red, fontSize:12, cursor:'pointer',
             display:'flex', alignItems:'center', fontFamily:'inherit' }}>
-          <Trash2 size={13} />
+          <Trash size={13} />
         </button>
       </div>
     </div>

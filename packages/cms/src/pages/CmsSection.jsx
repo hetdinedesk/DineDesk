@@ -19,7 +19,7 @@ const LEFT = [
   { key:'homepage', label:'Homepage', Icon: Home },
   { key:'navigation', label:'Site Navigation', Icon: Menu },
   { key:'team', label:'Meet the Team', Icon: Users },
-  { key:'specials', label:'Specials & Promos', Icon: Tag },
+  { key:'specials', label:'Specials', Icon: Tag },
 ]
 
 const RIGHT = {
@@ -47,7 +47,6 @@ const RIGHT = {
   ],
   specials: [
     { key:'specials-list', label:'Specials', Icon: Megaphone },
-    { key:'promo-tiles', label:'Promo Tiles', Icon: Tag },
   ],
 }
 
@@ -77,7 +76,7 @@ export default function CmsSection({ clientId, user }) {
         { key:'ordering', label:'Online Ordering', Icon: ShoppingCart },
         { key:'locations', label:'Locations', Icon: MapPin },
         { key:'team', label:'Meet the Team', Icon: Users },
-        { key:'specials', label:'Specials & Promos', Icon: Tag },
+        { key:'specials', label:'Specials', Icon: Tag },
       ]
     }
     
@@ -105,7 +104,6 @@ export default function CmsSection({ clientId, user }) {
         ],
         specials: [
           { key:'specials-list', label:'Specials', Icon: Megaphone },
-          { key:'promo-tiles', label:'Promo Tiles', Icon: Tag },
         ],
       }
     }
@@ -206,7 +204,6 @@ export default function CmsSection({ clientId, user }) {
       return <div style={{color:C.t2,fontSize:14}}>Homepage section - Select a subsection from the sidebar.</div>
     }
     if(lnav==='specials') {
-      if(rnav==='promo-tiles') return <PromoTiles clientId={clientId} />
       return <Specials clientId={clientId} />
     }
     if(lnav==='ordering') return <OnlineOrderingSection clientId={clientId} subsection={rnav} />

@@ -1,4 +1,5 @@
 import { useState, useMemo, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -264,8 +265,8 @@ function TeamMemberModal({ member, departments, clientId, onSave, onClose }) {
 
   const setContent = (field, value) => setForm(f => ({ ...f, content: { ...f.content, [field]: value } }))
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ padding: 24, borderBottom: `1px solid ${C.border}` }}>
           <h3 style={{ margin: 0, color: C.t0, fontSize: 18 }}>{member.id?.startsWith('temp') ? 'Add' : 'Edit'} Team Member</h3>
@@ -307,14 +308,15 @@ function TeamMemberModal({ member, departments, clientId, onSave, onClose }) {
           <button onClick={() => onSave(form)} style={btnSave}>Save</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
 function DepartmentModal({ department, onSave, onClose }) {
   const [form, setForm] = useState(department)
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 16, width: '100%', maxWidth: 420 }}>
         <div style={{ padding: 24, borderBottom: `1px solid ${C.border}` }}>
           <h3 style={{ margin: 0, color: C.t0, fontSize: 18 }}>{department?.id?.startsWith('temp') ? 'Add' : 'Edit'} Department</h3>
@@ -329,7 +331,8 @@ function DepartmentModal({ department, onSave, onClose }) {
           <button onClick={() => onSave(form)} style={btnSave}>Save</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

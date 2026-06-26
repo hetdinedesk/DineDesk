@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BarChart3, Copy, Trash2 } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Copy, Trash } from 'lucide-react'
 import { getAnalytics } from '../api/analytics'
 import { getMenuItems } from '../api/menuItems'
 import { getPages } from '../api/pages'
@@ -352,7 +352,7 @@ function OverviewTab({ clientId, period, onDeleteSite, onCloneSite }) {
                 style={{ padding:'8px 16px', background:'transparent', border:`1px solid ${C.red}`,
                   borderRadius:7, color:C.red, fontWeight:700, fontSize:12, cursor:'pointer',
                   fontFamily:'inherit', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                <Trash2 size={13}/> Delete Client
+                <Trash size={13}/> Delete Client
               </button>
             ) : (
               <div style={{ display:'flex', gap:8, flexShrink:0 }}>

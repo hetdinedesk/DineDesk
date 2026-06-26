@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { DndContext, closestCenter, useDroppable, useDraggable, DragOverlay } from '@dnd-kit/core'
@@ -12,7 +13,7 @@ import { apiFetch } from '../api/utils'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Menu, ImageIcon, PanelBottom, FileText, Plus, Trash2 } from 'lucide-react'
+import { Menu, ImageIcon, PanelBottom, FileText, Plus, Trash } from 'lucide-react'
 import LoadingSpinner from '../Components/LoadingSpinner'
 import { SkeletonPage } from '../Components/Skeleton'
 import ImageUpload from '../Components/ImageUpload'
@@ -108,9 +109,9 @@ const TextArea = memo(({ label, value, onChange, placeholder, rows = 4, hint }) 
 
 const Modal = memo(({ isOpen, onClose, title, children, onSave, saveLabel = 'Save' }) => {
   if (!isOpen) return null
-  return (
+  return createPortal(
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
     }}>
       <div style={{
@@ -134,7 +135,8 @@ const Modal = memo(({ isOpen, onClose, title, children, onSave, saveLabel = 'Sav
           }}>{saveLabel}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 })
 
@@ -242,7 +244,7 @@ function SortableHeadingRow ({ h, pages, onEdit, onToggle, onDelete }) {
       </div>
       <ToggleSwitch checked={h.isActive !== false} onChange={() => onToggle(h.id)} size="small" />
       <button type="button" onClick={() => onEdit(h)} style={btnCyan}>Edit</button>
-      <button type="button" onClick={() => onDelete(h.id)} style={btnDanger} title="Delete"><Trash2 size={16} /></button>
+      <button type="button" onClick={() => onDelete(h.id)} style={btnDanger} title="Delete"><Trash size={16} /></button>
     </div>
   )
 }
@@ -999,7 +1001,7 @@ function SortableFooterLink ({ link, pages, onUpdate, onRemove }) {
         <div style={{ fontSize: 11, color: C.t2, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target}</div>
       </div>
       <button type="button" onClick={() => onUpdate(link)} style={{ ...btnCyan, padding: '3px 8px', fontSize: 11 }}>Edit</button>
-      <button type="button" onClick={onRemove} style={{ ...btnDanger, padding: '3px 8px', fontSize: 11 }} title="Remove"><Trash2 size={14} /></button>
+      <button type="button" onClick={onRemove} style={{ ...btnDanger, padding: '3px 8px', fontSize: 11 }} title="Remove"><Trash size={14} /></button>
     </div>
   )
 }
@@ -1021,7 +1023,7 @@ function SortableUnassignedLink ({ link, pages, sections, onDelete }) {
         style={{ ...btnDanger, padding: '4px 8px', fontSize: 11 }}
         title="Delete"
       >
-        <Trash2 size={14} />
+        <Trash size={14} />
       </button>
     </div>
   )
@@ -1079,7 +1081,7 @@ function SortableFooterSection ({ section, pages, onToggle, onAddLink, onEditLin
           <button type="button" onClick={() => setEditingTitle(true)} style={{ ...btnGhost, padding: '4px 8px', fontSize: 11, flexShrink: 0 }}>Edit</button>
         )}
         <button type="button" onClick={() => onAddLink(section.id)} style={{ ...btnCyan, padding: '4px 10px', fontSize: 11, flexShrink: 0 }}>+ Link</button>
-        <button type="button" onClick={() => onDelete(section.id)} style={{ ...btnDanger, padding: '4px 8px', fontSize: 11, flexShrink: 0 }} title="Delete"><Trash2 size={14} /></button>
+        <button type="button" onClick={() => onDelete(section.id)} style={{ ...btnDanger, padding: '4px 8px', fontSize: 11, flexShrink: 0 }} title="Delete"><Trash size={14} /></button>
       </div>
       {expanded && (
         <div style={{ padding: links.length ? 10 : '8px 12px' }}>
@@ -1477,7 +1479,7 @@ const DraggablePage = memo(function DraggablePage ({ page, index, onToggle, onEd
             <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: isPublished ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
           </div>
           <button type="button" onClick={handleEdit} style={{...btnCyan, padding: '8px 14px'}}>Edit</button>
-          <button type="button" onClick={handleDelete} style={{...btnDanger, padding: '8px 12px'}} title="Delete"><Trash2 size={16} /></button>
+          <button type="button" onClick={handleDelete} style={{...btnDanger, padding: '8px 12px'}} title="Delete"><Trash size={16} /></button>
         </div>
       )}
     </Draggable>
@@ -1806,8 +1808,8 @@ function PagesListPanel ({ clientId, data, qc }) {
       )}
 
       {/* Step 1 — Type selection */}
-      {modal?.step === 1 && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      {modal?.step === 1 && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 18, width: '100%', maxWidth: 700 }}>
             <div style={{ padding: '22px 28px', borderBottom: `1px solid ${C.border}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Step 1 of 2</div>
@@ -1832,12 +1834,13 @@ function PagesListPanel ({ clientId, data, qc }) {
               <button type="button" onClick={() => setModal(null)} style={btnGhost}>Cancel</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Step 2 — Page details */}
-      {modal?.step === 2 && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      {modal?.step === 2 && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 18, width: '100%', maxWidth: 820, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {/* Modal header */}
             <div style={{ padding: '20px 28px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
@@ -2035,7 +2038,8 @@ function PagesListPanel ({ clientId, data, qc }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

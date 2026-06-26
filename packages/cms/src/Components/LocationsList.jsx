@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapPin, Star } from 'lucide-react'
 import { getLocations, updateLocation, deleteLocation } from '../api/locations'
@@ -138,20 +139,33 @@ export default function LocationsList({ clientId }) {
           ))
         )}
       </div>
-      {editModal && (
+      {editModal && createPortal(
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-          <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, maxWidth:'90vw', maxHeight:'90vh', overflow:'auto' }}>
-            <LocationForm
-              key={editLocation?.id || 'new-location'}
-              location={editLocation}
-              isEdit={!!editLocation.id}
-              clientId={clientId}
-              onSave={handleFormSave}
-              onClose={handleFormClose}
-            />
-
+          <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:16, maxWidth:'90vw', maxHeight:'calc(100vh - 48px)', overflow:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, padding:20, borderBottom:`1px solid ${C.border}` }}>
+              <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:C.t0 }}>
+                {editLocation?.id ? 'Edit Location' : 'Add Location'}
+              </h2>
+              <button 
+                onClick={handleFormClose}
+                style={{ padding:'8px 16px', background:C.card, border:`1px solid ${C.border}`, borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:600, color:C.t0 }}
+              >
+                Close
+              </button>
+            </div>
+            <div style={{ padding:20 }}>
+              <LocationForm
+                key={editLocation?.id || 'new-location'}
+                location={editLocation}
+                isEdit={!!editLocation.id}
+                clientId={clientId}
+                onSave={handleFormSave}
+                onClose={handleFormClose}
+              />
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete Confirmation Modal */}

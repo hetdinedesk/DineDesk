@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSpecials, createSpecial, updateSpecial, deleteSpecial } from '../api/specials'
 import { getSpecialsConfig, updateSpecialsConfig } from '../api/specialsConfig'
@@ -306,7 +307,7 @@ export default function Specials({ clientId }) {
       </div>
       
       {/* Special Form Modal */}
-      {showForm && (
+      {showForm && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, maxWidth: 600, width: '100%', maxHeight: '90vh', overflow: 'auto', padding: 24 }}>
             <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: C.t0 }}>
@@ -436,7 +437,8 @@ export default function Specials({ clientId }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
       {/* Specials List */}

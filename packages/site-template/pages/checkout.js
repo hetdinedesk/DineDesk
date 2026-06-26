@@ -742,9 +742,9 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         }
 
         const result = await response.json()
+        // Clear cart before redirect to prevent empty cart flash
+        clearCart()
         router.push(`/order/${result.order.id}?site=${siteId}`)
-        // Clear cart after redirect to prevent empty cart flash
-        setTimeout(() => clearCart(), 100)
       }
     } catch (err) {
       setError(err.message)
@@ -773,6 +773,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       // Still redirect even if this fails - webhook will catch it
     }
 
+    // Clear cart before redirect to prevent empty cart flash
     clearCart()
     router.push(isProd ? `/order/${orderId}` : `/order/${orderId}?site=${siteId}`)
   }

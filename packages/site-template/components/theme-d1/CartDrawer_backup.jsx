@@ -1,7 +1,7 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, X, Plus, Minus, Trash2, MapPin, Clock } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, Trash, MapPin, Clock } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { formatTableDisplay } from '../../lib/tableDetection';
 
@@ -118,7 +118,7 @@ return (
                               className="ml-auto text-red-500 hover:text-red-700 transition-colors"
                               aria-label="Remove item"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash className="w-4 h-4" />
                             </button>
                           </div>
                         </div>

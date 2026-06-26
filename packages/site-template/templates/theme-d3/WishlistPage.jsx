@@ -2,7 +2,7 @@ import React from 'react';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCMS } from '../../contexts/CMSContext';
 import { useCart } from '../../contexts/CartContext';
-import { Heart, Trash2, Plus, ArrowRight } from 'lucide-react';
+import { Heart, Trash, Plus, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { withSiteParam, getSiteId } from '../../lib/links';
@@ -84,7 +84,7 @@ export default function WishlistPage() {
             onClick={handleClearAll}
             className="flex items-center gap-2 text-[var(--color-secondary)]/60 hover:text-red-500 transition-colors font-sans text-xs font-bold uppercase tracking-widest"
           >
-            <Trash2 width={16} height={16} />
+            <Trash width={16} height={16} />
             Clear All
           </button>
         </div>
