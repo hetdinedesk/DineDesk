@@ -44,7 +44,7 @@ export default function TermsPage({ data, template }) {
   const { Header, Footer } = THEME_COMPONENTS[normalizedTemplate] || THEME_COMPONENTS['theme-d1']
 
   return (
-    <CMSProvider data={data}>
+    <>
       <Head>
         <title>Terms & Conditions - {siteName}</title>
         <meta name="description" content={`Terms & Conditions for ${siteName}. Read our terms of service before placing an order.`} />
@@ -75,6 +75,6 @@ export default function TermsPage({ data, template }) {
         </div>
       </main>
       <Footer />
-    </CMSProvider>
+    </>
   )
 }

@@ -44,7 +44,7 @@ export default function RestaurantTermsPage({ data, template }) {
   const { Header, Footer } = THEME_COMPONENTS[normalizedTemplate] || THEME_COMPONENTS['theme-d1']
 
   return (
-    <CMSProvider data={data}>
+    <>
       <Head>
         <title>Restaurant Terms of Service - {siteName}</title>
         <meta name="description" content={`Restaurant Terms of Service for ${siteName}. Our policies on ordering, reservations and dining.`} />
@@ -75,6 +75,6 @@ export default function RestaurantTermsPage({ data, template }) {
         </div>
       </main>
       <Footer />
-    </CMSProvider>
+    </>
   )
 }

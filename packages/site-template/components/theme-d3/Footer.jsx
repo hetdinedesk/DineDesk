@@ -162,15 +162,12 @@ export const Footer = () => {
         <div className="pt-16 border-t border-[var(--color-accent)]/5 flex flex-col md:flex-row justify-between items-center gap-10 text-[9px] font-sans font-bold uppercase tracking-[0.3em] text-[var(--color-accent)]/10">
           <p>&copy; {new Date().getFullYear()} {restaurant?.name || ''}. ALL RIGHTS RESERVED.</p>
           <div className="flex gap-12 items-center">
-            {allColumns.length > 2 && (
-              <div className="flex gap-12">
-                {allColumns[2].links?.map((link, index) => (
-                  <Link key={index} href={withSiteParam(link.url || '#', siteId)} className="hover:text-[var(--color-accent)] transition-colors">
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            )}
+            <Link href={withSiteParam('/terms', siteId)} className="hover:text-[var(--color-accent)] transition-colors">
+              Terms
+            </Link>
+            <Link href={withSiteParam('/privacy', siteId)} className="hover:text-[var(--color-accent)] transition-colors">
+              Privacy Policy
+            </Link>
             <a href="https://dinedesk.com.au" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent)] transition-colors">
               Powered by DineDesk
             </a>

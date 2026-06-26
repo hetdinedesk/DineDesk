@@ -187,41 +187,39 @@ export default function CheckoutPage({ data, template }) {
   if (totalItems === 0) {
     return (
       <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
-        <CMSProvider data={data}>
-          <Head>
-            <title>Checkout - {normalizedTemplate === 'theme-d1' ? 'Your Cart is Empty' : normalizedTemplate === 'theme-d2' ? 'Your Cart is Empty' : 'Your Harvest is Empty'}</title>
-            <meta name="robots" content="noindex, nofollow" />
-          </Head>
-          <div className="min-h-screen bg-[var(--color-accent)]">
-            <Header />
-            <div className="min-h-[60vh] flex items-center justify-center px-6 pt-32 pb-24">
-              <div className="text-center space-y-8">
-                <div className="w-24 h-24 bg-[var(--color-primary)]/10 rounded-full flex items-center justify-center mx-auto">
-                  <ShoppingCart width={32} height={32} strokeWidth={2} className="text-[var(--color-primary)]/40" />
-                </div>
-                <div>
-                  <h1 className="font-serif text-5xl italic text-[var(--color-secondary)] mb-4">
-                    {normalizedTemplate === 'theme-d1' ? 'Your cart is empty' : normalizedTemplate === 'theme-d2' ? 'Your cart is empty' : 'Your harvest is empty'}
-                  </h1>
-                  <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">ADD ITEMS FROM THE MENU</p>
-                </div>
-                <button
-                  onClick={() => {
-                    const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
-                    const isProd = !!envSiteId
-                    const siteId = isProd ? '' : (router.query.site || '')
-                    router.push(isProd ? '/menu' : `/menu?site=${siteId}`)
-                  }}
-                  className="px-8 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg inline-flex items-center gap-3"
-                >
-                  <ArrowLeft width={18} height={18} strokeWidth={2} />
-                  BROWSE MENU
-                </button>
+        <Head>
+          <title>Checkout - {normalizedTemplate === 'theme-d1' ? 'Your Cart is Empty' : normalizedTemplate === 'theme-d2' ? 'Your Cart is Empty' : 'Your Harvest is Empty'}</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Head>
+        <div className="min-h-screen bg-[var(--color-accent)]">
+          <Header />
+          <div className="min-h-[60vh] flex items-center justify-center px-6 pt-32 pb-24">
+            <div className="text-center space-y-8">
+              <div className="w-24 h-24 bg-[var(--color-primary)]/10 rounded-full flex items-center justify-center mx-auto">
+                <ShoppingCart width={32} height={32} strokeWidth={2} className="text-[var(--color-primary)]/40" />
               </div>
+              <div>
+                <h1 className="font-serif text-5xl italic text-[var(--color-secondary)] mb-4">
+                  {normalizedTemplate === 'theme-d1' ? 'Your cart is empty' : normalizedTemplate === 'theme-d2' ? 'Your cart is empty' : 'Your harvest is empty'}
+                </h1>
+                <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">ADD ITEMS FROM THE MENU</p>
+              </div>
+              <button
+                onClick={() => {
+                  const envSiteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || ''
+                  const isProd = !!envSiteId
+                  const siteId = isProd ? '' : (router.query.site || '')
+                  router.push(isProd ? '/menu' : `/menu?site=${siteId}`)
+                }}
+                className="px-8 py-4 bg-[var(--color-primary)] text-[var(--color-accent)] rounded-full font-bold text-[10px] tracking-widest uppercase hover:bg-[var(--color-secondary)] transition-all duration-300 shadow-lg inline-flex items-center gap-3"
+              >
+                <ArrowLeft width={18} height={18} strokeWidth={2} />
+                BROWSE MENU
+              </button>
             </div>
-            <Footer />
           </div>
-        </CMSProvider>
+          <Footer />
+        </div>
       </LoyaltyProvider>
     )
   }
@@ -833,7 +831,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
   // Show ordering disabled message
   if (!isOrderingEnabled) {
     return (
-      <CMSProvider data={data}>
+      <>
         <Head>
           <title>Orders Unavailable - {siteName}</title>
           <meta name="robots" content="noindex, nofollow" />
@@ -933,12 +931,12 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
           
           <Footer />
         </div>
-      </CMSProvider>
+      </>
     )
   }
 
   return (
-    <CMSProvider data={data}>
+    <>
       <Head>
         <title>Checkout - {siteName}</title>
         <meta name="robots" content="noindex, nofollow" />
@@ -1711,6 +1709,6 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         </div>
         <Footer />
       </div>
-    </CMSProvider>
+    </>
   )
 }

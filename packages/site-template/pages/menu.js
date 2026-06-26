@@ -108,7 +108,7 @@ export default function Page({ data, template }) {
   const canonicalUrl = siteUrl ? `${siteUrl}/menu` : ''
 
   return (
-    <CMSProvider data={data}>
+    <>
       <Head>
         <title>{`${sc(title)}`}</title>
         {desc && <meta name="description" content={sc(desc)} />}
@@ -124,6 +124,6 @@ export default function Page({ data, template }) {
       <Suspense fallback={<div>Loading...</div>}>
         <DynamicMenuTemplate themeKey={template} data={data} page={page} banner={banner} />
       </Suspense>
-    </CMSProvider>
+    </>
   )
 }

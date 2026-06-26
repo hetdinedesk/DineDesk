@@ -83,7 +83,7 @@ export default function HomePage({ data, template, siteType }) {
   const ogImage = homePage?.ogImage || logoUrl || null
 
   return (
-    <CMSProvider data={enhancedData}>
+    <>
       <Head>
         <title>{homeTitle}</title>
         <meta name="description" content={homeDesc} />
@@ -99,6 +99,6 @@ export default function HomePage({ data, template, siteType }) {
       <LoyaltyProvider clientId={clientId} loyaltyConfig={loyaltyConfig}>
         <Template data={enhancedData} siteType={siteType}/>
       </LoyaltyProvider>
-    </CMSProvider>
+    </>
   )
 }

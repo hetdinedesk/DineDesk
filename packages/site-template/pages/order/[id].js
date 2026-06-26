@@ -326,7 +326,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
   if (loading) {
     return (
-      <CMSProvider data={data}>
+      <>
         <Head>
           <title>Order Status - {siteName}</title>
           {/* Theme CSS */}
@@ -339,13 +339,13 @@ export default function OrderStatusPage({ data, orderId, template }) {
           </div>
           <Footer />
         </div>
-      </CMSProvider>
+      </>
     )
   }
 
   if (error || !order) {
     return (
-      <CMSProvider data={data}>
+      <>
         <Head>
           <title>Order Not Found - {siteName}</title>
           {/* Theme CSS */}
@@ -378,7 +378,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
           </div>
           <Footer />
         </div>
-      </CMSProvider>
+      </>
     )
   }
 
@@ -413,7 +413,7 @@ export default function OrderStatusPage({ data, orderId, template }) {
   }
 
   return (
-    <CMSProvider data={data}>
+    <>
       <Head>
         <title>Order #{order.orderNumber} - {siteName}</title>
         <style>{`
@@ -887,6 +887,6 @@ export default function OrderStatusPage({ data, orderId, template }) {
 
       <Footer />
       </div>
-    </CMSProvider>
+    </>
   )
 }

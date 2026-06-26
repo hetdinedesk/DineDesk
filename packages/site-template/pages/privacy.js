@@ -44,7 +44,7 @@ export default function PrivacyPage({ data, template }) {
   const { Header, Footer } = THEME_COMPONENTS[normalizedTemplate] || THEME_COMPONENTS['theme-d1']
 
   return (
-    <CMSProvider data={data}>
+    <>
       <Head>
         <title>Privacy Policy - {siteName}</title>
         <meta name="description" content={`Privacy Policy for ${siteName}. Learn how we collect, use and protect your personal information.`} />
@@ -75,6 +75,6 @@ export default function PrivacyPage({ data, template }) {
         </div>
       </main>
       <Footer />
-    </CMSProvider>
+    </>
   )
 }
