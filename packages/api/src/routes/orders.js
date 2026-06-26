@@ -351,7 +351,7 @@ router.get('/:orderId', async (req, res) => {
       }
     })
     if (!order) return res.status(404).json({ error: 'Order not found' })
-    res.json({ ...order, tableNumber: order.table?.tableNumber || null })
+    res.json({ ...order, tableNumber: order.tableNumber || order.table?.tableNumber || null })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -421,9 +421,10 @@ router.get('/', authenticateToken, async (req, res) => {
       }
     })
     // Flatten tableNumber onto each order for easy frontend consumption
+    // Prioritize direct tableNumber field over table relation
     const result = orders.map(o => ({
       ...o,
-      tableNumber: o.table?.tableNumber || null
+      tableNumber: o.tableNumber || o.table?.tableNumber || null
     }))
     res.json(result)
   } catch (err) {
