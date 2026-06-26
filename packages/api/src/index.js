@@ -89,7 +89,22 @@ app.use(express.urlencoded({ extended: true }))
 // Serve local uploads (fallback when R2 not configured)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
-app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }))
+app.get('/health', (req, res) => {
+  console.log('[HEALTH] Health check called from:', req.ip)
+  res.json({ status: 'OK', timestamp: new Date().toISOString() })
+})
+
+app.get('/test', (req, res) => {
+  console.log('[TEST] Test endpoint called from:', req.ip)
+  res.json({ 
+    message: 'API is working', 
+    timestamp: new Date().toISOString(),
+    env: {
+      hasGooglePlacesKey: !!process.env.GOOGLE_PLACES_API_KEY,
+      NODE_ENV: process.env.NODE_ENV
+    }
+  })
+})
 
 // AUTOMATIC ORDER STATUS UPDATES
 // Run every minute to update order statuses based on elapsed time
@@ -148,6 +163,14 @@ async function startServer() {
     console.error('❌ Failed to connect to database:', err.message)
     process.exit(1)
   }
+
+  console.log('[STARTUP] Environment check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT,
+    hasGooglePlacesKey: !!process.env.GOOGLE_PLACES_API_KEY,
+    googlePlacesKeyPrefix: process.env.GOOGLE_PLACES_API_KEY ? `${process.env.GOOGLE_PLACES_API_KEY.substring(0, 10)}...` : 'not set',
+    CORS_ORIGINS: process.env.CORS_ORIGINS
+  })
 
   httpServer.listen(PORT, () => {
     console.log(`🚀 API Server running on http://localhost:${PORT}`)

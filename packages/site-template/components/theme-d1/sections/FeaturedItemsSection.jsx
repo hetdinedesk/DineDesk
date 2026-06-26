@@ -41,11 +41,11 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="group"
+              className="group h-full"
             >
-              <div className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
+              <div className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 h-full flex flex-col">
                 {(item.imageUrl || item.image) && (
-                  <div className="h-64 overflow-hidden">
+                  <div className="h-64 overflow-hidden flex-shrink-0">
                     <img
                       src={item.imageUrl || item.image}
                       alt={item.name}
@@ -53,12 +53,12 @@ export const FeaturedItemsSection = ({ title, subtitle, items }) => {
                     />
                   </div>
                 )}
-                <div className="p-6">
+                <div className="p-6 flex flex-col flex-grow">
                   <h3 className="text-xl font-semibold text-[var(--color-primary)] mb-2">
                     {item.name}
                   </h3>
-                  <p className="text-gray-600 mb-4 line-clamp-2">{item.description}</p>
-                  <div className="flex items-center justify-between">
+                  <p className="text-gray-600 mb-4 line-clamp-2 flex-grow">{item.description}</p>
+                  <div className="flex items-center justify-between mt-auto">
                     <span className="text-2xl font-bold text-[var(--color-secondary)]">
                       ${item.price.toFixed(2)}
                     </span>

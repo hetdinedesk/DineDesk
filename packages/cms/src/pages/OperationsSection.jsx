@@ -728,6 +728,14 @@ export default function OperationsSection({ clientId, user: userProp }) {
           const scheduledAccepted = allNewCol.filter(o => isCompactScheduled(o))
             .sort((a, b) => new Date(a.pickupTime) - new Date(b.pickupTime))
 
+          // Future scheduled orders: accepted orders scheduled for future days (not today)
+          const futureScheduled = liveOrders.filter(o => 
+            o.status === 'accepted' && 
+            isScheduled(o) && 
+            !isPickupToday(o) && 
+            new Date(o.pickupTime) >= now
+          ).sort((a, b) => new Date(a.pickupTime) - new Date(b.pickupTime))
+
           const preparingOrders = visibleLive.filter(o => o.status === 'preparing')
           const readyOrders = visibleLive.filter(o => o.status === 'ready')
           const inProgressOrders = preparingOrders
@@ -1043,6 +1051,49 @@ export default function OperationsSection({ clientId, user: userProp }) {
                     <PipelineColumn stage="preparing" icon={<ChefHat size={14} color="#185FA5" />} label="Preparing" orders={inProgressOrders} emptyText="Nothing preparing" cardProps={{ actionLabel: 'Mark ready', actionColor: '#3B6D11', nextStatus: 'ready' }} />
                     <PipelineColumn stage="ready" icon={<CheckCircle size={14} color="#3B6D11" />} label="Ready" orders={readyOrders} emptyText="Nothing ready yet" cardProps={{ actionLabel: 'Collected ✓', actionColor: '#3B6D11', nextStatus: 'completed' }} />
                   </div>
+
+                  {/* Future Scheduled Orders */}
+                  {futureScheduled.length > 0 && (
+                    <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+                      <div style={{ padding: '10px 16px', background: C.page, borderBottom: `0.5px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: C.t0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Calendar size={14} color="#8B5CF6" />
+                          Upcoming Scheduled Orders
+                        </span>
+                        <span style={{ fontSize: 12, color: C.t2 }}>{futureScheduled.length} order{futureScheduled.length > 1 ? 's' : ''}</span>
+                      </div>
+                      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                        {futureScheduled.map((o) => {
+                          const pickupDate = new Date(o.pickupTime)
+                          const isTomorrow = pickupDate.toDateString() === new Date(todayEnd).toDateString()
+                          const dateLabel = isTomorrow 
+                            ? 'Tomorrow' 
+                            : pickupDate.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
+                          const timeLabel = pickupDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
+                          
+                          return (
+                            <div key={o.id} onClick={() => setSelectedOrder(o)} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '10px 16px', borderBottom: `0.5px solid ${C.border}40`, cursor: 'pointer'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <span style={{ fontSize: 12, color: C.t2 }}>#{o.orderNumber}</span>
+                                <span style={{ fontSize: 13, color: C.t0 }}>{o.customerName}</span>
+                                <span style={{ fontSize: 12, color: C.t3 }}>{o.items?.map(it => `${it.quantity}x ${it.name}`).join(', ')}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: 12, fontWeight: 500, color: '#8B5CF6' }}>{dateLabel}</div>
+                                  <div style={{ fontSize: 11, color: C.t3 }}>{timeLabel}</div>
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: C.t0 }}>${(o.total || 0).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Completed Today */}
                   {completedToday.length > 0 && (

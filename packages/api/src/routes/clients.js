@@ -379,12 +379,15 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
 router.get('/:id/export', async (req, res) => {
   try {
     const id = req.params.id
+    console.log('[EXPORT] Export endpoint called for client:', id, 'from IP:', req.ip)
 
     // Check cache first (60s TTL — cleared on any CMS save)
     const cached = getCachedExport(id)
     if (cached) {
+      console.log('[EXPORT] Returning cached data for client:', id)
       return res.json(cached)
     }
+    console.log('[EXPORT] Cache miss, fetching fresh data for client:', id)
 
     const [client, menuCategories, menuItems, specials, pages, banners, footerSections, unassignedFooterLinks, cfg, navigationItems, homeSections, promoTiles, promoConfig, featuredConfig, welcomeContent, teamDepartments, specialsConfig, homepageLayout, customTextBlocks, paymentGateway, legalDocs, loyaltyConfig] = await Promise.all([
       prisma.client.findUnique({
@@ -686,12 +689,27 @@ const reviewsConfig = cfg?.reviews || {}
                                 isValidPlaceId(placeId) &&
                                 process.env.GOOGLE_PLACES_API_KEY
 
+  console.log('[GOOGLE REVIEWS] Debug info:', {
+    hasPlaceId: !!placeId,
+    placeId: placeId ? `${placeId.substring(0, 10)}...` : null,
+    isValidPlaceId: placeId ? isValidPlaceId(placeId) : false,
+    hasApiKey: !!process.env.GOOGLE_PLACES_API_KEY,
+    apiKeyPrefix: process.env.GOOGLE_PLACES_API_KEY ? `${process.env.GOOGLE_PLACES_API_KEY.substring(0, 10)}...` : null,
+    shouldFetch: shouldFetchGoogleReviews
+  })
+
   if (shouldFetchGoogleReviews) {
   try {
     const gRes = await fetch(
       `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,reviews&key=${process.env.GOOGLE_PLACES_API_KEY}`
     )
     const gData = await gRes.json()
+    console.log('[GOOGLE REVIEWS] API response:', {
+      status: gData.status,
+      hasResult: !!gData.result,
+      resultKeys: gData.result ? Object.keys(gData.result) : [],
+      error: gData.error_message
+    })
     if (gData.result) {
       googlePlaceData = {
         rating:       gData.result.rating,
@@ -711,12 +729,25 @@ const reviewsConfig = cfg?.reviews || {}
         }))
         .slice(0, 10) // Limit to max 10 reviews
       finalReviews = googleReviews;
+      console.log('[GOOGLE REVIEWS] Fetched reviews:', {
+        total: rawReviews.length,
+        filtered: googleReviews.length,
+        rating: googlePlaceData.rating,
+        totalReviews: googlePlaceData.totalReviews
+      })
     }
   } catch (err) {
     console.error('[GOOGLE API] Error fetching Google reviews:', err)
   }
 } else if (placeId && !isValidPlaceId(placeId)) {
+  console.log('[GOOGLE REVIEWS] Invalid Place ID format:', placeId)
   // Invalid Place ID format
+} else {
+  console.log('[GOOGLE REVIEWS] Not fetching - missing requirements:', {
+    hasPlaceId: !!placeId,
+    hasValidPlaceId: placeId ? isValidPlaceId(placeId) : false,
+    hasApiKey: !!process.env.GOOGLE_PLACES_API_KEY
+  })
 }
 
 const exportData = {
@@ -3608,4 +3639,5 @@ router.delete('/:clientId/rewards/:rewardId', authenticateToken, async (req, res
 })
 
 module.exports = router
+module.exports.clearExportCache = clearExportCache
 module.exports.clearExportCache = clearExportCache

@@ -113,23 +113,35 @@ async function getSiteData(clientId) {
   // Use provided clientId, or get from browser query param, or fallback to env
   const id = clientId || getClientId()
   
+  console.log('[FRONTEND API] getSiteData called with:', {
+    clientId,
+    id,
+    CMS_API_URL,
+    envSiteId: DEFAULT_SITE_ID
+  })
+  
   if (!id) {
-    console.warn('No SITE_ID provided - showing empty state. Set SITE_ID in .env.local or pass ?site=ID in the URL')
+    console.warn('[FRONTEND API] No SITE_ID provided - showing empty state. Set SITE_ID in .env.local or pass ?site=ID in the URL')
     return EMPTY_STATE_DATA
   }
 
   try {
-    const res = await fetch(`${CMS_API_URL}/clients/${id}/export`, {
+    const url = `${CMS_API_URL}/clients/${id}/export`
+    console.log('[FRONTEND API] Fetching from:', url)
+    const res = await fetch(url, {
       cache: 'no-store'
     })
+    console.log('[FRONTEND API] Response status:', res.status, 'ok:', res.ok)
     if (!res.ok) {
-      console.error('Export fetch failed:', res.status, 'for client:', id, '- using empty state')
+      console.error('[FRONTEND API] Export fetch failed:', res.status, 'for client:', id, '- using empty state')
       return EMPTY_STATE_DATA
     }
     const data = await res.json()
+    console.log('[FRONTEND API] Data received, keys:', Object.keys(data), 'reviews config:', data.reviews)
+    console.log('[FRONTEND API] Google reviews in data:', data.reviews?.googleReviews?.length || 0, 'items')
     return data
   } catch (err) {
-    console.error('getSiteData error:', err.message, '- using empty state')
+    console.error('[FRONTEND API] getSiteData error:', err.message, '- using empty state')
     return EMPTY_STATE_DATA
   }
 }

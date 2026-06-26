@@ -34,13 +34,15 @@ export async function getServerSideProps({ query, req }) {
   const isPreview = Boolean(isValidSite)
   const siteId = isValidSite ? rawSite : (process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || '')
 
+  console.log('[SSR index.js] Fetching data for siteId:', siteId, 'isPreview:', isPreview)
   const data = await getSiteData(siteId)
-  
+  console.log('[SSR index.js] Data received, has reviews:', !!data.reviews, 'googleReviews count:', data.reviews?.googleReviews?.length || 0)
+
   const template = data.colours?.theme
     || process.env.SITE_TEMPLATE
     || 'theme-v1'  // Default to Fine Dining theme
   const siteType = data.siteType || 'restaurant'
-  
+
   return {
     props: { data, template, colours: data.colours || null, siteType, isPreview }
   }
