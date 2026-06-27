@@ -79,7 +79,7 @@ export default function CartDrawer() {
                   <ShoppingCart width={24} height={24} strokeWidth={2} className="text-[var(--color-primary)]" />
                 </div>
                 <div>
-                  <h2 className="font-serif text-3xl italic text-[var(--color-secondary)]">Your Harvest</h2>
+                  <h2 className="font-serif text-3xl italic text-[var(--color-secondary)]">Your Cart</h2>
                   <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">
                     {totalItems} {totalItems === 1 ? 'ITEM' : 'ITEMS'}
                   </p>
@@ -102,7 +102,7 @@ export default function CartDrawer() {
                     <ShoppingCart width={32} height={32} strokeWidth={2} className="text-[var(--color-primary)]/40" />
                   </div>
                   <div>
-                    <p className="font-serif text-2xl italic text-[var(--color-secondary)]">Your harvest is empty</p>
+                    <p className="font-serif text-2xl italic text-[var(--color-secondary)]">Your cart is empty</p>
                     <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/40 uppercase mt-2">ADD ITEMS FROM THE MENU</p>
                   </div>
                 </div>

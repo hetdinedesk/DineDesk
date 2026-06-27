@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useCMS } from '../../../contexts/CMSContext';
 import { Star, Quote, Heart } from 'lucide-react';
@@ -7,9 +7,75 @@ import { replaceShortcodes } from '../../../lib/shortcodes';
 
 export const ReviewsSection = ({ title, subtitle, content = {} }) => {
   const { reviews, siteConfig, shortcodes } = useCMS();
-  
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const scrollContainerRef = useRef(null);
+
   // Read alternateStyles from CMS config
   const alternate = siteConfig?.reviews?.alternateStyles === true;
+
+  // Auto-scroll effect for mobile
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !isAutoScrolling) return;
+
+    let scrollAmount = 0;
+    const scrollSpeed = 1; // pixels per frame
+    let animationFrameId;
+
+    const scroll = () => {
+      if (!isAutoScrolling) {
+        animationFrameId = requestAnimationFrame(scroll);
+        return;
+      }
+
+      scrollAmount += scrollSpeed;
+      container.scrollLeft = scrollAmount;
+
+      // Reset when reaching the end
+      if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
+        scrollAmount = 0;
+        container.scrollLeft = 0;
+      }
+
+      animationFrameId = requestAnimationFrame(scroll);
+    };
+
+    animationFrameId = requestAnimationFrame(scroll);
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isAutoScrolling]);
+
+  // Stop auto-scroll on user interaction
+  const handleUserInteraction = () => {
+    setIsAutoScrolling(false);
+  };
+
+  // Resume auto-scroll after 5 seconds of no interaction
+  useEffect(() => {
+    let timeoutId;
+    const resumeScroll = () => {
+      setIsAutoScrolling(true);
+    };
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(resumeScroll, 5000);
+    };
+
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener('touchstart', resetTimer);
+      container.addEventListener('mousedown', resetTimer);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (container) {
+        container.removeEventListener('touchstart', resetTimer);
+        container.removeEventListener('mousedown', resetTimer);
+      }
+    };
+  }, []);
   
   // CMS configuration - check if reviews carousel should be shown
   const reviewsConfig = siteConfig?.reviews || {};
@@ -162,8 +228,19 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
           </motion.div>
         )}
 
-        {/* Reviews Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+        {/* Reviews Grid - Desktop: Grid, Mobile: Horizontal Scroll */}
+        <div 
+          ref={scrollContainerRef}
+          onTouchStart={handleUserInteraction}
+          onMouseDown={handleUserInteraction}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-8 md:grid overflow-x-auto md:overflow-visible pb-4 md:pb-0 snap-x snap-mandatory md:snap-none scrollbar-hide"
+          style={{ 
+            gridAutoFlow: 'column',
+            gridAutoColumns: 'minmax(280px, 1fr)',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
+        >
           {activeReviews.map((review, index) => (
             <motion.div
               key={review.id || `review-${index}`}
@@ -171,7 +248,7 @@ export const ReviewsSection = ({ title, subtitle, content = {} }) => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.05 }}
-              className="group relative p-8 rounded-[32px] hover:bg-opacity-10 transition-all duration-700"
+              className="group relative p-8 rounded-[32px] hover:bg-opacity-10 transition-all duration-700 snap-start shrink-0"
               style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}
             >
               <Quote className="absolute top-6 right-6 w-12 h-12" style={{ color: 'var(--color-primary)', opacity: 0.2 }} />

@@ -28,7 +28,8 @@ export const Footer = () => {
   const socialLinks = {
     instagram: social?.instagram,
     twitter: social?.twitter,
-    facebook: social?.facebook
+    facebook: social?.facebook,
+    showInFooter: social?.showInFooter !== false
   };
 
   return (
@@ -51,28 +52,25 @@ export const Footer = () => {
                 </span>
               )}
             </Link>
-            {siteConfig?.tagline && (
-              <p className="text-[var(--color-accent)]/40 font-sans text-xs leading-loose tracking-[0.1em] uppercase max-w-xs">
-                {siteConfig.tagline}
-              </p>
+            {socialLinks.showInFooter && (
+              <div className="flex gap-6">
+                {socialLinks.instagram && (
+                  <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
+                    <FaInstagram size={18} className="group-hover:scale-110 transition-transform" />
+                  </a>
+                )}
+                {socialLinks.twitter && (
+                  <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
+                    <FaTwitter size={18} className="group-hover:scale-110 transition-transform" />
+                  </a>
+                )}
+                {socialLinks.facebook && (
+                  <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
+                    <FaFacebook size={18} className="group-hover:scale-110 transition-transform" />
+                  </a>
+                )}
+              </div>
             )}
-            <div className="flex gap-6">
-              {socialLinks.instagram && (
-                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
-                  <FaInstagram size={18} className="group-hover:scale-110 transition-transform" />
-                </a>
-              )}
-              {socialLinks.twitter && (
-                <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
-                  <FaTwitter size={18} className="group-hover:scale-110 transition-transform" />
-                </a>
-              )}
-              {socialLinks.facebook && (
-                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="w-12 h-12 border border-[var(--color-accent)]/10 flex items-center justify-center rounded-full hover:bg-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all duration-700 group">
-                  <FaFacebook size={18} className="group-hover:scale-110 transition-transform" />
-                </a>
-              )}
-            </div>
           </div>
 
           {/* Dynamic CMS Columns */}

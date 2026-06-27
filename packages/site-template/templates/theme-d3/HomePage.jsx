@@ -195,7 +195,7 @@ function BannerCarousel({ banners, shortcodes, siteConfig }) {
   const external = banner.isExternal || isExternalLink(bannerUrl);
 
   return (
-    <section className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-bloom-cream">
+    <section className="relative min-h-[500px] md:min-h-[700px] lg:h-screen flex items-center justify-center overflow-hidden bg-bloom-cream">
       {/* Grid Pattern Overlay */}
       <div className="absolute inset-0 z-0 opacity-[0.02] pointer-events-none">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -223,7 +223,17 @@ function BannerCarousel({ banners, shortcodes, siteConfig }) {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] aspect-square max-w-none opacity-[0.03] animate-pulse-soft">
               <Leaf className="w-full h-full text-bloom-dark" />
             </div>
-            {/* Floating Image on Right */}
+            {/* Mobile Background Image */}
+            {banner.imageUrl && (
+              <div className="absolute inset-0 lg:hidden opacity-10">
+                <img
+                  src={banner.imageUrl}
+                  alt={banner.title || 'Cafe Sanctuary'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            {/* Floating Image on Right (Desktop) */}
             {banner.imageUrl && (
               <div className="absolute right-6 top-1/2 -translate-y-1/2 w-1/3 aspect-[3/4] hidden lg:block overflow-hidden rounded-full">
                 <img
@@ -239,21 +249,21 @@ function BannerCarousel({ banners, shortcodes, siteConfig }) {
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
-        <div className="max-w-3xl space-y-12 animate-slide-up">
+        <div className="max-w-3xl md:max-w-2xl space-y-8 md:space-y-12 animate-slide-up text-center md:text-left">
           {/* Label */}
           {banner.subtitle && (
-            <div className="inline-flex items-center gap-4 text-bloom-sage font-sans text-[10px] font-bold tracking-[0.4em] uppercase">
-              <span className="w-8 h-px bg-bloom-sage/30"></span>
+            <div className="inline-flex items-center gap-4 text-bloom-sage font-sans text-[9px] md:text-[10px] font-bold tracking-[0.3em] md:tracking-[0.4em] uppercase">
+              <span className="w-6 md:w-8 h-px bg-bloom-sage/30"></span>
               <span>{banner.subtitle}</span>
             </div>
           )}
 
           {/* Heading */}
           {banner.title && (
-            <h1 className="heading-xl text-bloom-dark">
+            <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl xl:text-8xl text-bloom-dark leading-[1.1] md:leading-[0.9] tracking-tight">
               {replaceShortcodes(banner.title, shortcodes)}
               {banner.text && (
-                <span className="italic text-bloom-sage block md:inline">
+                <span className="italic text-bloom-sage block md:inline text-lg md:text-2xl lg:text-3xl xl:text-4xl">
                   {' '}{replaceShortcodes(banner.text, shortcodes)}
                 </span>
               )}
@@ -262,31 +272,31 @@ function BannerCarousel({ banners, shortcodes, siteConfig }) {
 
           {/* Description */}
           {banner.text && !banner.title && (
-            <p className="max-w-xl text-lg md:text-xl text-bloom-dark/50 leading-relaxed font-sans font-light">
+            <p className="max-w-xl text-base md:text-lg md:text-xl text-bloom-dark/50 leading-relaxed font-sans font-light">
               {replaceShortcodes(banner.text, shortcodes)}
             </p>
           )}
 
           {/* CTA Buttons */}
           {banner.buttonText && bannerUrl && (
-            <div className="flex flex-wrap items-center gap-8 pt-4">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 md:gap-8 pt-4">
               {external ? (
                 <a
                   href={bannerUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn-bloom btn-sage px-14 py-5 text-xs shadow-xl shadow-bloom-sage/10"
+                  className="btn-bloom btn-sage px-10 md:px-14 py-4 md:py-5 text-[10px] md:text-xs shadow-xl shadow-bloom-sage/10"
                 >
                   {replaceShortcodes(banner.buttonText, shortcodes)}
-                  <ArrowRight className="w-[18px] h-[18px]" />
+                  <ArrowRight className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" />
                 </a>
               ) : (
                 <Link
                   href={withSiteParam(bannerUrl, siteId)}
-                  className="btn-bloom btn-sage px-14 py-5 text-xs shadow-xl shadow-bloom-sage/10"
+                  className="btn-bloom btn-sage px-10 md:px-14 py-4 md:py-5 text-[10px] md:text-xs shadow-xl shadow-bloom-sage/10"
                 >
                   {replaceShortcodes(banner.buttonText, shortcodes)}
-                  <ArrowRight className="w-[18px] h-[18px]" />
+                  <ArrowRight className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" />
                 </Link>
               )}
             </div>
@@ -329,7 +339,7 @@ function WelcomeSection({ title, subtitle, content, image, ctaText, ctaUrl, isEx
                 <div className="absolute inset-0 bg-bloom-sage/10 mix-blend-multiply"></div>
               </div>
               {/* Decorative Elements */}
-              <div className="absolute -top-20 -left-20 w-64 h-64 bg-bloom-sage/5 rounded-full blur-3xl -z-10"></div>
+              <div className="absolute -top-10 -left-20 w-64 h-64 bg-bloom-sage/5 rounded-full blur-3xl -z-10"></div>
               <div className="absolute top-40 -right-10 w-40 h-40 border border-bloom-sage/20 rounded-full -z-10"></div>
             </motion.div>
           )}

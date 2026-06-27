@@ -336,7 +336,6 @@ router.post('/:id/bookings', bookingCreationLimiter, async (req, res) => {
         where: { id: clientId },
         select: {
           name: true,
-          logo: true,
           colours: true
         }
       })
@@ -2126,9 +2125,18 @@ router.post('/:id/banners', async (req, res) => {
 router.put('/:id/banners/:bannerId', async (req, res) => {
   try {
     const clientId = req.params.id
+    // Filter out invalid fields from req.body
+    const { bannerIds, ...validData } = req.body
+    const allowedFields = ['title', 'text', 'imageUrl', 'buttonText', 'buttonUrl', 'isActive', 'assignTo', 'sortOrder', 'widthPx', 'heightPx', 'isExternal', 'location', 'subtitle']
+    const updateData = {}
+    allowedFields.forEach(field => {
+      if (validData[field] !== undefined) {
+        updateData[field] = validData[field]
+      }
+    })
     const banner = await prisma.banner.update({
       where: { id: req.params.bannerId },
-      data: req.body
+      data: updateData
     })
 
     // Clear export cache so preview sites get fresh data

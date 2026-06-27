@@ -169,7 +169,6 @@ router.post('/', bookingLimiter, async (req, res) => {
         where: { id: clientId },
         select: {
           name: true,
-          logo: true,
           colours: true,
           email: true
         }
@@ -435,7 +434,6 @@ router.post('/:clientId/bookings', authenticateToken, async (req, res) => {
         where: { id: clientId },
         select: {
           name: true,
-          logo: true,
           colours: true,
           email: true
         }

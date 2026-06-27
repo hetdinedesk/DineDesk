@@ -30,18 +30,6 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
     return Sparkles;
   };
 
-  // Get category label from promo
-  const getCategoryLabel = (promo) => {
-    const heading = (promo.heading || '').toLowerCase();
-    if (heading.includes('reward') || heading.includes('loyalty') || heading.includes('gift') || heading.includes('membership')) {
-      return 'Membership';
-    }
-    if (heading.includes('workshop') || heading.includes('education')) {
-      return 'Education';
-    }
-    return 'Special Release';
-  };
-
   return (
     <section className="py-24 px-6 bg-[var(--color-accent)]">
       <div className="max-w-7xl mx-auto">
@@ -61,13 +49,13 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
           </div>
         )}
 
-        {/* Tiles Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Tiles Grid - Mobile: Horizontal scroll, Desktop: 3 columns */}
+        <div className="flex overflow-x-auto gap-4 md:grid md:grid-cols-3 md:overflow-visible md:gap-8 snap-x snap-mandatory md:snap-none scrollbar-hide pb-4 md:pb-0"
+             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {promos.map((promo, index) => {
             const hasCta = promo.linkLabel && promo.linkUrl;
             const hasLink = promo.linkUrl;
             const Icon = getIcon(promo);
-            const categoryLabel = getCategoryLabel(promo);
 
             const TileContent = (
               <>
@@ -81,9 +69,6 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
                 </div>
                 <div className="p-12 space-y-8">
                   <div className="flex justify-between items-center">
-                    <span className="font-sans text-[9px] font-bold text-[var(--color-primary)] tracking-[0.3em] uppercase">
-                      {categoryLabel}
-                    </span>
                     <div className="w-10 h-10 bg-[var(--color-primary)]/5 rounded-full flex items-center justify-center">
                       <Icon className="text-[var(--color-primary)]" width={24} height={24} strokeWidth={1.5} />
                     </div>
@@ -92,9 +77,11 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
                     <h3 className="font-serif text-4xl text-[var(--color-secondary)] tracking-tight">
                       {replaceShortcodes(promo.heading)}
                     </h3>
-                    <p className="font-sans text-[11px] font-medium text-[var(--color-secondary)]/40 leading-relaxed tracking-widest uppercase">
-                      {replaceShortcodes(promo.subheading)}
-                    </p>
+                    {promo.subheading && (
+                      <p className="font-sans text-[11px] font-medium text-[var(--color-secondary)]/40 leading-relaxed tracking-widest uppercase">
+                        {replaceShortcodes(promo.subheading)}
+                      </p>
+                    )}
                   </div>
                   {(hasCta || hasLink) && (
                     <button className="flex items-center gap-3 font-sans text-[9px] font-bold tracking-[0.25em] text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-all duration-500 uppercase group/btn">
@@ -109,7 +96,7 @@ export default function PromoTilesSection({ promos = [], title, subtitle, shortc
             return (
               <div
                 key={promo.id || index}
-                className="group relative bg-white overflow-hidden transition-all duration-1000 shadow-lg hover:shadow-xl"
+                className="group relative bg-white overflow-hidden transition-all duration-1000 shadow-lg hover:shadow-xl shrink-0 w-[280px] md:w-auto snap-start"
               >
                 {hasCta ? (
                   <Link

@@ -188,7 +188,7 @@ export default function CheckoutPage({ data, template }) {
     return (
       <LoyaltyProvider clientId={clientId} loyaltyConfig={data?.loyaltyConfig}>
         <Head>
-          <title>Checkout - {normalizedTemplate === 'theme-d1' ? 'Your Cart is Empty' : normalizedTemplate === 'theme-d2' ? 'Your Cart is Empty' : 'Your Harvest is Empty'}</title>
+          <title>Checkout - Your Cart is Empty</title>
           <meta name="robots" content="noindex, nofollow" />
         </Head>
         <div className="min-h-screen bg-[var(--color-accent)]">
@@ -200,7 +200,7 @@ export default function CheckoutPage({ data, template }) {
               </div>
               <div>
                 <h1 className="font-serif text-5xl italic text-[var(--color-secondary)] mb-4">
-                  {normalizedTemplate === 'theme-d1' ? 'Your cart is empty' : normalizedTemplate === 'theme-d2' ? 'Your cart is empty' : 'Your harvest is empty'}
+                  Your cart is empty
                 </h1>
                 <p className="text-xs font-sans font-bold tracking-widest text-[var(--color-secondary)]/60 uppercase">ADD ITEMS FROM THE MENU</p>
               </div>
@@ -740,9 +740,9 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
         }
 
         const result = await response.json()
-        // Clear cart before redirect to prevent empty cart flash
-        clearCart()
         router.push(`/order/${result.order.id}?site=${siteId}`)
+        // Clear cart after redirect
+        clearCart()
       }
     } catch (err) {
       setError(err.message)
@@ -771,9 +771,9 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
       // Still redirect even if this fails - webhook will catch it
     }
 
-    // Clear cart before redirect to prevent empty cart flash
-    clearCart()
     router.push(isProd ? `/order/${orderId}` : `/order/${orderId}?site=${siteId}`)
+    // Clear cart after redirect
+    clearCart()
   }
 
   const handlePaymentError = async (errorMessage) => {
@@ -992,13 +992,13 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
             <div className="relative z-10 space-y-8 max-w-4xl mx-auto">
               <div className="inline-flex items-center gap-4 text-[var(--color-primary)] font-sans font-semibold uppercase tracking-[0.4em] text-[10px]">
                 <Sparkles width={16} height={16} strokeWidth={2} />
-                <span>The Harvest</span>
+                <span>Your Cart</span>
               </div>
               <h1 className="font-serif text-6xl md:text-[120px] leading-[0.8] tracking-tight">
                 <span className="italic text-[var(--color-primary)]">Checkout</span>
               </h1>
               <p className="max-w-xl mx-auto text-[var(--color-accent)]/60 font-sans text-sm font-light leading-relaxed">
-                Complete your harvest collection
+                Complete your order
               </p>
             </div>
           </div>
@@ -1575,7 +1575,7 @@ function CheckoutContent({ data, siteName, router, customer, loyaltyConfig, look
             <div className={`${normalizedTemplate === 'theme-d1' ? 'bg-white border-[var(--color-secondary)]/20' : normalizedTemplate === 'theme-d2' ? 'bg-white border-teal-200' : 'bg-white'} rounded-[48px] border p-8 sticky top-8`}>
               <h2 className={`font-serif text-2xl italic mb-6 flex items-center gap-3 ${normalizedTemplate === 'theme-d1' ? 'text-[var(--color-primary)]' : normalizedTemplate === 'theme-d2' ? 'text-teal-600' : 'text-[var(--color-secondary)]'}`}>
                 <ShoppingCart width={24} height={24} strokeWidth={2} />
-                {normalizedTemplate === 'theme-d1' ? 'Order Summary' : normalizedTemplate === 'theme-d2' ? 'Your Order' : 'Your Harvest'}
+                Order Summary
               </h2>
               {tableInfo?.tableNumber && (
                 <div className={`flex items-center gap-3 mb-6 px-5 py-3 rounded-full text-sm font-bold ${normalizedTemplate === 'theme-d1' ? 'bg-amber-50 text-amber-800 border border-amber-200' : normalizedTemplate === 'theme-d2' ? 'bg-teal-50 text-teal-800 border border-teal-200' : 'bg-[var(--color-primary)]/10 text-[var(--color-secondary)] border border-[var(--color-primary)]/20'}`}>
