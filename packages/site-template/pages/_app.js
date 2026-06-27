@@ -72,7 +72,7 @@ export default function App({ Component, pageProps }) {
 
   // Scroll to top on route change
   useEffect(() => {
-    const handleRouteChange = () => {
+    const handleRouteChange = (url) => {
       window.scrollTo(0, 0)
     }
     router.events.on('routeChangeComplete', handleRouteChange)

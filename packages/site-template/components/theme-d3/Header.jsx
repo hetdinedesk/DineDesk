@@ -361,7 +361,7 @@ const StandardHeader = (props) => {
                           key={child.id} 
                           href={withSiteParam(child.url) || '#'}
                           className={`block px-6 py-1.5 text-sm font-medium transition-colors rounded-md ${
-                            router.asPath === child.url 
+                            pathname === child.url 
                               ? (isDark ? 'text-white bg-white/10' : 'text-[var(--color-primary)]')
                               : (isDark ? 'text-white/60' : 'text-[var(--color-secondary)]/70')
                           }`}
@@ -550,7 +550,7 @@ const SplitHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restauran
                     const itemChildren = buildChildrenMap(navigation)[item.id] || [];
                     const hrefRaw = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
                     const href = withSiteParam(hrefRaw);
-                    const isActive = router.asPath === hrefRaw || router.asPath === href;
+                    const isActive = pathname === hrefRaw || pathname === href;
                     return (
                       <React.Fragment key={item.id}>
                         <Link
@@ -709,7 +709,7 @@ const MinimalHeader = ({ mobileMenuOpen, setMobileMenuOpen, displayLogo, restaur
                     // Redirect to first child page when heading is clicked
                     const hrefRaw = itemChildren.length > 0 ? (itemChildren[0].url || '#') : (item.url || '#');
                     const href = withSiteParam(hrefRaw);
-                    const isActive = router.asPath === hrefRaw || router.asPath === href;
+                    const isActive = pathname === hrefRaw || pathname === href;
                     return (
                       <React.Fragment key={item.id}>
                         <Link
@@ -895,7 +895,7 @@ const StickyHeader = ({ mobileMenuOpen, setMobileMenuOpen, scrolled, displayLogo
                           key={child.id}
                           href={withSiteParam(child.url) || '#'}
                           className={`block px-6 py-1.5 text-sm font-medium transition-colors rounded-md ${
-                            router.asPath === child.url
+                            pathname === child.url
                               ? 'text-[var(--color-primary)]'
                               : 'text-[var(--color-secondary)]/70'
                           }`}

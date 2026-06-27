@@ -37,11 +37,19 @@ export default function MenuPage({ data, page, banner }) {
     .filter((cat) => cat.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // Filter out categories that have no available items (independent of selection)
+  const categoriesWithItems = activeCategories.filter((category) => {
+    const categoryItems = menuItems.filter((item) => 
+      item.isAvailable && item.categoryId === category.id
+    );
+    return categoryItems.length > 0;
+  });
+
   const filteredItems = menuItems
     .filter((item) => {
       const name = replaceShortcodes(item.name || '', shortcodes);
       const description = replaceShortcodes(item.description || '', shortcodes);
-      
+
       const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
       const matchesSearch =
         !searchQuery ||
@@ -50,12 +58,6 @@ export default function MenuPage({ data, page, banner }) {
       return item.isAvailable && matchesCategory && matchesSearch;
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  // Filter out categories that have no available items
-  const categoriesWithItems = activeCategories.filter((category) => {
-    const categoryItems = filteredItems.filter((item) => item.categoryId === category.id);
-    return categoryItems.length > 0;
-  });
 
   const getItemImage = (item) => {
     if (item.image) return item.image;

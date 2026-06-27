@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, X, Plus, Minus, Trash, ArrowRight, Sparkles } from 'lucide-react';
@@ -9,14 +9,14 @@ const API_BASE = process.env.NEXT_PUBLIC_CMS_API_URL || 'http://localhost:3001/a
 
 function useAlsoOrderedWith(clientId, cartItemIds) {
   const [suggestions, setSuggestions] = useState([])
+  const idsString = useMemo(() => cartItemIds.join(','), [cartItemIds])
   useEffect(() => {
     if (!clientId || cartItemIds.length === 0) { setSuggestions([]); return }
-    const ids = cartItemIds.join(',')
-    fetch(`${API_BASE}/clients/${clientId}/menu-items/suggestions?itemIds=${ids}`)
+    fetch(`${API_BASE}/clients/${clientId}/menu-items/suggestions?itemIds=${idsString}`)
       .then(r => r.ok ? r.json() : [])
       .then(data => setSuggestions(Array.isArray(data) ? data : []))
       .catch(() => setSuggestions([]))
-  }, [clientId, cartItemIds])
+  }, [clientId, idsString, cartItemIds.length])
   return suggestions
 }
 
